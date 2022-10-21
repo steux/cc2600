@@ -28,6 +28,8 @@ use std::error;
 use std::fmt;
 use std::io::{self, BufRead, Write};
 
+use log::{debug};
+
 use regex::{Captures, Regex, Replacer};
 
 /// The context for preprocessing a file.
@@ -267,17 +269,47 @@ pub fn process<I: BufRead, O: Write>(
     context: &mut Context,
 ) -> Result<Vec::<u32>, Error> {
     let mut buf = String::new();
+    let mut uncommented_buf = String::new();
     let mut stack = Vec::new();
     let mut state = State::Active;
     let mut lines = Vec::<u32>::new();
     let mut line = 0;
-
+    let mut in_multiline_comments = false;
     let mut regex = context.build_regex();
 
     while input.read_line(&mut buf)? > 0 {
         line += 1;
-        {
-            let substr = buf.trim();
+        let has_lf = buf.ends_with("\n");
+        let mut remaining: &str = &buf;
+        let mut insert_it = !in_multiline_comments;
+        uncommented_buf.clear();
+        while remaining.len() > 0 {
+            if in_multiline_comments {
+                let mut s = remaining.splitn(2, "*/");
+                s.next().unwrap();
+                match s.next() {
+                    Some(string) => {
+                        in_multiline_comments = false;
+                        remaining = string;
+                        if remaining.len() > 0 { insert_it = true; }
+                    },
+                    _ => break
+                }
+            } else {
+                let mut s = remaining.splitn(2, "/*");
+                uncommented_buf.push_str(s.next().unwrap());
+                match s.next() {
+                    Some(string) => {
+                        in_multiline_comments = true;
+                        remaining = string;
+                    },
+                    _ => break
+                }
+            }
+            debug!("Line: {}, Uncommented: {:?}, Remaining: {:?}", line, uncommented_buf, remaining);
+        }
+        if insert_it {
+            let substr = uncommented_buf.trim();
             // Before substitution, test the #ifdef
             if substr.starts_with("#ifdef") {
                 let mut parts = substr.splitn(2, "//").next().unwrap().splitn(2, " ");
@@ -291,8 +323,7 @@ pub fn process<I: BufRead, O: Write>(
                 });
                 let expr = maybe_expr.ok_or_else(|| Error::Syntax {
                     line,
-                    msg: "Expected something after `#ifdef`",
-                })?;
+                    msg: "Expected something after `#ifdef`" })?;
                 stack.push(state);
                 if state == State::Active {
                     if context.get_macro(expr).is_none() {
@@ -306,7 +337,7 @@ pub fn process<I: BufRead, O: Write>(
                 let new_line;
                 {
                     let mut replacer = context.replacer();
-                    new_line = regex.replace_all(&buf, replacer.by_ref());
+                    new_line = regex.replace_all(&uncommented_buf, replacer.by_ref());
                     substr = new_line.trim();
                 }
                 if substr.starts_with("#") {
@@ -322,81 +353,72 @@ pub fn process<I: BufRead, O: Write>(
 
                     match name {
                         "#define" => {
-                        let expr = maybe_expr.ok_or_else(|| Error::Syntax {
-                            line,
-                            msg: "Expected macro after `#define`",
-                        })?;
-                        let mut p = expr.splitn(2, " ");
-                        let mcro = p.next().unwrap();
-                        let value = p.next().unwrap();
-                        context.define(mcro, value);
-                        regex = context.build_regex();
-                    }
-                    "#if" => {
-                        let expr = maybe_expr.ok_or_else(|| Error::Syntax {
-                            line,
-                            msg: "Expected expression after `#if`",
-                        })?;
-                        stack.push(state);
-                        if state == State::Active {
-                            if !context.evaluate(expr, line)? {
-                                state = State::Inactive;
+                            if state == State::Active {
+                                let expr = maybe_expr.ok_or_else(|| Error::Syntax {
+                                    line,
+                                    msg: "Expected macro after `#define`" })?;
+                                let mut p = expr.splitn(2, " ");
+                                let mcro = p.next().unwrap();
+                                let value = p.next().or_else(|| Some("")).unwrap();
+                                context.define(mcro, value);
+                                regex = context.build_regex();
+                            } },
+                        "#if" => {
+                            let expr = maybe_expr.ok_or_else(|| Error::Syntax {
+                                line,
+                                msg: "Expected expression after `#if`" })?;
+                            stack.push(state);
+                            if state == State::Active {
+                                if !context.evaluate(expr, line)? {
+                                    state = State::Inactive;
+                                }
+                            } else {
+                                state = State::Skip;
+                            } },
+                        "#elif" => {
+                            let expr = maybe_expr.ok_or_else(|| Error::Syntax {
+                                line,
+                                msg: "Expected expression after `#elif`" })?;
+                            if state == State::Inactive {
+                                if context.evaluate(expr, line)? {
+                                    state = State::Active;
+                                }
+                            } else {
+                                state = State::Skip;
+                            } },
+                        "#else" => {
+                            if maybe_expr.is_some() {
+                                return Err(Error::Syntax {
+                                    line,
+                                    msg: "Unexpected expression after `#else`" });
                             }
-                        } else {
-                            state = State::Skip;
-                        }
-                    }
-                    "#elif" => {
-                        let expr = maybe_expr.ok_or_else(|| Error::Syntax {
-                            line,
-                            msg: "Expected expression after `#elif`",
-                        })?;
-                        if state == State::Inactive {
-                            if context.evaluate(expr, line)? {
+                            if state == State::Inactive {
                                 state = State::Active;
+                            } else {
+                                state = State::Skip;
+                            } },
+                        "#endif" => {
+                            if maybe_expr.is_some() {
+                                return Err(Error::Syntax {
+                                    line,
+                                    msg: "Unexpected expression after `#else`" });
                             }
-                        } else {
-                            state = State::Skip;
-                        }
-                    }
-                    "#else" => {
-                        if maybe_expr.is_some() {
+                            state = stack.pop().ok_or_else(|| Error::Syntax {
+                                line,
+                                msg: "Unexpected `#endif` with no matching `#if`" })?;
+                        },
+                        _ => {
                             return Err(Error::Syntax {
                                 line,
-                                msg: "Unexpected expression after `#else`",
-                            });
-                        }
-                        if state == State::Inactive {
-                            state = State::Active;
-                        } else {
-                            state = State::Skip;
+                                msg: "Unrecognised preprocessor directive" });
                         }
                     }
-                    "#endif" => {
-                        if maybe_expr.is_some() {
-                            return Err(Error::Syntax {
-                                line,
-                                msg: "Unexpected expression after `#else`",
-                            });
-                        }
-                        state = stack.pop().ok_or_else(|| Error::Syntax {
-                            line,
-                            msg: "Unexpected `#endif` with no matching `#if`",
-                        })?;
-                    }
-                    _ => {
-                        return Err(Error::Syntax {
-                            line,
-                            msg: "Unrecognised preprocessor directive",
-                        });
-                    }
+                } else if state == State::Active {
+                    lines.push(line);
+                    output.write_all(new_line.as_bytes())?;
+                    if !new_line.ends_with("\n") && has_lf { output.write(b"\n")?; }
                 }
-            } else if state == State::Active {
-                lines.push(line);
-                output.write_all(new_line.as_bytes())?;
-            }
-
-            }
+            } 
         }
         buf.clear();
     }

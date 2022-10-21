@@ -42,19 +42,22 @@ fn parse_expr(pairs: Pairs<Rule>, pratt: &PrattParser<Rule>) -> i32 {
 fn main() {
     assert_eq!(cpp::process_str("
      #if FOO
-     foo text
+     foo text /* Bobby */
      #endif
      bar text", cpp::Context::new().define("FOO", "1")).unwrap(), "
-     foo text
+     foo text 
      bar text");
-    println!("{}", cpp::process_str("
-     #define FOO FOO_BAR 
+    println!("{}", cpp::process_str("#define ZOBI
+     #define FOO FOO_BAR // JR
      #ifdef FOO
      foo text
      #endif
-     FOO bar text", &mut cpp::Context::new()).unwrap());
+     FOO /*bar text
+     Dallas
+     */ Ewing", &mut cpp::Context::new()).unwrap());
     let mut output = Vec::new();
-    let result = cpp::process("#define FOO FOO_BAR 
+    let result = cpp::process("#define ZOBI
+    #define FOO FOO_BAR 
      #ifdef FOO
      foo text
      #endif
@@ -66,7 +69,7 @@ fn main() {
         .op(Op::infix(Rule::and, Assoc::Left) | Op::infix(Rule::or, Assoc::Left) | Op::infix(Rule::xor, Assoc::Left))
         .op(Op::postfix(Rule::mm) | Op::postfix(Rule::pp))
         .op(Op::prefix(Rule::neg) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp));
-    let pairs = Cc2600Parser::parse(Rule::program, "\n1+2&3+2x3").unwrap_or_else(|e| panic!("{}", e)).next().unwrap();
+    let pairs = Cc2600Parser::parse(Rule::program, "\n1+2&3+2|3").unwrap_or_else(|e| panic!("{}", e)).next().unwrap();
     for pair in pairs.into_inner() {
         match pair.as_rule() {
             Rule::expr => {
