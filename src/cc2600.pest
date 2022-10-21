@@ -1,0 +1,19 @@
+WHITESPACE   =  _{ " " | "\t" | NEWLINE }
+  
+program      =   { SOI ~ expr ~ EOI }
+  expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
+    infix    =  _{ add | sub | and | or | xor }
+      add    =   { "+" } // Addition
+      sub    =   { "-" } // Subtraction
+      and    =   { "&" } // And
+      or     =   { "|" } // Or
+      xor    =   { "^" } // Xor
+    prefix   =  _{ neg | ppp | mmp }
+      neg    =   { "-" } // Negation
+      ppp    =   { "++" } // Increment
+      mmp    =   { "--" } // Decrement
+    postfix  =  _{ pp | mm }
+      pp     =   { "++" } // Increment
+      mm     =   { "--" } // Decrement
+    primary  =  _{ int | "(" ~ expr ~ ")" }
+      int    =  @{ (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT+ | ASCII_DIGIT) }
