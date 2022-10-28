@@ -1,14 +1,30 @@
 mod cpp;
 
+use std::io::BufReader;
+use std::fs::File;
+
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
-
 use pest::{Parser, pratt_parser::{Op, PrattParser, Assoc}, iterators::Pairs};
+
+use clap::Parser as ClapParser;
 
 #[derive(Parser)]
 #[grammar = "cc2600.pest"]
 struct Cc2600Parser;
+
+/// C compiler for Atari 2600
+#[derive(ClapParser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Input file name
+    input: String,
+
+    /// Output file name
+    #[arg(short, long, default_value="out.a")]
+    output: String
+}
 
 fn parse_expr(pairs: Pairs<Rule>, pratt: &PrattParser<Rule>) -> i32 {
     pratt
@@ -39,14 +55,28 @@ fn parse_expr(pairs: Pairs<Rule>, pratt: &PrattParser<Rule>) -> i32 {
         .parse(pairs)
 }
 
-fn main() {
+fn main() -> Result<(), cpp::Error> {
+    env_logger::init();
+
+    let args = Args::parse();
+    
+    let mut preprocessed = Vec::new();
+    let f = File::open(args.input)?;
+    let f = BufReader::new(f);
+
+    let mut context = cpp::Context::new();
+
+    let mapped_lines = cpp::process(f, &mut preprocessed, &mut context)?;
+    println!("Mapped lines: {mapped_lines:?}");
+
     let pratt =
         PrattParser::new()
         .op(Op::infix(Rule::add, Assoc::Left) | Op::infix(Rule::sub, Assoc::Left))
         .op(Op::infix(Rule::and, Assoc::Left) | Op::infix(Rule::or, Assoc::Left) | Op::infix(Rule::xor, Assoc::Left))
         .op(Op::postfix(Rule::mm) | Op::postfix(Rule::pp))
         .op(Op::prefix(Rule::neg) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp));
-    let pairs = Cc2600Parser::parse(Rule::program, "\n1+2&3+2|3").unwrap_or_else(|e| panic!("{}", e)).next().unwrap();
+    let preprocessed_utf8 = std::str::from_utf8(&preprocessed)?;
+    let pairs = Cc2600Parser::parse(Rule::program, &preprocessed_utf8).unwrap_or_else(|e| panic!("{}", e)).next().unwrap();
     for pair in pairs.into_inner() {
         match pair.as_rule() {
             Rule::expr => {
@@ -57,4 +87,5 @@ fn main() {
             _ => unreachable!()
         }
     }
+    Ok(())
 }

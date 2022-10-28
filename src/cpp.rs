@@ -95,6 +95,15 @@ impl From<io::Error> for Error {
     }
 }
 
+impl From<std::str::Utf8Error> for Error {
+    fn from(_other: std::str::Utf8Error) -> Self {
+        Error::Syntax {
+                line: 0,
+                msg: "Utf8 conversion error",
+            }
+    }
+}
+
 impl Context {
     /// Creates a new, empty context with no macros defined.
     pub fn new() -> Self {
@@ -237,6 +246,7 @@ enum State {
 ///     bar text", cpp::Context::new().define("FOO", "0")).unwrap(), "
 ///     bar text");
 /// ```
+#[allow(dead_code)]
 pub fn process_str(input: &str, context: &mut Context) -> Result<String, Error> {
     let mut output = Vec::new();
     process(input.as_bytes(), &mut output, context)?;
@@ -306,7 +316,7 @@ pub fn process<I: BufRead, O: Write>(
                     _ => break
                 }
             }
-            debug!("Line: {}, Uncommented: {:?}, Remaining: {:?}", line, uncommented_buf, remaining);
+            debug!("Line: {}, Uncommented: {:?}, Remaining: {:?}, insert it: {:?}", line, uncommented_buf, remaining, insert_it);
         }
         if insert_it {
             let substr = uncommented_buf.trim();
