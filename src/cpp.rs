@@ -811,5 +811,43 @@ mod tests {
         "
         );
     }
+    
+    #[test]
+    fn multiline_comments() {
+        assert_eq!(process_str("
+     #if FOO
+     foo text /* Bobby */
+     #endif
+     bar text", Context::new().define("FOO", "1")).unwrap(), "
+     foo text 
+     bar text");
+
+    }
+
+    #[test]
+    fn define() {
+    assert_eq!(process_str("#define ZOBI
+     #define FOO FOO_BAR // JR
+     #ifdef FOO
+     foo text
+     #endif
+     FOO /*bar text
+     Dallas
+     */ Ewing", &mut Context::new()).unwrap(), "     foo text
+     FOO_BAR 
+ Ewing");
+    }
+
+    #[test]
+    fn lines_mapping() {
+        let mut output = Vec::new();
+        let result = process("#define ZOBI
+            #define FOO FOO_BAR 
+            #ifdef FOO
+                foo text
+            #endif
+            FOO bar text".as_bytes(), &mut output, &mut Context::new());
+        assert_eq!(result.unwrap(), &[4, 6]);
+    }
 }
 

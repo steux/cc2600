@@ -40,29 +40,6 @@ fn parse_expr(pairs: Pairs<Rule>, pratt: &PrattParser<Rule>) -> i32 {
 }
 
 fn main() {
-    assert_eq!(cpp::process_str("
-     #if FOO
-     foo text /* Bobby */
-     #endif
-     bar text", cpp::Context::new().define("FOO", "1")).unwrap(), "
-     foo text 
-     bar text");
-    println!("{}", cpp::process_str("#define ZOBI
-     #define FOO FOO_BAR // JR
-     #ifdef FOO
-     foo text
-     #endif
-     FOO /*bar text
-     Dallas
-     */ Ewing", &mut cpp::Context::new()).unwrap());
-    let mut output = Vec::new();
-    let result = cpp::process("#define ZOBI
-    #define FOO FOO_BAR 
-     #ifdef FOO
-     foo text
-     #endif
-     FOO bar text".as_bytes(), &mut output, &mut cpp::Context::new());
-    println!("Result: {:?}", result);
     let pratt =
         PrattParser::new()
         .op(Op::infix(Rule::add, Assoc::Left) | Op::infix(Rule::sub, Assoc::Left))
