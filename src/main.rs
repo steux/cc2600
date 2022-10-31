@@ -1,4 +1,7 @@
 mod cpp;
+mod error;
+
+use error::Error;
 
 use std::io::BufReader;
 use std::fs::File;
@@ -14,7 +17,7 @@ use clap::Parser as ClapParser;
 #[grammar = "cc2600.pest"]
 struct Cc2600Parser;
 
-/// C compiler for Atari 2600
+/// Subset of C compiler for the Atari 2600
 #[derive(ClapParser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -55,7 +58,7 @@ fn parse_expr(pairs: Pairs<Rule>, pratt: &PrattParser<Rule>) -> i32 {
         .parse(pairs)
 }
 
-fn main() -> Result<(), cpp::Error> {
+fn main() -> Result<(), Error> {
     env_logger::init();
 
     let args = Args::parse();
