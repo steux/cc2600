@@ -45,6 +45,8 @@ use regex::{Captures, Regex, Replacer};
 /// ```
 #[derive(Debug, Clone)]
 pub struct Context {
+    includes_stack: Vec<String>,
+    include_directories: Vec<String>,
     defs: BTreeMap<String, String>,
 }
 
@@ -52,6 +54,8 @@ impl Context {
     /// Creates a new, empty context with no macros defined.
     pub fn new() -> Self {
         Context {
+            includes_stack: Vec::<String>::new(),
+            include_directories: Vec::<String>::new(),
             defs: BTreeMap::new(),
         }
     }
@@ -221,13 +225,14 @@ pub fn process<I: BufRead, O: Write>(
     mut input: I,
     mut output: O,
     context: &mut Context,
-) -> Result<Vec::<u32>, Error> {
+) -> Result<Vec::<(std::rc::Rc::<String>,u32)>, Error> {
     let mut buf = String::new();
     let mut uncommented_buf = String::new();
     let mut stack = Vec::new();
     let mut state = State::Active;
-    let mut lines = Vec::<u32>::new();
+    let mut lines = Vec::<(std::rc::Rc::<String>,u32)>::new();
     let mut line = 0;
+    let filename = std::rc::Rc::<String>::new(context.includes_stack.last().unwrap_or(&String::new()).clone());
     let mut in_multiline_comments = false;
     let mut regex = context.build_regex();
 
@@ -368,7 +373,7 @@ pub fn process<I: BufRead, O: Write>(
                         }
                     }
                 } else if state == State::Active {
-                    lines.push(line);
+                    lines.push((filename.clone(),line));
                     output.write_all(new_line.as_bytes())?;
                     if !new_line.ends_with("\n") && has_lf { output.write(b"\n")?; }
                 }
@@ -801,7 +806,7 @@ mod tests {
                 foo text
             #endif
             FOO bar text".as_bytes(), &mut output, &mut Context::new());
-        assert_eq!(result.unwrap(), &[4, 6]);
+        assert_eq!(result.unwrap().iter().map(|x| x.1).collect::<Vec::<u32>>(), &[4, 6]);
     }
 }
 
