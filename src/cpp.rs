@@ -26,7 +26,9 @@ use crate::error::Error;
 extern crate regex;
 
 use std::collections::BTreeMap;
-use std::io::{BufRead, Write};
+use std::io::{BufReader, BufRead, Write};
+use std::fs::File;
+use std::path::Path;
 
 use log::debug;
 
@@ -111,17 +113,28 @@ impl Context {
         if term
             .chars()
             .next()
-            .ok_or_else(|| Error::Syntax {
-                line,
-                msg: "Expected term, found nothing",
+            .ok_or_else(|| { 
+                let filename = self.includes_stack.last().unwrap_or(&String::new()).clone();
+                let included_in = match self.includes_stack.get(((self.includes_stack.len() as i32) - 2) as usize) {
+                    Some(s) => Some(s.clone()),
+                    None => None,
+                };
+                Error::Syntax {
+                    filename, included_in, line,
+                    msg: "Expected term, found nothing".to_string() }
             })?
-            .is_digit(10)
+        .is_digit(10)
         {
             Ok(term == "1")
         } else {
+            let filename = self.includes_stack.last().unwrap_or(&String::new()).clone();
+            let included_in = match self.includes_stack.get(((self.includes_stack.len() as i32) - 2) as usize) {
+                Some(s) => Some(s.clone()),
+                None => None,
+            };
             Err(Error::Syntax {
-                line,
-                msg: "Undefined identifier",
+                filename, included_in, line,
+                msg: "Undefined identifier".to_string(),
             })
         }
     }
@@ -150,9 +163,14 @@ impl Context {
         let result = self.eval_eq(&mut expr, line)?;
         self.skip_whitespace(&mut expr);
         if !expr.is_empty() {
+            let filename = self.includes_stack.last().unwrap_or(&String::new()).clone();
+            let included_in = match self.includes_stack.get(((self.includes_stack.len() as i32) - 2) as usize) {
+                Some(s) => Some(s.clone()),
+                None => None,
+            };
             return Err(Error::Syntax {
-                line,
-                msg: "Expected end-of-line",
+                filename, included_in, line,
+                msg: "Expected end-of-line".to_string(),
             });
         }
         Ok(result)
@@ -223,7 +241,7 @@ pub fn process_str(input: &str, context: &mut Context) -> Result<String, Error> 
 /// ```
 pub fn process<I: BufRead, O: Write>(
     mut input: I,
-    mut output: O,
+    output: &mut O,
     context: &mut Context,
 ) -> Result<Vec::<(std::rc::Rc::<String>,u32)>, Error> {
     let mut buf = String::new();
@@ -232,9 +250,15 @@ pub fn process<I: BufRead, O: Write>(
     let mut state = State::Active;
     let mut lines = Vec::<(std::rc::Rc::<String>,u32)>::new();
     let mut line = 0;
-    let filename = std::rc::Rc::<String>::new(context.includes_stack.last().unwrap_or(&String::new()).clone());
+    let filename = context.includes_stack.last().unwrap_or(&String::new()).clone();
+    let filename_rc = std::rc::Rc::<String>::new(filename.clone());
     let mut in_multiline_comments = false;
     let mut regex = context.build_regex();
+
+    let included_in = match context.includes_stack.get(((context.includes_stack.len() as i32) - 2) as usize) {
+        Some(s) => Some(s.clone()),
+        None => None,
+    };
 
     while input.read_line(&mut buf)? > 0 {
         line += 1;
@@ -280,9 +304,15 @@ pub fn process<I: BufRead, O: Write>(
                         Some(s)
                     }
                 });
-                let expr = maybe_expr.ok_or_else(|| Error::Syntax {
-                    line,
-                    msg: "Expected something after `#ifdef`" })?;
+                let expr = match maybe_expr {
+                    Some(x) => x,
+                    _ => {
+                        return Err(Error::Syntax {
+                            filename: filename.clone(), included_in: included_in.clone(), line,
+                            msg: "Expected something after `#ifdef`".to_string() })
+
+                    }
+                };
                 stack.push(state);
                 if state == State::Active {
                     if context.get_macro(expr).is_none() {
@@ -311,11 +341,60 @@ pub fn process<I: BufRead, O: Write>(
                     });
 
                     match name {
+                        "#include" => {
+                            if state == State::Active {
+                                // Get filename
+                                let expr = maybe_expr.ok_or_else(|| Error::Syntax {
+                                    filename: filename.clone(), included_in: included_in.clone(), line,
+                                    msg: "Expected filename after `#include`".to_string() })?;
+                                let mut chars = expr.chars();
+                                let separator = chars.next();
+                                let end_separator = match separator {
+                                    Some('<') => '>',
+                                    Some('"') => '"',
+                                    _ => return Err(Error::Syntax { filename: filename.clone(), included_in: included_in.clone(), line, msg: "Expected < or \" in #include filename spec".to_string() })
+                                };
+                                let mut fname = String::new();
+                                loop {
+                                    let nc = chars.next();
+                                    match nc {
+                                        Some(x) => if x == end_separator { break; } else { fname.push(x); }, 
+                                        None => return Err(Error::Syntax { filename: filename.clone(), included_in: included_in.clone(), line, msg: "Missing end separator in #include fname".to_string() })
+                                    }    
+                                }
+
+                                // Open include file
+                                let mut px;
+                                let mut path = Path::new(&fname);
+                                if !path.exists() {
+                                    let mut found = false;
+                                    for p in &context.include_directories {
+                                        px = p.clone() + "/" + &fname;
+                                        path = Path::new(&px);
+                                        if path.exists() {
+                                            found = true;
+                                            break;
+                                        }
+                                    }    
+                                    if !found {
+                                        return Err(Error::Syntax { 
+                                            filename: filename.clone(), included_in: included_in.clone(), line, msg: format!("Included file {fname} not found")});
+                                    }
+                                }
+
+                                // Process file
+                                let f = File::open(path)?;
+                                let f = BufReader::new(f);
+                                context.includes_stack.push(fname);
+                                let mut mapped_lines = process(f, output, context)?;
+                                context.includes_stack.pop();
+                                lines.append(&mut mapped_lines);
+                            } },
                         "#define" => {
                             if state == State::Active {
                                 let expr = maybe_expr.ok_or_else(|| Error::Syntax {
-                                    line,
-                                    msg: "Expected macro after `#define`" })?;
+                                    filename: filename.clone(), included_in: included_in.clone(), line,
+                                    msg: "Expected macro after `#define`".to_string() })?;
                                 let mut p = expr.splitn(2, " ");
                                 let mcro = p.next().unwrap();
                                 let value = p.next().or_else(|| Some("")).unwrap();
@@ -324,8 +403,8 @@ pub fn process<I: BufRead, O: Write>(
                             } },
                         "#if" => {
                             let expr = maybe_expr.ok_or_else(|| Error::Syntax {
-                                line,
-                                msg: "Expected expression after `#if`" })?;
+                                filename: filename.clone(), included_in: included_in.clone(), line,
+                                msg: "Expected expression after `#if`".to_string() })?;
                             stack.push(state);
                             if state == State::Active {
                                 if !context.evaluate(expr, line)? {
@@ -336,8 +415,8 @@ pub fn process<I: BufRead, O: Write>(
                             } },
                         "#elif" => {
                             let expr = maybe_expr.ok_or_else(|| Error::Syntax {
-                                line,
-                                msg: "Expected expression after `#elif`" })?;
+                                filename: filename.clone(), included_in: included_in.clone(), line, 
+                                msg: "Expected expression after `#elif`".to_string() })?;
                             if state == State::Inactive {
                                 if context.evaluate(expr, line)? {
                                     state = State::Active;
@@ -348,8 +427,8 @@ pub fn process<I: BufRead, O: Write>(
                         "#else" => {
                             if maybe_expr.is_some() {
                                 return Err(Error::Syntax {
-                                    line,
-                                    msg: "Unexpected expression after `#else`" });
+                                    filename: filename.clone(), included_in: included_in.clone(), line,
+                                    msg: "Unexpected expression after `#else`".to_string() });
                             }
                             if state == State::Inactive {
                                 state = State::Active;
@@ -359,21 +438,21 @@ pub fn process<I: BufRead, O: Write>(
                         "#endif" => {
                             if maybe_expr.is_some() {
                                 return Err(Error::Syntax {
-                                    line,
-                                    msg: "Unexpected expression after `#else`" });
+                                    filename: filename.clone(), included_in: included_in.clone(), line,
+                                    msg: "Unexpected expression after `#else`".to_string() });
                             }
                             state = stack.pop().ok_or_else(|| Error::Syntax {
-                                line,
-                                msg: "Unexpected `#endif` with no matching `#if`" })?;
+                                filename: filename.clone(), included_in: included_in.clone(), line,
+                                msg: "Unexpected `#endif` with no matching `#if`".to_string() })?;
                         },
                         _ => {
                             return Err(Error::Syntax {
-                                line,
-                                msg: "Unrecognised preprocessor directive" });
+                                filename: filename.clone(), included_in: included_in.clone(), line,
+                                msg: "Unrecognised preprocessor directive".to_string() });
                         }
                     }
                 } else if state == State::Active {
-                    lines.push((filename.clone(),line));
+                    lines.push((filename_rc.clone(),line));
                     output.write_all(new_line.as_bytes())?;
                     if !new_line.ends_with("\n") && has_lf { output.write(b"\n")?; }
                 }

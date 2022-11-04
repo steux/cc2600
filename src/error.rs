@@ -17,19 +17,24 @@ use std::io;
 ///     panic!();
 /// }
 #[derive(Debug)]
-pub enum Error {
+pub enum Error  {
     /// An error from the Rust standard I/O library.
     Io(io::Error),
     /// An error caused by malformed preprocessor syntax, with a line showing where the error
     /// occurred and a string explaining the error further.
-    Syntax { line: u32, msg: &'static str },
+    Syntax { filename: String, included_in: Option<String>, line: u32, msg: String },
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &Error::Io(ref e) => e.fmt(f),
-            &Error::Syntax { msg, line } => write!(f, "{} on line {}", msg, line),
+            Error::Syntax { filename, included_in, msg, line } => {
+                match included_in {
+                    Some(file) => write!(f, "{} on line {} of {} (included in {})", msg, line, filename, file),
+                    None => write!(f, "{} on line {} of {}", msg, line, filename)
+                }
+            }
         }
     }
 }
@@ -52,8 +57,10 @@ impl From<io::Error> for Error {
 impl From<std::str::Utf8Error> for Error {
     fn from(_other: std::str::Utf8Error) -> Self {
         Error::Syntax {
+                filename: "internal buffer".to_string(),
+                included_in: None,
                 line: 0,
-                msg: "Utf8 conversion error",
+                msg: "Utf8 conversion error".to_string(),
             }
     }
 }
