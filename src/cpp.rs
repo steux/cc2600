@@ -47,7 +47,8 @@ use regex::{Captures, Regex, Replacer};
 /// ```
 #[derive(Debug, Clone)]
 pub struct Context {
-    includes_stack: Vec<String>,
+    current_filename: String,
+    includes_stack: Vec<(String, u32)>,
     include_directories: Vec<String>,
     defs: BTreeMap<String, String>,
 }
@@ -56,7 +57,8 @@ impl Context {
     /// Creates a new, empty context with no macros defined.
     pub fn new() -> Self {
         Context {
-            includes_stack: Vec::<String>::new(),
+            current_filename: String::new(),
+            includes_stack: Vec::<(String, u32)>::new(),
             include_directories: Vec::<String>::new(),
             defs: BTreeMap::new(),
         }
@@ -114,8 +116,8 @@ impl Context {
             .chars()
             .next()
             .ok_or_else(|| { 
-                let filename = self.includes_stack.last().unwrap_or(&String::new()).clone();
-                let included_in = match self.includes_stack.get(((self.includes_stack.len() as i32) - 2) as usize) {
+                let filename = self.current_filename.clone();
+                let included_in = match self.includes_stack.last() {
                     Some(s) => Some(s.clone()),
                     None => None,
                 };
@@ -127,8 +129,8 @@ impl Context {
         {
             Ok(term == "1")
         } else {
-            let filename = self.includes_stack.last().unwrap_or(&String::new()).clone();
-            let included_in = match self.includes_stack.get(((self.includes_stack.len() as i32) - 2) as usize) {
+            let filename = self.current_filename.clone();
+            let included_in = match self.includes_stack.last() {
                 Some(s) => Some(s.clone()),
                 None => None,
             };
@@ -163,8 +165,8 @@ impl Context {
         let result = self.eval_eq(&mut expr, line)?;
         self.skip_whitespace(&mut expr);
         if !expr.is_empty() {
-            let filename = self.includes_stack.last().unwrap_or(&String::new()).clone();
-            let included_in = match self.includes_stack.get(((self.includes_stack.len() as i32) - 2) as usize) {
+            let filename = self.current_filename.clone();
+            let included_in = match self.includes_stack.last() {
                 Some(s) => Some(s.clone()),
                 None => None,
             };
@@ -250,12 +252,12 @@ pub fn process<I: BufRead, O: Write>(
     let mut state = State::Active;
     let mut lines = Vec::<(std::rc::Rc::<String>,u32)>::new();
     let mut line = 0;
-    let filename = context.includes_stack.last().unwrap_or(&String::new()).clone();
+    let filename = context.current_filename.clone();
     let filename_rc = std::rc::Rc::<String>::new(filename.clone());
     let mut in_multiline_comments = false;
     let mut regex = context.build_regex();
 
-    let included_in = match context.includes_stack.get(((context.includes_stack.len() as i32) - 2) as usize) {
+    let included_in = match context.includes_stack.last() {
         Some(s) => Some(s.clone()),
         None => None,
     };
@@ -392,9 +394,11 @@ pub fn process<I: BufRead, O: Write>(
                                 // Process file
                                 let f = File::open(path)?;
                                 let f = BufReader::new(f);
-                                context.includes_stack.push(fname);
+                                context.current_filename = fname.clone();
+                                context.includes_stack.push((filename.clone(), line));
                                 let mut mapped_lines = process(f, output, context)?;
                                 context.includes_stack.pop();
+                                context.current_filename = filename.clone();
                                 lines.append(&mut mapped_lines);
                             } },
                         "#define" => {
@@ -914,7 +918,7 @@ mod tests {
     #[test]
     fn error() {
         let mut context = Context::new();
-        context.includes_stack.push("string".to_string());
+        context.current_filename = "string".to_string();
         let result = process_str("#error This is an error
             foo bar", &mut context);
         assert_eq!(result.err().unwrap().to_string(), 
