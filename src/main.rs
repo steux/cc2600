@@ -11,7 +11,7 @@ use log::debug;
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
-use pest::{Parser, pratt_parser::{Op, PrattParser, Assoc}, iterators::Pairs};
+use pest::{Parser, pratt_parser::{Op, PrattParser, Assoc}, iterators::Pairs, error::LineColLocation};
 
 use clap::Parser as ClapParser;
 
@@ -96,17 +96,43 @@ fn compile() -> Result<(), Error> {
         .op(Op::postfix(Rule::mm) | Op::postfix(Rule::pp))
         .op(Op::prefix(Rule::neg) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp));
     let preprocessed_utf8 = std::str::from_utf8(&preprocessed)?;
-    let pairs = Cc2600Parser::parse(Rule::program, &preprocessed_utf8).unwrap_or_else(|e| panic!("{}", e)).next().unwrap();
-    for pair in pairs.into_inner() {
-        match pair.as_rule() {
-            Rule::expr => {
-                let result = parse_expr(pair.into_inner(), &pratt);
-                println!("Result : {}", result);
-            },
-            Rule::EOI => break,
-            _ => unreachable!()
+    let r = Cc2600Parser::parse(Rule::program, &preprocessed_utf8);
+    match r {
+        Err(e) => {
+            let mut ex = e.clone();
+            let filename;
+            let line;
+            ex.line_col = match e.line_col {
+                LineColLocation::Pos((l, c)) => {
+                    filename = mapped_lines[l].0.clone();
+                    line = mapped_lines[l].1;
+                    LineColLocation::Pos((mapped_lines[l].1 as usize, c))
+                },
+                LineColLocation::Span((l1, c1), (l2, c2)) => {
+                    filename = mapped_lines[l1].0.clone();
+                    line = mapped_lines[l1].1;
+                    LineColLocation::Span((mapped_lines[l1].1 as usize, c1), (mapped_lines[l2].1 as usize, c2))
+                },
+            };
+            eprintln!("{}", ex);
+            return Err(Error::Syntax {
+                filename: filename.to_string(), included_in: None, line,
+                msg: e.variant.message().to_string() })
         }
-    }
+        Ok(mut p) => {
+            let pairs = p.next().unwrap();
+            for pair in pairs.into_inner() {
+                match pair.as_rule() {
+                    Rule::expr => {
+                        let result = parse_expr(pair.into_inner(), &pratt);
+                        println!("Result : {}", result);
+                    },
+                    Rule::EOI => break,
+                    _ => unreachable!()
+                }
+            }
+        }
+    };
     Ok(())
 }
 
