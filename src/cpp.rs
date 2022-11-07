@@ -13,7 +13,7 @@
 //!     #endif
 //!     more FOO text";
 //!
-//! let result = cpp::process_str(text, cpp::Context::new().define("FOO", "1")).unwrap();
+//! let result = cpp::process_str(text, cpp::Context::new("string").define("FOO", "1")).unwrap();
 //!
 //! assert_eq!(result, "
 //!     some text
@@ -41,7 +41,7 @@ use regex::{Captures, Regex, Replacer};
 /// # Example
 ///
 /// ```
-/// let mut context = cpp::Context::new();
+/// let mut context = cpp::Context::new("string");
 /// context.define("my_macro", "5");
 /// assert_eq!(context.get_macro("my_macro").unwrap(), "5");
 /// ```
@@ -49,15 +49,15 @@ use regex::{Captures, Regex, Replacer};
 pub struct Context {
     current_filename: String,
     includes_stack: Vec<(String, u32)>,
-    include_directories: Vec<String>,
+    pub include_directories: Vec<String>,
     defs: BTreeMap<String, String>,
 }
 
 impl Context {
     /// Creates a new, empty context with no macros defined.
-    pub fn new() -> Self {
+    pub fn new(current_filename: &str) -> Self {
         Context {
-            current_filename: String::new(),
+            current_filename: String::from(current_filename),
             includes_stack: Vec::<(String, u32)>::new(),
             include_directories: Vec::<String>::new(),
             defs: BTreeMap::new(),
@@ -69,7 +69,7 @@ impl Context {
     /// # Example
     ///
     /// ```
-    /// assert_eq!(cpp::Context::new().define("foo", "bar").define("quaz", "quux").get_macro("foo").unwrap(), "bar");
+    /// assert_eq!(cpp::Context::new("string").define("foo", "bar").define("quaz", "quux").get_macro("foo").unwrap(), "bar");
     /// ```
     pub fn define<N: Into<String>, V: Into<String>>(&mut self, name: N, value: V) -> &mut Self {
         self.defs.insert(name.into(), value.into());
@@ -204,14 +204,14 @@ enum State {
 ///     #if FOO
 ///     foo text
 ///     #endif
-///     bar text", cpp::Context::new().define("FOO", "1")).unwrap(), "
+///     bar text", cpp::Context::new("string").define("FOO", "1")).unwrap(), "
 ///     foo text
 ///     bar text");
 /// assert_eq!(cpp::process_str("
 ///     #if FOO
 ///     foo text
 ///     #endif
-///     bar text", cpp::Context::new().define("FOO", "0")).unwrap(), "
+///     bar text", cpp::Context::new("string").define("FOO", "0")).unwrap(), "
 ///     bar text");
 /// ```
 #[allow(dead_code)]
@@ -234,7 +234,7 @@ pub fn process_str(input: &str, context: &mut Context) -> Result<String, Error> 
 ///     #if !FOO
 ///     more text
 ///     #endif
-///     bar text".as_bytes(), &mut output, cpp::Context::new().define("FOO", "0"));
+///     bar text".as_bytes(), &mut output, cpp::Context::new("string").define("FOO", "0"));
 ///
 /// assert_eq!(String::from_utf8(output).unwrap(), "
 ///     foo text
@@ -496,7 +496,7 @@ mod tests {
             text
             with # symbols
         ",
-                &mut Context::new()
+                &mut Context::new("string")
             )
             .unwrap(),
             "
@@ -520,7 +520,7 @@ mod tests {
             #endif
             with # symbols
         ",
-                Context::new().define("FOO", "0")
+                Context::new("string").define("FOO", "0")
             )
             .unwrap(),
             "
@@ -539,7 +539,7 @@ mod tests {
             #endif
             with # symbols
         ",
-                Context::new().define("FOO", "1")
+                Context::new("string").define("FOO", "1")
             )
             .unwrap(),
             "
@@ -563,7 +563,7 @@ mod tests {
             #endif
             with # symbols
         ",
-                &mut Context::new()
+                &mut Context::new("string")
             )
             .unwrap(),
             "
@@ -582,7 +582,7 @@ mod tests {
             #endif
             with # symbols
         ",
-                &mut Context::new()
+                &mut Context::new("string")
             )
             .unwrap(),
             "
@@ -606,7 +606,7 @@ mod tests {
             #endif
             with # symbols
         ",
-                Context::new().define("FOO", "1")
+                Context::new("string").define("FOO", "1")
             )
             .unwrap(),
             "
@@ -625,7 +625,7 @@ mod tests {
             #endif
             with # symbols
         ",
-                Context::new().define("FOO", "0")
+                Context::new("string").define("FOO", "0")
             )
             .unwrap(),
             "
@@ -650,7 +650,7 @@ mod tests {
             #endif
             with # symbols
         ",
-                Context::new().define("FOO", "0")
+                Context::new("string").define("FOO", "0")
             )
             .unwrap(),
             "
@@ -671,7 +671,7 @@ mod tests {
             #endif
             with # symbols
         ",
-                Context::new().define("FOO", "1")
+                Context::new("string").define("FOO", "1")
             )
             .unwrap(),
             "
@@ -695,7 +695,7 @@ mod tests {
             #endif
             with # symbols
         ",
-                Context::new().define("FOO", "0")
+                Context::new("string").define("FOO", "0")
             )
             .unwrap(),
             "
@@ -716,7 +716,7 @@ mod tests {
             #endif
             with # symbols
         ",
-                Context::new().define("FOO", "1")
+                Context::new("string").define("FOO", "1")
             )
             .unwrap(),
             "
@@ -737,7 +737,7 @@ mod tests {
             #endif
             with # symbols
         ",
-                Context::new().define("FOO", "0")
+                Context::new("string").define("FOO", "0")
             )
             .unwrap(),
             "
@@ -758,7 +758,7 @@ mod tests {
             with # symbols
             #endif
         ",
-                Context::new().define("FOO", "0")
+                Context::new("string").define("FOO", "0")
             )
             .unwrap(),
             "
@@ -779,7 +779,7 @@ mod tests {
             with # symbols
             #endif
         ",
-                Context::new().define("FOO", "0")
+                Context::new("string").define("FOO", "0")
             )
             .unwrap(),
             "
@@ -801,7 +801,7 @@ mod tests {
             #endif
             with # symbols
         ",
-                Context::new().define("FOO", "0")
+                Context::new("string").define("FOO", "0")
             )
             .unwrap(),
             "
@@ -820,7 +820,7 @@ mod tests {
             #endif
             with # symbols
         ",
-                Context::new().define("FOO", "0")
+                Context::new("string").define("FOO", "0")
             )
             .unwrap(),
             "
@@ -841,7 +841,7 @@ mod tests {
             FOO-BAR
             multiline
         ",
-                Context::new().define("FOO", "0")
+                Context::new("string").define("FOO", "0")
             )
             .unwrap(),
             "
@@ -858,7 +858,7 @@ mod tests {
             FOO_BAR
             multiline
         ",
-                Context::new().define("FOO", "0")
+                Context::new("string").define("FOO", "0")
             )
             .unwrap(),
             "
@@ -875,7 +875,7 @@ mod tests {
      #if FOO
      foo text /* Bobby */
      #endif
-     bar text", Context::new().define("FOO", "1")).unwrap(), "
+     bar text", Context::new("string").define("FOO", "1")).unwrap(), "
      foo text 
      bar text");
 
@@ -890,7 +890,7 @@ mod tests {
      #endif
      FOO /*bar text
      Dallas
-     */ Ewing", &mut Context::new()).unwrap(), "     foo text
+     */ Ewing", &mut Context::new("string")).unwrap(), "     foo text
      FOO_BAR 
  Ewing");
     }
@@ -903,7 +903,7 @@ mod tests {
             #ifdef FOO
                 foo text
             #endif
-            FOO bar text".as_bytes(), &mut output, &mut Context::new());
+            FOO bar text".as_bytes(), &mut output, &mut Context::new("string"));
         assert_eq!(result.unwrap().iter().map(|x| x.1).collect::<Vec::<u32>>(), &[4, 6]);
     }
     
@@ -911,13 +911,13 @@ mod tests {
     fn lines_mapping2() {
         let mut output = Vec::new();
         let result = process("/* Hello */
-            world".as_bytes(), &mut output, &mut Context::new());
+            world".as_bytes(), &mut output, &mut Context::new("string"));
         assert_eq!(result.unwrap().iter().map(|x| x.1).collect::<Vec::<u32>>(), &[2]);
     }
     
     #[test]
     fn error() {
-        let mut context = Context::new();
+        let mut context = Context::new("string");
         context.current_filename = "string".to_string();
         let result = process_str("#error This is an error
             foo bar", &mut context);

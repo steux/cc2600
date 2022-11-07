@@ -6,6 +6,8 @@ use error::Error;
 use std::io::BufReader;
 use std::fs::File;
 
+use log::debug;
+
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
@@ -23,6 +25,14 @@ struct Cc2600Parser;
 struct Args {
     /// Input file name
     input: String,
+
+    /// Preprocessor definitions
+    #[arg(short='D')]
+    defines: Vec<String>,
+
+    /// Include directories
+    #[arg(short='I')]
+    include_directories: Vec<String>,
 
     /// Output file name
     #[arg(short, long, default_value="out.a")]
@@ -64,10 +74,18 @@ fn main() -> Result<(), Error> {
     let args = Args::parse();
     
     let mut preprocessed = Vec::new();
-    let f = File::open(args.input)?;
+    let f = File::open(&args.input)?;
     let f = BufReader::new(f);
 
-    let mut context = cpp::Context::new();
+    let mut context = cpp::Context::new(&args.input);
+    context.include_directories = args.include_directories.clone();
+    context.define("__ATARI2600__", "1");
+    for i in &args.defines {
+        let mut s = i.splitn(2, "=");
+        let def = s.next().unwrap();
+        let value = s.next().unwrap_or("1");
+        context.define(def, value);
+    }
 
     let mapped_lines = cpp::process(f, &mut preprocessed, &mut context)?;
     println!("Mapped lines: {mapped_lines:?}");
