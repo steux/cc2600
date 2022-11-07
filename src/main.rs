@@ -3,6 +3,7 @@ mod error;
 
 use error::Error;
 
+use std::io::prelude::*;
 use std::io::BufReader;
 use std::fs::File;
 
@@ -76,7 +77,7 @@ fn parse_expr(pairs: Pairs<Rule>, pratt: &PrattParser<Rule>) -> i32 {
                     Rule::EOI => break,
                     */
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Copy, Clone)]
 enum VariableType {
     UnsignedChar,
     #[default]
@@ -101,21 +102,64 @@ struct State {
     functions: Vec<Function>
 }
 
-fn compile_decl(state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error> 
+fn compile_var_decl(state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error>
 {
+    let mut var_type = VariableType::SignedChar;
     for pair in pairs {
         match pair.as_rule() {
-            Rule::var_decl => {
-                debug!("var decl: {:?}", pair.into_inner());
+            Rule::var_type => {
+                let sign = pair.into_inner().next().unwrap();
+                if sign.as_str().eq("unsigned") {
+                    var_type = VariableType::UnsignedChar;
+                }
             },
-            Rule::func_decl => {
-                debug!("func decl: {:?}", pair.into_inner());
+            Rule::var_name_ex => {
+                let mut p = pair.into_inner();
+                let name = p.next().unwrap().as_str().to_string();
+                let size = match p.next() {
+                    Some(x) => x.as_str().parse::<usize>().unwrap(),
+                    None => 1 
+                };
+                if name != "X" && name != "Y" {
+                    state.variables.push(Variable {name, var_type, size});
+                }
             },
             _ => {
                 debug!("What's this ? {:?}", pair);
                 unreachable!()
             }
         }
+    }
+    Ok(())
+}
+
+fn compile_decl(mut state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error> 
+{
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::var_decl => {
+                compile_var_decl(&mut state, pair.into_inner())?;
+            },
+            Rule::func_decl => {
+                debug!("func decl: {:?}", pair);
+            },
+            _ => {
+                debug!("What's this ? {:?}", pair);
+                unreachable!()
+            }
+        }
+    }
+    Ok(())
+}
+
+fn generate_asm(state: &State, filename: &str) -> Result<(), Error> 
+{
+    let mut file = File::create(filename)?;
+    file.write_all(b"\tPROCESSOR 6502\n")?;
+    file.write_all(b"\tINCLUDE \"vcs.h\"\n\n")?;
+    file.write_all(b"\tSEG.U variables\n\tORG $80\n\n")?;
+    for v in &state.variables {
+        file.write_all(format!("{:23}\tds {}\n", v.name, v.size).as_bytes())?; 
     }
     Ok(())
 }
@@ -151,7 +195,6 @@ fn compile() -> Result<(), Error> {
         .op(Op::postfix(Rule::mm) | Op::postfix(Rule::pp))
         .op(Op::prefix(Rule::neg) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp));
     
-
     let mut state = State::default();
     let preprocessed_utf8 = std::str::from_utf8(&preprocessed)?;
     let r = Cc2600Parser::parse(Rule::program, &preprocessed_utf8);
@@ -182,7 +225,7 @@ fn compile() -> Result<(), Error> {
             for pair in pairs.into_inner() {
                 match pair.as_rule() {
                     Rule::decl => {
-                        compile_decl(&mut state, pair.into_inner());
+                        compile_decl(&mut state, pair.into_inner())?;
                     },
                     Rule::EOI => break,
                     _ => {
@@ -193,6 +236,7 @@ fn compile() -> Result<(), Error> {
             }
         }
     };
+    generate_asm(&mut state, &args.output)?;
     Ok(())
 }
 
