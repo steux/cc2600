@@ -1,7 +1,24 @@
 WHITESPACE   =  _{ " " | "\t" | NEWLINE }
-  
-program      =   { SOI ~ expr ~ EOI }
-  expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
+COMMENT   = _{ "//" ~ (!NEWLINE ~ ANY)* ~ NEWLINE } 
+
+program      =   { SOI ~ decl* ~ EOI }
+
+decl = { var_decl
+       | func_decl 
+       }
+
+var_decl = { var_type ~ var_name_ex ~ ("," ~ var_name_ex)* ~ ";" }
+
+var_type = { var_sign ~ var_simple_type }
+var_sign = { ("signed" | "unsigned")? } 
+var_simple_type = { "char" }
+var_name = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+var_name_ex = { var_name ~ ("[" ~ int ~ "]")? }
+
+func_decl = { "void" ~ var_name ~ "(" ~ ("void")? ~ ")" ~ "{" ~ "}" }
+func = { expr }
+
+expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
     infix    =  _{ add | sub | and | or | xor }
       add    =   { "+" } // Addition
       sub    =   { "-" } // Subtraction

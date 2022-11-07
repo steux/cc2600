@@ -68,6 +68,58 @@ fn parse_expr(pairs: Pairs<Rule>, pratt: &PrattParser<Rule>) -> i32 {
         .parse(pairs)
 }
 
+                    /*
+                    Rule::expr => {
+                        let result = parse_expr(pair.into_inner(), &pratt);
+                        println!("Result : {}", result);
+                    },
+                    Rule::EOI => break,
+                    */
+
+#[derive(Default, Debug)]
+enum VariableType {
+    UnsignedChar,
+    #[default]
+    SignedChar,
+}
+
+#[derive(Default, Debug)]
+struct Variable {
+    name: String,
+    var_type: VariableType,
+    size: usize,
+}
+
+#[derive(Default, Debug)]
+struct Function {
+    
+}
+
+#[derive(Default, Debug)]
+struct State {
+    variables: Vec<Variable>,
+    functions: Vec<Function>
+}
+
+fn compile_decl(state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error> 
+{
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::var_decl => {
+                debug!("var decl: {:?}", pair.into_inner());
+            },
+            Rule::func_decl => {
+                debug!("func decl: {:?}", pair.into_inner());
+            },
+            _ => {
+                debug!("What's this ? {:?}", pair);
+                unreachable!()
+            }
+        }
+    }
+    Ok(())
+}
+
 fn compile() -> Result<(), Error> {
     env_logger::init();
 
@@ -77,6 +129,7 @@ fn compile() -> Result<(), Error> {
     let f = File::open(&args.input)?;
     let f = BufReader::new(f);
 
+    // Prepare the context
     let mut context = cpp::Context::new(&args.input);
     context.include_directories = args.include_directories.clone();
     context.define("__ATARI2600__", "1");
@@ -87,7 +140,9 @@ fn compile() -> Result<(), Error> {
         context.define(def, value);
     }
 
+    // Start preprocessor
     let mapped_lines = cpp::process(f, &mut preprocessed, &mut context)?;
+    debug!("Mapped lines = {:?}", mapped_lines);
 
     let pratt =
         PrattParser::new()
@@ -95,6 +150,9 @@ fn compile() -> Result<(), Error> {
         .op(Op::infix(Rule::and, Assoc::Left) | Op::infix(Rule::or, Assoc::Left) | Op::infix(Rule::xor, Assoc::Left))
         .op(Op::postfix(Rule::mm) | Op::postfix(Rule::pp))
         .op(Op::prefix(Rule::neg) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp));
+    
+
+    let mut state = State::default();
     let preprocessed_utf8 = std::str::from_utf8(&preprocessed)?;
     let r = Cc2600Parser::parse(Rule::program, &preprocessed_utf8);
     match r {
@@ -104,14 +162,14 @@ fn compile() -> Result<(), Error> {
             let line;
             ex.line_col = match e.line_col {
                 LineColLocation::Pos((l, c)) => {
-                    filename = mapped_lines[l].0.clone();
-                    line = mapped_lines[l].1;
-                    LineColLocation::Pos((mapped_lines[l].1 as usize, c))
+                    filename = mapped_lines[l - 1].0.clone();
+                    line = mapped_lines[l - 1].1;
+                    LineColLocation::Pos((mapped_lines[l - 1].1 as usize, c))
                 },
                 LineColLocation::Span((l1, c1), (l2, c2)) => {
-                    filename = mapped_lines[l1].0.clone();
-                    line = mapped_lines[l1].1;
-                    LineColLocation::Span((mapped_lines[l1].1 as usize, c1), (mapped_lines[l2].1 as usize, c2))
+                    filename = mapped_lines[l1 - 1].0.clone();
+                    line = mapped_lines[l1 - 1].1;
+                    LineColLocation::Span((mapped_lines[l1 - 1].1 as usize, c1), (mapped_lines[l2 - 1].1 as usize, c2))
                 },
             };
             eprintln!("{}", ex);
@@ -123,12 +181,14 @@ fn compile() -> Result<(), Error> {
             let pairs = p.next().unwrap();
             for pair in pairs.into_inner() {
                 match pair.as_rule() {
-                    Rule::expr => {
-                        let result = parse_expr(pair.into_inner(), &pratt);
-                        println!("Result : {}", result);
+                    Rule::decl => {
+                        compile_decl(&mut state, pair.into_inner());
                     },
                     Rule::EOI => break,
-                    _ => unreachable!()
+                    _ => {
+                        debug!("What's this ? {:?}", pair);
+                        unreachable!()
+                    }
                 }
             }
         }
