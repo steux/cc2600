@@ -23,6 +23,7 @@ pub enum Error  {
     /// An error caused by malformed preprocessor syntax, with a line showing where the error
     /// occurred and a string explaining the error further.
     Syntax { filename: String, included_in: Option<String>, line: u32, msg: String },
+    Compiler { filename: String, included_in: Option<String>, line: u32, msg: String },
 }
 
 impl fmt::Display for Error {
@@ -31,10 +32,16 @@ impl fmt::Display for Error {
             &Error::Io(ref e) => e.fmt(f),
             Error::Syntax { filename, included_in, msg, line } => {
                 match included_in {
-                    Some(file) => write!(f, "{} on line {} of {} (included in {})", msg, line, filename, file),
-                    None => write!(f, "{} on line {} of {}", msg, line, filename)
+                    Some(file) => write!(f, "Syntax error: {} on line {} of {} (included in {})", msg, line, filename, file),
+                    None => write!(f, "Syntax error: {} on line {} of {}", msg, line, filename)
                 }
-            }
+            },
+            Error::Compiler { filename, included_in, line, msg } => {
+                match included_in {
+                    Some(file) => write!(f, "Compiler error: {} on line {} of {} (included in {})", msg, line, filename, file),
+                    None => write!(f, "Compiler error: {} on line {} of {}", msg, line, filename)
+                }
+            },
         }
     }
 }
@@ -44,6 +51,7 @@ impl error::Error for Error {
         match self {
             &Error::Io(ref e) => Some(e),
             &Error::Syntax { .. } => None,
+            &Error::Compiler { .. } => None,
         }
     }
 }

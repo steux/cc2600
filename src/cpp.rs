@@ -274,13 +274,20 @@ pub fn process<I: BufRead, O: Write>(
                     Some(string) => {
                         in_multiline_comments = false;
                         remaining = string;
-                        if remaining.len() > 0 { insert_it = true; }
+                        if remaining.len() > 0 { 
+                            if remaining.eq("\n") {
+                                remaining = "";
+                            } else {
+                                insert_it = true; 
+                            }
+                        }
                     },
                     _ => break
                 }
             } else {
                 let mut s = remaining.splitn(2, "/*");
                 uncommented_buf.push_str(s.next().unwrap());
+                if uncommented_buf.is_empty() { insert_it = false; }
                 match s.next() {
                     Some(string) => {
                         in_multiline_comments = true;
@@ -444,6 +451,14 @@ pub fn process<I: BufRead, O: Write>(
                             state = stack.pop().ok_or_else(|| Error::Syntax {
                                 filename: filename.clone(), included_in: included_in.clone(), line,
                                 msg: "Unexpected `#endif` with no matching `#if`".to_string() })?;
+                        },
+                        "#error" => {
+                            let expr = maybe_expr.ok_or_else(|| Error::Syntax {
+                                filename: filename.clone(), included_in: included_in.clone(), line,
+                                msg: "Expected error text after `#error`".to_string() })?;
+                            return Err(Error::Compiler {
+                                filename: filename.clone(), included_in: included_in.clone(), line,
+                                msg: expr.to_string() });
                         },
                         _ => {
                             return Err(Error::Syntax {
@@ -886,6 +901,25 @@ mod tests {
             #endif
             FOO bar text".as_bytes(), &mut output, &mut Context::new());
         assert_eq!(result.unwrap().iter().map(|x| x.1).collect::<Vec::<u32>>(), &[4, 6]);
+    }
+    
+    #[test]
+    fn lines_mapping2() {
+        let mut output = Vec::new();
+        let result = process("/* Hello */
+            world".as_bytes(), &mut output, &mut Context::new());
+        assert_eq!(result.unwrap().iter().map(|x| x.1).collect::<Vec::<u32>>(), &[2]);
+    }
+    
+    #[test]
+    fn error() {
+        let mut context = Context::new();
+        context.includes_stack.push("string".to_string());
+        let result = process_str("#error This is an error
+            foo bar", &mut context);
+        assert_eq!(result.err().unwrap().to_string(), 
+            "Compiler error: This is an error on line 1 of string".to_string()
+            );
     }
 }
 
