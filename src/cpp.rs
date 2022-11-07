@@ -330,6 +330,33 @@ pub fn process<I: BufRead, O: Write>(
                 } else {
                     state = State::Skip;
                 }
+            } else if substr.starts_with("#ifndef") {
+                let mut parts = substr.splitn(2, "//").next().unwrap().splitn(2, " ");
+                parts.next().unwrap();
+                let maybe_expr = parts.next().map(|s| s.trim()).and_then(|s| {
+                    if s.is_empty() {
+                        None
+                    } else {
+                        Some(s)
+                    }
+                });
+                let expr = match maybe_expr {
+                    Some(x) => x,
+                    _ => {
+                        return Err(Error::Syntax {
+                            filename: filename.clone(), included_in: included_in.clone(), line,
+                            msg: "Expected something after `#ifndef`".to_string() })
+
+                    }
+                };
+                stack.push(state);
+                if state == State::Active {
+                    if context.get_macro(expr).is_some() {
+                        state = State::Inactive;
+                    }
+                } else {
+                    state = State::Skip;
+                }
             } else {
                 let substr;
                 let new_line;

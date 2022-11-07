@@ -68,7 +68,7 @@ fn parse_expr(pairs: Pairs<Rule>, pratt: &PrattParser<Rule>) -> i32 {
         .parse(pairs)
 }
 
-fn main() -> Result<(), Error> {
+fn compile() -> Result<(), Error> {
     env_logger::init();
 
     let args = Args::parse();
@@ -88,7 +88,6 @@ fn main() -> Result<(), Error> {
     }
 
     let mapped_lines = cpp::process(f, &mut preprocessed, &mut context)?;
-    println!("Mapped lines: {mapped_lines:?}");
 
     let pratt =
         PrattParser::new()
@@ -109,4 +108,14 @@ fn main() -> Result<(), Error> {
         }
     }
     Ok(())
+}
+
+fn main() {
+    match compile() {
+        Err(e) => {
+            eprintln!("{}", e);
+            std::process::exit(1) 
+        },
+        Ok(_) => std::process::exit(0) 
+    }
 }
