@@ -1,5 +1,6 @@
 use std::io::BufReader;
 use std::fs::File;
+use std::collections::HashMap;
 
 use log::debug;
 
@@ -31,7 +32,7 @@ enum VariableType {
 
 #[derive(Default, Debug)]
 pub struct Variable {
-    pub name: String,
+    order: usize,
     var_type: VariableType,
     pub size: usize,
 }
@@ -41,10 +42,18 @@ struct Function {
     
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct State {
-    pub variables: Vec<Variable>,
+    variables: HashMap<String, Variable>,
     functions: Vec<Function>
+}
+
+impl State {
+    pub fn sorted_variables(&self) -> Vec<(&String, &Variable)> {
+        let mut v: Vec<(&String, &Variable)> = self.variables.iter().collect();
+        v.sort_by(|a, b| a.1.order.cmp(&b.1.order));
+        v
+    }
 }
 
 fn parse_expr(pairs: Pairs<Rule>, pratt: &PrattParser<Rule>) -> i32 {
@@ -95,7 +104,9 @@ fn compile_var_decl(state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error>
                     None => 1 
                 };
                 if name != "X" && name != "Y" {
-                    state.variables.push(Variable {name, var_type, size});
+                    state.variables.insert(name, Variable {
+                        order: state.variables.len(),
+                        var_type, size});
                 }
             },
             _ => {
@@ -130,6 +141,12 @@ pub fn compile(args: &Args) -> Result<(), Error> {
     let mut preprocessed = Vec::new();
     let f = File::open(&args.input)?;
     let f = BufReader::new(f);
+    
+    // Prepare the state
+    let mut state = State {
+        variables: HashMap::new(),
+        functions: Vec::new()
+    };
 
     // Prepare the context
     let mut context = cpp::Context::new(&args.input);
@@ -153,7 +170,6 @@ pub fn compile(args: &Args) -> Result<(), Error> {
         .op(Op::postfix(Rule::mm) | Op::postfix(Rule::pp))
         .op(Op::prefix(Rule::neg) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp));
     
-    let mut state = State::default();
     let preprocessed_utf8 = std::str::from_utf8(&preprocessed)?;
     let r = Cc2600Parser::parse(Rule::program, &preprocessed_utf8);
     match r {
