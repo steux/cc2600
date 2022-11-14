@@ -24,6 +24,7 @@ pub enum Error  {
     /// occurred and a string explaining the error further.
     Syntax { filename: String, included_in: Option<(String, u32)>, line: u32, msg: String },
     Compiler { filename: String, included_in: Option<(String, u32)>, line: u32, msg: String },
+    Unimplemented { feature: &'static str }
 }
 
 impl fmt::Display for Error {
@@ -42,6 +43,9 @@ impl fmt::Display for Error {
                     None => write!(f, "Compiler error: {} on line {} of {}", msg, line, filename)
                 }
             },
+            Error::Unimplemented { feature } => {
+                write!(f, "Compiler error: Unimplemented feature {}", feature)
+            },
         }
     }
 }
@@ -52,6 +56,7 @@ impl error::Error for Error {
             &Error::Io(ref e) => Some(e),
             &Error::Syntax { .. } => None,
             &Error::Compiler { .. } => None,
+            &Error::Unimplemented { .. } => None,
         }
     }
 }

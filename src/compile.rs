@@ -37,15 +37,46 @@ pub struct Variable {
     pub size: usize,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
+pub enum Operation {
+    Add,
+    Substract,
+    Multiply,
+    Assign,
+}
+
+#[derive(Debug)]
+pub enum Expr {
+    Integer(i32),
+    BinOp {
+        lhs: Box<Expr>,
+        op: Operation,
+        rhs: Box<Expr>,
+    }
+}
+
+#[derive(Debug)]
+pub enum Statement {
+    Block(Vec<StatementLoc>),
+    Expression(Expr)
+}
+
+#[derive(Debug)]
+pub struct StatementLoc {
+    pos: usize,
+    statement: Statement
+}
+
+#[derive(Debug)]
 struct Function {
-    
+    order: usize,
+    code: StatementLoc,
 }
 
 #[derive(Debug)]
 pub struct State {
     variables: HashMap<String, Variable>,
-    functions: Vec<Function>
+    functions: HashMap<String, Function>
 }
 
 impl State {
@@ -118,6 +149,41 @@ fn compile_var_decl(state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error>
     Ok(())
 }
 
+fn compile_block(state: &mut State, pairs: Pairs<Rule>) -> Result<StatementLoc, Error>
+{
+    Err(Error::Unimplemented { feature: "Block compilation" })
+}
+
+fn compile_func_decl(mut state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error>
+{
+    let mut p = pairs.into_iter();
+    let pair = p.next().unwrap();
+    match pair.as_rule() {
+        Rule::var_name => {
+            let name = pair.as_str();
+            let pair = p.next().unwrap();
+            match pair.as_rule() {
+                Rule::block => {
+                    let code = compile_block(&mut state, pair.into_inner())?;
+                    state.functions.insert(name.to_string(), Function {
+                        order: state.functions.len(),
+                        code 
+                    });
+                },
+                _ => {
+                    debug!("What's this ? {:?}", pair);
+                    unreachable!()
+                }
+            }
+        },
+        _ => {
+            debug!("What's this ? {:?}", pair);
+            unreachable!()
+        }
+    }
+    Ok(())
+}
+
 fn compile_decl(mut state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error> 
 {
     for pair in pairs {
@@ -126,7 +192,7 @@ fn compile_decl(mut state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error>
                 compile_var_decl(&mut state, pair.into_inner())?;
             },
             Rule::func_decl => {
-                debug!("func decl: {:?}", pair);
+                compile_func_decl(&mut state, pair.into_inner())?;
             },
             _ => {
                 debug!("What's this ? {:?}", pair);
@@ -145,7 +211,7 @@ pub fn compile(args: &Args) -> Result<(), Error> {
     // Prepare the state
     let mut state = State {
         variables: HashMap::new(),
-        functions: Vec::new()
+        functions: HashMap::new()
     };
 
     // Prepare the context
@@ -165,6 +231,7 @@ pub fn compile(args: &Args) -> Result<(), Error> {
 
     let pratt =
         PrattParser::new()
+        .op(Op::infix(Rule::assign, Assoc::Right))
         .op(Op::infix(Rule::add, Assoc::Left) | Op::infix(Rule::sub, Assoc::Left))
         .op(Op::infix(Rule::and, Assoc::Left) | Op::infix(Rule::or, Assoc::Left) | Op::infix(Rule::xor, Assoc::Left))
         .op(Op::postfix(Rule::mm) | Op::postfix(Rule::pp))

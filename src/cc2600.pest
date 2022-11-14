@@ -15,22 +15,65 @@ var_simple_type = { "char" }
 var_name = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 var_name_ex = { var_name ~ ("[" ~ int ~ "]")? }
 
-func_decl = { "void" ~ var_name ~ "(" ~ ("void")? ~ ")" ~ "{" ~ "}" }
-func = { expr }
+func_decl = { "void" ~ var_name ~ "(" ~ ("void")? ~ ")" ~ block }
+block = { "{" ~ statement* ~ "}" }
+c_expr = { expr ~ ("," ~ expr)* ~ ";" }
+statement = {
+      "do" ~ statement ~ "while" ~ "(" ~ expr ~ ")" ~ ";"
+    | "for" ~ "(" ~ c_expr ~ "," ~ c_expr ~ "," ~ c_expr ~ ")" ~ statement
+    | c_expr
+    | block
+    }
 
 expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
-    infix    =  _{ add | sub | and | or | xor }
-      add    =   { "+" } // Addition
-      sub    =   { "-" } // Subtraction
-      and    =   { "&" } // And
-      or     =   { "|" } // Or
-      xor    =   { "^" } // Xor
+    infix    =  _{ mul | div | add | sub | bls | brs | lt | lte | gt | gte | eq | neq |
+                   and | xor | or | land | lor | assign |
+                   pass | mass | mulass | divass | blsass | brsass | andass | xorass | orass }
+      mul    =   { "*" }  // Multiplication
+      div    =   { "/" }  // Division
+      add    =   { "+" }  // Addition
+      sub    =   { "-" }  // Subtraction
+      bls    =   { "<<" } // Bitwise left shift
+      brs    =   { ">>" } // Bitwise right shift
+      lt     =   { "<" }  // Less than
+      lte    =   { "<=" } // Less than or equal
+      gt     =   { ">" }  // Greater than
+      gte    =   { ">=" } // Greater than or equal
+      eq     =   { "==" } // Equal
+      neq    =   { "!=" } // Different
+      and    =   { "&" }  // And
+      xor    =   { "^" }  // Xor
+      or     =   { "|" }  // Or
+      land   =   { "&&" } // Logical and
+      lor    =   { "||" } // Logical or
+      assign =   { "=" }  // Assignment
+      pass   =   { "+=" } // Add assign
+      mass   =   { "-=" } // Sub assign
+      mulass =   { "*=" } // Multiply assign
+      divass =   { "/=" } // Divide assign
+      blsass =   { "<<=" }// Bitwise left shift assign
+      brsass =   { ">>=" }// Bitwise right shift assign
+      andass =   { "&=" } // And assign
+      xorass =   { "^=" } // Or assign
+      orass  =   { "|=" } // Or assign
     prefix   =  _{ neg | ppp | mmp }
-      neg    =   { "-" } // Negation
       ppp    =   { "++" } // Increment
       mmp    =   { "--" } // Decrement
+      neg    =   { "-" }  // Negation
+      addr   =   { "&" }  // Adress of
+      deref  =   { "*" }  // Dereference
     postfix  =  _{ pp | mm }
       pp     =   { "++" } // Increment
       mm     =   { "--" } // Decrement
-    primary  =  _{ int | "(" ~ expr ~ ")" }
-      int    =  @{ (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT+ | ASCII_DIGIT) }
+    primary  =  _{ int
+        | var_name ~ subscript?
+        | "(" ~ expr ~ ")" 
+        }
+
+subscript   = { "[" ~ index ~ "]" }
+index       = { "X" | "Y" }
+      
+int = { decimal | hexadecimal | octal }
+decimal     = @{ (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT+ | ASCII_DIGIT) }
+hexadecimal = @{ "0x" ~ ASCII_HEX_DIGIT+ }
+octal       = @{ "0" ~ ASCII_OCT_DIGIT+ }
