@@ -123,12 +123,14 @@ fn parse_var<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<(&'a str, 
 
 fn parse_expr<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<Expr<'a>, Error>
 {
-    let result = state.pratt
-        .map_primary(|primary| match primary.as_rule() {
-            Rule::int => Expr::Integer(parse_int(primary.into_inner().next().unwrap())),
-            Rule::expr => parse_expr(state, primary.into_inner()).unwrap(),
-            Rule::var => Expr::Var(parse_var(state, primary.into_inner()).unwrap()),
-            rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
+    state.pratt
+        .map_primary(|primary| -> Result<Expr<'a>, Error> {
+            match primary.as_rule() {
+                Rule::int => Ok(Expr::Integer(parse_int(primary.into_inner().next().unwrap()))),
+                Rule::expr => Ok(parse_expr(state, primary.into_inner())?),
+                Rule::var => Ok(Expr::Var(parse_var(state, primary.into_inner())?)),
+                rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
+            }
         })
         .map_infix(|lhs, op, rhs| {
             let op = match op.as_rule() {
@@ -137,18 +139,17 @@ fn parse_expr<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<Expr<'a>,
                 Rule::assign => Operation::Assign,
                 rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
             };
-            Expr::BinOp {
-                lhs: Box::new(lhs),
+            Ok(Expr::BinOp {
+                lhs: Box::new(lhs?),
                 op,
-                rhs: Box::new(rhs),
-            }
+                rhs: Box::new(rhs?),
+            })
         })
         .map_prefix(|op, rhs| match op.as_rule() {
-            Rule::neg => Expr::Neg(Box::new(rhs)),
+            Rule::neg => Ok(Expr::Neg(Box::new(rhs?))),
             _ => unreachable!(),
         })
-        .parse(pairs);
-    Ok(result)
+        .parse(pairs)
 }
 
 fn compile_var_decl(state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error>
