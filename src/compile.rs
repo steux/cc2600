@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use log::debug;
 
-use pest::{Parser, pratt_parser::{Op, PrattParser, Assoc}, iterators::Pairs, error::LineColLocation};
+use pest::{Parser, pratt_parser::{Op, PrattParser, Assoc}, iterators::{Pair, Pairs}, error::LineColLocation};
 
 use crate::error::Error;
 use crate::cpp;
@@ -14,14 +14,6 @@ use crate::generate::generate_asm;
 #[derive(Parser)]
 #[grammar = "cc2600.pest"]
 struct Cc2600Parser;
-
-/*
-                    Rule::expr => {
-                        let result = parse_expr(pair.into_inner(), &pratt);
-                        println!("Result : {}", result);
-                    },
-                    Rule::EOI => break,
-                    */
 
 #[derive(Default, Debug, Copy, Clone)]
 enum VariableType {
@@ -40,80 +32,123 @@ pub struct Variable {
 #[derive(Debug)]
 pub enum Operation {
     Add,
-    Substract,
-    Multiply,
+    Sub,
     Assign,
 }
 
 #[derive(Debug)]
-pub enum Expr {
+pub enum Subscript {
+    None,
+    X,
+    Y
+}
+
+#[derive(Debug)]
+pub enum Expr<'a>{
     Integer(i32),
+    Var((&'a str, Subscript)),
     BinOp {
-        lhs: Box<Expr>,
+        lhs: Box<Expr<'a>>,
         op: Operation,
-        rhs: Box<Expr>,
-    }
+        rhs: Box<Expr<'a>>,
+    },
+    Neg(Box<Expr<'a>>),
 }
 
 #[derive(Debug)]
-pub enum Statement {
-    Block(Vec<StatementLoc>),
-    Expression(Expr)
+pub enum Statement<'a> {
+    Block(Vec<StatementLoc<'a>>),
+    Expression(Expr<'a>)
 }
 
 #[derive(Debug)]
-pub struct StatementLoc {
+pub struct StatementLoc<'a> {
     pos: usize,
-    statement: Statement
+    statement: Statement<'a>
 }
 
 #[derive(Debug)]
-struct Function {
+struct Function<'a> {
     order: usize,
-    code: StatementLoc,
+    code: StatementLoc<'a>,
 }
 
-#[derive(Debug)]
-pub struct State {
+pub struct State<'a> {
     variables: HashMap<String, Variable>,
-    functions: HashMap<String, Function>
+    functions: HashMap<String, Function<'a>>,
+    pratt: PrattParser<Rule>
 }
 
-impl State {
+impl<'a> State<'a> {
     pub fn sorted_variables(&self) -> Vec<(&String, &Variable)> {
         let mut v: Vec<(&String, &Variable)> = self.variables.iter().collect();
         v.sort_by(|a, b| a.1.order.cmp(&b.1.order));
         v
     }
 }
+fn parse_int(p: Pair<Rule>) -> i32
+{
+    match p.as_rule() {
+        Rule::decimal => p.as_str().parse::<i32>().unwrap(),
+        Rule::hexadecimal => i32::from_str_radix(p.as_str(), 16).unwrap(),
+        Rule::octal => i32::from_str_radix(p.as_str(), 8).unwrap(),
+        _ => {
+            unreachable!()
+        }
+    } 
+}
 
-fn parse_expr(pairs: Pairs<Rule>, pratt: &PrattParser<Rule>) -> i32 {
-    pratt
+fn parse_var<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<(&'a str, Subscript), Error>
+{
+    let mut p = pairs.into_iter();
+    let varname = p.next().unwrap().as_str();
+    let subscript = match p.next() {
+        Some(pair) => {
+            match pair.as_str() {
+                "[X]" => Subscript::X,
+                "[Y]" => Subscript::Y,
+                _ => return Err(Error::Unimplemented { feature: "Error display for bad array index"})  
+            }
+        },
+        None => Subscript::None
+    };
+    match state.variables.get(varname) {
+        Some(_var) => {
+            // TODO: Check subscript is correct
+            Ok((varname, subscript))
+        },
+        None => Err(Error::Unimplemented { feature: "Error display for unknown identifier"})
+    }
+}
+
+fn parse_expr<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<Expr<'a>, Error>
+{
+    let result = state.pratt
         .map_primary(|primary| match primary.as_rule() {
-            Rule::int  => primary.as_str().parse().unwrap(),
-            Rule::expr => parse_expr(primary.into_inner(), pratt), // from "(" ~ expr ~ ")"
-            _          => unreachable!(),
+            Rule::int => Expr::Integer(parse_int(primary.into_inner().next().unwrap())),
+            Rule::expr => parse_expr(state, primary.into_inner()).unwrap(),
+            Rule::var => Expr::Var(parse_var(state, primary.into_inner()).unwrap()),
+            rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
+        })
+        .map_infix(|lhs, op, rhs| {
+            let op = match op.as_rule() {
+                Rule::add => Operation::Add,
+                Rule::sub => Operation::Sub,
+                Rule::assign => Operation::Assign,
+                rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
+            };
+            Expr::BinOp {
+                lhs: Box::new(lhs),
+                op,
+                rhs: Box::new(rhs),
+            }
         })
         .map_prefix(|op, rhs| match op.as_rule() {
-            Rule::neg  => -rhs,
-            Rule::mmp  => rhs - 1,
-            Rule::ppp  => rhs + 1,
-            _          => unreachable!(),
+            Rule::neg => Expr::Neg(Box::new(rhs)),
+            _ => unreachable!(),
         })
-        .map_postfix(|lhs, op| match op.as_rule() {
-            Rule::mm   => lhs - 1,
-            Rule::pp   => lhs + 1,
-            _          => unreachable!(),
-        })
-        .map_infix(|lhs, op, rhs| match op.as_rule() {
-            Rule::add  => lhs + rhs,
-            Rule::sub  => lhs - rhs,
-            Rule::and  => lhs & rhs,
-            Rule::or   => lhs | rhs,
-            Rule::xor  => lhs ^ rhs,
-            _          => unreachable!(),
-        })
-        .parse(pairs)
+        .parse(pairs);
+    Ok(result)
 }
 
 fn compile_var_decl(state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error>
@@ -149,12 +184,44 @@ fn compile_var_decl(state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error>
     Ok(())
 }
 
-fn compile_block(state: &mut State, pairs: Pairs<Rule>) -> Result<StatementLoc, Error>
+fn compile_statement<'a>(state: &State<'a>, pair: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
 {
-    Err(Error::Unimplemented { feature: "Block compilation" })
+    let pos = pair.as_span().start();
+    match pair.as_rule() {
+        Rule::expr => {
+            let expr = parse_expr(state, pair.into_inner())?;
+            Ok(StatementLoc {
+                pos, statement: Statement::Expression(expr)
+            })
+        },
+        _ => {
+            debug!("What's this ? {:?}", pair);
+            unreachable!()
+        }
+    }
 }
 
-fn compile_func_decl(mut state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error>
+fn compile_block<'a>(state: &State<'a>, p: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
+{
+    let pos = p.as_span().start();
+    let mut statements = Vec::<StatementLoc>::new();
+    for pair in p.into_inner() {
+        match pair.as_rule() {
+            Rule::statement => {
+                statements.push(compile_statement(state, pair.into_inner().next().unwrap())?)
+            },
+            _ => {
+                debug!("What's this ? {:?}", pair);
+                unreachable!()
+            }
+        }
+    }
+    Ok(StatementLoc {
+        pos, statement: Statement::Block(statements) 
+    })
+}
+
+fn compile_func_decl<'a>(state: &mut State<'a>, pairs: Pairs<'a, Rule>) -> Result<(), Error>
 {
     let mut p = pairs.into_iter();
     let pair = p.next().unwrap();
@@ -164,7 +231,7 @@ fn compile_func_decl(mut state: &mut State, pairs: Pairs<Rule>) -> Result<(), Er
             let pair = p.next().unwrap();
             match pair.as_rule() {
                 Rule::block => {
-                    let code = compile_block(&mut state, pair.into_inner())?;
+                    let code = compile_block(state, pair)?;
                     state.functions.insert(name.to_string(), Function {
                         order: state.functions.len(),
                         code 
@@ -184,15 +251,15 @@ fn compile_func_decl(mut state: &mut State, pairs: Pairs<Rule>) -> Result<(), Er
     Ok(())
 }
 
-fn compile_decl(mut state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error> 
+fn compile_decl<'a>(state: &mut State<'a>, pairs: Pairs<'a, Rule>) -> Result<(), Error> 
 {
     for pair in pairs {
         match pair.as_rule() {
             Rule::var_decl => {
-                compile_var_decl(&mut state, pair.into_inner())?;
+                compile_var_decl(state, pair.into_inner())?;
             },
             Rule::func_decl => {
-                compile_func_decl(&mut state, pair.into_inner())?;
+                compile_func_decl(state, pair.into_inner())?;
             },
             _ => {
                 debug!("What's this ? {:?}", pair);
@@ -208,10 +275,20 @@ pub fn compile(args: &Args) -> Result<(), Error> {
     let f = File::open(&args.input)?;
     let f = BufReader::new(f);
     
+    let pratt =
+        PrattParser::new()
+        .op(Op::infix(Rule::comma, Assoc::Left))
+        .op(Op::infix(Rule::assign, Assoc::Right))
+        .op(Op::infix(Rule::add, Assoc::Left) | Op::infix(Rule::sub, Assoc::Left))
+        .op(Op::infix(Rule::and, Assoc::Left) | Op::infix(Rule::or, Assoc::Left) | Op::infix(Rule::xor, Assoc::Left))
+        .op(Op::postfix(Rule::mm) | Op::postfix(Rule::pp))
+        .op(Op::prefix(Rule::neg) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp));
+    
     // Prepare the state
     let mut state = State {
         variables: HashMap::new(),
-        functions: HashMap::new()
+        functions: HashMap::new(),
+        pratt
     };
 
     // Prepare the context
@@ -229,14 +306,6 @@ pub fn compile(args: &Args) -> Result<(), Error> {
     let mapped_lines = cpp::process(f, &mut preprocessed, &mut context)?;
     debug!("Mapped lines = {:?}", mapped_lines);
 
-    let pratt =
-        PrattParser::new()
-        .op(Op::infix(Rule::assign, Assoc::Right))
-        .op(Op::infix(Rule::add, Assoc::Left) | Op::infix(Rule::sub, Assoc::Left))
-        .op(Op::infix(Rule::and, Assoc::Left) | Op::infix(Rule::or, Assoc::Left) | Op::infix(Rule::xor, Assoc::Left))
-        .op(Op::postfix(Rule::mm) | Op::postfix(Rule::pp))
-        .op(Op::prefix(Rule::neg) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp));
-    
     let preprocessed_utf8 = std::str::from_utf8(&preprocessed)?;
     let r = Cc2600Parser::parse(Rule::program, &preprocessed_utf8);
     match r {

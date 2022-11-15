@@ -17,17 +17,18 @@ var_name_ex = { var_name ~ ("[" ~ int ~ "]")? }
 
 func_decl = { "void" ~ var_name ~ "(" ~ ("void")? ~ ")" ~ block }
 block = { "{" ~ statement* ~ "}" }
-c_expr = { expr ~ ("," ~ expr)* ~ ";" }
 statement = {
-      "do" ~ statement ~ "while" ~ "(" ~ expr ~ ")" ~ ";"
-    | "for" ~ "(" ~ c_expr ~ "," ~ c_expr ~ "," ~ c_expr ~ ")" ~ statement
-    | c_expr
+      do_while
+    | for_loop 
+    | expr ~ ";"
     | block
     }
+do_while = { "do" ~ statement ~ "while" ~ "(" ~ expr ~ ")" ~ ";" }
+for_loop = { "for" ~ "(" ~ expr ~ ";" ~ expr ~ ";" ~ expr ~ ")" ~ statement }
 
 expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
     infix    =  _{ mul | div | add | sub | bls | brs | lt | lte | gt | gte | eq | neq |
-                   and | xor | or | land | lor | assign |
+                   and | xor | or | land | lor | assign | comma |
                    pass | mass | mulass | divass | blsass | brsass | andass | xorass | orass }
       mul    =   { "*" }  // Multiplication
       div    =   { "/" }  // Division
@@ -56,6 +57,7 @@ expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ pos
       andass =   { "&=" } // And assign
       xorass =   { "^=" } // Or assign
       orass  =   { "|=" } // Or assign
+      comma  =   { "," }  // Comma (discard left)
     prefix   =  _{ neg | ppp | mmp }
       ppp    =   { "++" } // Increment
       mmp    =   { "--" } // Decrement
@@ -65,11 +67,9 @@ expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ pos
     postfix  =  _{ pp | mm }
       pp     =   { "++" } // Increment
       mm     =   { "--" } // Decrement
-    primary  =  _{ int
-        | var_name ~ subscript?
-        | "(" ~ expr ~ ")" 
-        }
+    primary  =  _{ int | var | "(" ~ expr ~ ")" }
 
+var         = { var_name ~ subscript? }
 subscript   = { "[" ~ index ~ "]" }
 index       = { "X" | "Y" }
       
