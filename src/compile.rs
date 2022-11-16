@@ -76,7 +76,9 @@ struct Function<'a> {
 pub struct State<'a> {
     variables: HashMap<String, Variable>,
     functions: HashMap<String, Function<'a>>,
-    pratt: PrattParser<Rule>
+    pratt: PrattParser<Rule>,
+    mapped_lines: &'a Vec::<(std::rc::Rc::<String>,u32,Option<(std::rc::Rc::<String>,u32)>)>,
+    preprocessed_utf8: &'a str,
 }
 
 impl<'a> State<'a> {
@@ -86,6 +88,28 @@ impl<'a> State<'a> {
         v
     }
 }
+
+fn syntax_error<'a>(state: &State<'a>, message: &str, loc: usize) -> Error
+{
+    let mut line_number: usize = 0;
+    let mut char_number = 0;
+    for c in state.preprocessed_utf8.chars() {
+        if c == '\n' { line_number += 1; }
+        char_number += 1;
+        if char_number == loc { break; }
+    }
+    let included_in = match &state.mapped_lines[line_number].2 {
+        None => None,
+        Some(iin) => Some((iin.0.to_string(), iin.1))
+    };
+    Error::Syntax {
+        filename: state.mapped_lines[line_number].0.to_string(),
+        line: state.mapped_lines[line_number].1,
+        included_in,
+        msg: message.to_string()
+    }
+}
+
 fn parse_int(p: Pair<Rule>) -> i32
 {
     match p.as_rule() {
@@ -101,13 +125,14 @@ fn parse_int(p: Pair<Rule>) -> i32
 fn parse_var<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<(&'a str, Subscript), Error>
 {
     let mut p = pairs.into_iter();
-    let varname = p.next().unwrap().as_str();
+    let px = p.next().unwrap();
+    let varname = px.as_str();
     let subscript = match p.next() {
         Some(pair) => {
             match pair.as_str() {
                 "[X]" => Subscript::X,
                 "[Y]" => Subscript::Y,
-                _ => return Err(Error::Unimplemented { feature: "Error display for bad array index"})  
+                _ => return Err(syntax_error(state, "Bad array subscript (only X and Y are supported)", pair.as_span().start()))  
             }
         },
         None => Subscript::None
@@ -117,7 +142,7 @@ fn parse_var<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<(&'a str, 
             // TODO: Check subscript is correct
             Ok((varname, subscript))
         },
-        None => Err(Error::Unimplemented { feature: "Error display for unknown identifier"})
+        None => Err(syntax_error(state, "Unknown identifier", px.as_span().start()))
     }
 }
 
@@ -285,13 +310,6 @@ pub fn compile(args: &Args) -> Result<(), Error> {
         .op(Op::postfix(Rule::mm) | Op::postfix(Rule::pp))
         .op(Op::prefix(Rule::neg) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp));
     
-    // Prepare the state
-    let mut state = State {
-        variables: HashMap::new(),
-        functions: HashMap::new(),
-        pratt
-    };
-
     // Prepare the context
     let mut context = cpp::Context::new(&args.input);
     context.include_directories = args.include_directories.clone();
@@ -308,6 +326,16 @@ pub fn compile(args: &Args) -> Result<(), Error> {
     debug!("Mapped lines = {:?}", mapped_lines);
 
     let preprocessed_utf8 = std::str::from_utf8(&preprocessed)?;
+    
+    // Prepare the state
+    let mut state = State {
+        variables: HashMap::new(),
+        functions: HashMap::new(),
+        pratt,
+        mapped_lines: &mapped_lines,
+        preprocessed_utf8
+    };
+
     let r = Cc2600Parser::parse(Rule::program, &preprocessed_utf8);
     match r {
         Err(e) => {

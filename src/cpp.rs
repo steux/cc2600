@@ -245,21 +245,21 @@ pub fn process<I: BufRead, O: Write>(
     mut input: I,
     output: &mut O,
     context: &mut Context,
-) -> Result<Vec::<(std::rc::Rc::<String>,u32)>, Error> {
+) -> Result<Vec::<(std::rc::Rc::<String>,u32,Option<(std::rc::Rc::<String>,u32)>)>, Error> {
     let mut buf = String::new();
     let mut uncommented_buf = String::new();
     let mut stack = Vec::new();
     let mut state = State::Active;
-    let mut lines = Vec::<(std::rc::Rc::<String>,u32)>::new();
+    let mut lines = Vec::<(std::rc::Rc::<String>,u32,Option<(std::rc::Rc::<String>,u32)>)>::new();
     let mut line = 0;
     let filename = context.current_filename.clone();
     let filename_rc = std::rc::Rc::<String>::new(filename.clone());
     let mut in_multiline_comments = false;
     let mut regex = context.build_regex();
 
-    let included_in = match context.includes_stack.last() {
-        Some(s) => Some(s.clone()),
-        None => None,
+    let (included_in, included_in_rc) = match context.includes_stack.last() {
+        Some(s) => (Some(s.clone()), Some((std::rc::Rc::<String>::new(s.0.clone()), s.1.clone()))),
+        None => (None, None),
     };
 
     while input.read_line(&mut buf)? > 0 {
@@ -346,8 +346,7 @@ pub fn process<I: BufRead, O: Write>(
                         return Err(Error::Syntax {
                             filename: filename.clone(), included_in: included_in.clone(), line,
                             msg: "Expected something after `#ifndef`".to_string() })
-
-                    }
+                        }
                 };
                 stack.push(state);
                 if state == State::Active {
@@ -498,7 +497,7 @@ pub fn process<I: BufRead, O: Write>(
                         }
                     }
                 } else if state == State::Active {
-                    lines.push((filename_rc.clone(),line));
+                    lines.push((filename_rc.clone(), line, included_in_rc.clone()));
                     output.write_all(new_line.as_bytes())?;
                     if !new_line.ends_with("\n") && has_lf { output.write(b"\n")?; }
                 }
