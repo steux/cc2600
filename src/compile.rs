@@ -114,12 +114,12 @@ fn parse_int(p: Pair<Rule>) -> i32
 {
     match p.as_rule() {
         Rule::decimal => p.as_str().parse::<i32>().unwrap(),
-        Rule::hexadecimal => i32::from_str_radix(p.as_str(), 16).unwrap(),
+        Rule::hexadecimal => i32::from_str_radix(&p.as_str()[2..], 16).unwrap(),
         Rule::octal => i32::from_str_radix(p.as_str(), 8).unwrap(),
         _ => {
             unreachable!()
         }
-    } 
+    }
 }
 
 fn parse_var<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<(&'a str, Subscript), Error>

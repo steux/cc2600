@@ -73,7 +73,7 @@ var         = { var_name ~ subscript? }
 subscript   = { "[" ~ index ~ "]" }
 index       = { "X" | "Y" }
       
-int = { decimal | hexadecimal | octal }
+int = { hexadecimal | octal | decimal }
 decimal     = @{ (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT+ | ASCII_DIGIT) }
 hexadecimal = @{ "0x" ~ ASCII_HEX_DIGIT+ }
 octal       = @{ "0" ~ ASCII_OCT_DIGIT+ }
