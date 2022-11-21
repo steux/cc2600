@@ -63,14 +63,14 @@ pub enum Statement<'a> {
 
 #[derive(Debug)]
 pub struct StatementLoc<'a> {
-    pos: usize,
-    statement: Statement<'a>
+    pub pos: usize,
+    pub statement: Statement<'a>
 }
 
 #[derive(Debug)]
-struct Function<'a> {
+pub struct Function<'a> {
     order: usize,
-    code: StatementLoc<'a>,
+    pub code: StatementLoc<'a>,
 }
 
 pub struct State<'a> {
@@ -78,7 +78,7 @@ pub struct State<'a> {
     functions: HashMap<String, Function<'a>>,
     pratt: PrattParser<Rule>,
     mapped_lines: &'a Vec::<(std::rc::Rc::<String>,u32,Option<(std::rc::Rc::<String>,u32)>)>,
-    preprocessed_utf8: &'a str,
+    pub preprocessed_utf8: &'a str,
 }
 
 impl<'a> State<'a> {
@@ -87,9 +87,14 @@ impl<'a> State<'a> {
         v.sort_by(|a, b| a.1.order.cmp(&b.1.order));
         v
     }
+    pub fn sorted_functions(&self) -> Vec<(&String, &Function)> {
+        let mut v: Vec<(&String, &Function)> = self.functions.iter().collect();
+        v.sort_by(|a, b| a.1.order.cmp(&b.1.order));
+        v
+    }
 }
 
-fn syntax_error<'a>(state: &State<'a>, message: &str, loc: usize) -> Error
+pub fn syntax_error<'a>(state: &State<'a>, message: &str, loc: usize) -> Error
 {
     let mut line_number: usize = 0;
     let mut char_number = 0;
@@ -375,6 +380,8 @@ pub fn compile(args: &Args) -> Result<(), Error> {
             }
         }
     };
+
+    // Generate assembly code from compilation output (abstract syntax tree)
     generate_asm(&mut state, &args.output)?;
     Ok(())
 }
