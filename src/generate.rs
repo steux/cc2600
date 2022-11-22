@@ -65,12 +65,11 @@ fn generate_assign(lhs: &Expr, rhs: &Expr, state: &State, gstate: &mut Generator
                 variable => {
                     generate_expr(rhs, state, gstate, pos, None)?;
                     let v = state.get_variable(variable);
-                    let cycles = if v.zeropage { 2 } else { 3 };
+                    let cycles = if v.zeropage { 3 } else { 4 };
                     gstate.file.write(format!("\tSTA {}\t; {} cycles\n", variable, cycles).as_bytes())?;
                 }
             }
-        }
-        ,
+        },
         _ => return Err(syntax_error(state, "Bad left value in assignement", pos)),
     }
     Ok(())
@@ -109,7 +108,60 @@ fn generate_expr(expr: &Expr, state: &State, gstate: &mut GeneratorState, pos: u
                 },
                 Operation::Add => return Err(Error::Unimplemented { feature: "Addition not implemented" }),
                 Operation::Sub => return Err(Error::Unimplemented { feature: "Subtraction not implemented" }),
+                Operation::Eq => return Err(Error::Unimplemented { feature: "Equal not implemented" }),
+                Operation::Neq => return Err(Error::Unimplemented { feature: "Not equal not implemented" }),
+                Operation::Gt => return Err(Error::Unimplemented { feature: "Comparison not implemented" }),
+                Operation::Gte => return Err(Error::Unimplemented { feature: "Comparison not implemented" }),
+                Operation::Lt => return Err(Error::Unimplemented { feature: "Comparison not implemented" }),
+                Operation::Lte => return Err(Error::Unimplemented { feature: "Comparison not implemented" }),
             };
+        },
+        Expr::Var((var, sub)) => {
+            match *var {
+                "X" => {
+                    match hint {
+                        Some(Hint::MoveToX) => {
+                            gstate.file.write("\tNOP\t; 2 cycles\n".as_bytes())?;
+                        },
+                        Some(Hint::MoveToY) => {
+                            gstate.file.write("\tTXA\t; 2 cycles\n".as_bytes())?;
+                            gstate.file.write("\tTAY\t; 2 cycles\n".as_bytes())?;
+                        },
+                        None => {
+                            gstate.file.write("\tTXA\t; 2 cycles\n".as_bytes())?;
+                        }
+                    }
+                },
+                "Y" => {
+                    match hint {
+                        Some(Hint::MoveToX) => {
+                            gstate.file.write("\tTYA\t; 2 cycles\n".as_bytes())?;
+                            gstate.file.write("\tTAX\t; 2 cycles\n".as_bytes())?;
+                        },
+                        Some(Hint::MoveToY) => {
+                            gstate.file.write("\tNOP\t; 2 cycles\n".as_bytes())?;
+                        },
+                        None => {
+                            gstate.file.write("\tTYA\t; 2 cycles\n".as_bytes())?;
+                        }
+                    }
+                },
+                variable => {
+                    let v = state.get_variable(variable);
+                    let cycles = if v.zeropage { 3 } else { 4 };
+                    match hint {
+                        Some(Hint::MoveToX) => {
+                            gstate.file.write(format!("\tLDX {}\t; {} cycles\n", variable, cycles).as_bytes())?;
+                        },
+                        Some(Hint::MoveToY) => {
+                            gstate.file.write(format!("\tLDY {}\t; {} cycles\n", variable, cycles).as_bytes())?;
+                        },
+                        None => {
+                            gstate.file.write(format!("\tLDA {}\t; {} cycles\n", variable, cycles).as_bytes())?;
+                        }
+                    }
+                }
+            }
         },
         _ => unreachable!() 
     }

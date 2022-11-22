@@ -34,9 +34,15 @@ pub enum Operation {
     Add,
     Sub,
     Assign,
+    Eq,
+    Neq,
+    Gt,
+    Gte,
+    Lt,
+    Lte
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Subscript {
     None,
     X,
@@ -53,6 +59,8 @@ pub enum Expr<'a>{
         rhs: Box<Expr<'a>>,
     },
     Neg(Box<Expr<'a>>),
+    MinusMinus(Box<Expr<'a>>),
+    PlusPlus(Box<Expr<'a>>),
 }
 
 #[derive(Debug)]
@@ -158,12 +166,16 @@ fn parse_var<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<(&'a str, 
         },
         None => Subscript::None
     };
+    if varname.eq("X") || varname.eq("Y") {
+        if subscript == Subscript::None { return Ok((varname, subscript)); }
+        else { return Err(syntax_error(state, &format!("No subscript for {} index", varname), px.as_span().start())); }
+    }
     match state.variables.get(varname) {
         Some(_var) => {
             // TODO: Check subscript is correct
             Ok((varname, subscript))
         },
-        None => Err(syntax_error(state, "Unknown identifier", px.as_span().start()))
+        None => Err(syntax_error(state, &format!("Unknown identifier {}", varname), px.as_span().start()))
     }
 }
 
@@ -182,7 +194,13 @@ fn parse_expr<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<Expr<'a>,
             let op = match op.as_rule() {
                 Rule::add => Operation::Add,
                 Rule::sub => Operation::Sub,
+                Rule::eq => Operation::Eq,
+                Rule::neq => Operation::Neq,
                 Rule::assign => Operation::Assign,
+                Rule::gt => Operation::Gt,
+                Rule::gte => Operation::Gte,
+                Rule::lt => Operation::Lt,
+                Rule::lte => Operation::Lte,
                 rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
             };
             Ok(Expr::BinOp {
@@ -193,6 +211,11 @@ fn parse_expr<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<Expr<'a>,
         })
         .map_prefix(|op, rhs| match op.as_rule() {
             Rule::neg => Ok(Expr::Neg(Box::new(rhs?))),
+            _ => unreachable!(),
+        })
+        .map_postfix(|lhs, op| match op.as_rule() {
+            Rule::mm => Ok(Expr::MinusMinus(Box::new(lhs?))),
+            Rule::pp => Ok(Expr::PlusPlus(Box::new(lhs?))),
             _ => unreachable!(),
         })
         .parse(pairs)
@@ -250,11 +273,35 @@ fn compile_statement<'a>(state: &State<'a>, pair: Pair<'a, Rule>) -> Result<Stat
             let init = parse_expr(state, p.next().unwrap().into_inner())?;
             let condition = parse_expr(state, p.next().unwrap().into_inner())?;
             let update = parse_expr(state, p.next().unwrap().into_inner())?;
-            let body = compile_statement(state, p.next().unwrap())?;
+            let body = compile_statement(state, p.next().unwrap().into_inner().next().unwrap())?;
             Ok(StatementLoc {
                 pos, statement: Statement::For {
                     init, condition, update, body: Box::new(body) 
                 }
+            })
+        },
+        Rule::if_statement => {
+            let mut p = pair.into_inner();
+            let condition = parse_expr(state, p.next().unwrap().into_inner())?;
+            let body = compile_statement(state, p.next().unwrap().into_inner().next().unwrap())?;
+            let else_body = match p.next() {
+                None => None,
+                Some(px) => Some(Box::new(compile_statement(state, px.into_inner().next().unwrap())?)),
+            };
+            Ok(StatementLoc {
+                pos, statement: Statement::If {
+                    condition, body: Box::new(body), else_body 
+                }
+            })
+        },
+        Rule::break_statement => {
+            Ok(StatementLoc {
+                pos, statement: Statement::Break
+            })
+        },
+        Rule::continue_statement => {
+            Ok(StatementLoc {
+                pos, statement: Statement::Continue
             })
         },
         _ => {
@@ -342,8 +389,9 @@ pub fn compile(args: &Args) -> Result<(), Error> {
         PrattParser::new()
         .op(Op::infix(Rule::comma, Assoc::Left))
         .op(Op::infix(Rule::assign, Assoc::Right))
-        .op(Op::infix(Rule::add, Assoc::Left) | Op::infix(Rule::sub, Assoc::Left))
         .op(Op::infix(Rule::and, Assoc::Left) | Op::infix(Rule::or, Assoc::Left) | Op::infix(Rule::xor, Assoc::Left))
+        .op(Op::infix(Rule::eq, Assoc::Left) | Op::infix(Rule::neq, Assoc::Left) | Op::infix(Rule::gt, Assoc::Left) | Op::infix(Rule::gte, Assoc::Left) | Op::infix(Rule::lt, Assoc::Left) | Op::infix(Rule::lte, Assoc::Left))
+        .op(Op::infix(Rule::add, Assoc::Left) | Op::infix(Rule::sub, Assoc::Left))
         .op(Op::postfix(Rule::mm) | Op::postfix(Rule::pp))
         .op(Op::prefix(Rule::neg) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp));
     
