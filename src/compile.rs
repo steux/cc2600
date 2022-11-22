@@ -26,6 +26,7 @@ enum VariableType {
 pub struct Variable {
     order: usize,
     var_type: VariableType,
+    pub zeropage: bool,
     pub size: usize,
 }
 
@@ -86,6 +87,9 @@ impl<'a> State<'a> {
         let mut v: Vec<(&String, &Variable)> = self.variables.iter().collect();
         v.sort_by(|a, b| a.1.order.cmp(&b.1.order));
         v
+    }
+    pub fn get_variable(&self, name: &str) -> &Variable {
+        self.variables.get(name).unwrap()
     }
     pub fn sorted_functions(&self) -> Vec<(&String, &Function)> {
         let mut v: Vec<(&String, &Function)> = self.functions.iter().collect();
@@ -203,6 +207,7 @@ fn compile_var_decl(state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error>
                 if name != "X" && name != "Y" {
                     state.variables.insert(name, Variable {
                         order: state.variables.len(),
+                        zeropage: true,
                         var_type, size});
                 }
             },
