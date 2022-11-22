@@ -15,14 +15,13 @@ use crate::generate::generate_asm;
 #[grammar = "cc2600.pest"]
 struct Cc2600Parser;
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 enum VariableType {
     UnsignedChar,
-    #[default]
     SignedChar,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Variable {
     order: usize,
     var_type: VariableType,
@@ -59,7 +58,20 @@ pub enum Expr<'a>{
 #[derive(Debug)]
 pub enum Statement<'a> {
     Block(Vec<StatementLoc<'a>>),
-    Expression(Expr<'a>)
+    Expression(Expr<'a>),
+    For { 
+        init: Expr<'a>,
+        condition: Expr<'a>,
+        update: Expr<'a>,
+        body: Box<StatementLoc<'a>>
+    },
+    If {
+        condition: Expr<'a>,
+        body: Box<StatementLoc<'a>>,
+        else_body: Option<Box<StatementLoc<'a>>>
+    },
+    Break,
+    Continue
 }
 
 #[derive(Debug)]
@@ -228,6 +240,21 @@ fn compile_statement<'a>(state: &State<'a>, pair: Pair<'a, Rule>) -> Result<Stat
             let expr = parse_expr(state, pair.into_inner())?;
             Ok(StatementLoc {
                 pos, statement: Statement::Expression(expr)
+            })
+        },
+        Rule::block => {
+            compile_block(state, pair)
+        },
+        Rule::for_loop => {
+            let mut p = pair.into_inner();
+            let init = parse_expr(state, p.next().unwrap().into_inner())?;
+            let condition = parse_expr(state, p.next().unwrap().into_inner())?;
+            let update = parse_expr(state, p.next().unwrap().into_inner())?;
+            let body = compile_statement(state, p.next().unwrap())?;
+            Ok(StatementLoc {
+                pos, statement: Statement::For {
+                    init, condition, update, body: Box::new(body) 
+                }
             })
         },
         _ => {

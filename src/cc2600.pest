@@ -19,6 +19,7 @@ func_decl = { "void" ~ var_name ~ "(" ~ ("void")? ~ ")" ~ block }
 block = { "{" ~ statement* ~ "}" }
 statement = {
       do_while
+    | while_do
     | for_loop
     | if_statement
     | expr ~ ";"
@@ -27,6 +28,7 @@ statement = {
     | continue_statement
     }
 do_while = { "do" ~ statement ~ "while" ~ "(" ~ expr ~ ")" ~ ";" }
+while_do = { "while" ~ "(" ~ expr ~ ")"~ statement }
 for_loop = { "for" ~ "(" ~ expr ~ ";" ~ expr ~ ";" ~ expr ~ ")" ~ statement }
 if_statement = { "if" ~ "(" ~ expr ~ ")" ~ statement ~ ("else" ~ statement)* }
 break_statement = { "break" ~ ";" }

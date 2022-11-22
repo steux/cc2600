@@ -117,6 +117,12 @@ fn generate_expr(expr: &Expr, state: &State, gstate: &mut GeneratorState, pos: u
     Ok(())
 }
 
+fn generate_for_loop(init: &Expr, condition: &Expr, update: &Expr, body: &StatementLoc, state: &State, gstate: &mut GeneratorState, pos: usize) -> Result<(), Error>
+{
+    generate_expr(init, state, gstate, pos, None)?;
+    Err(Error::Unimplemented { feature: "for loop statement not implemented" })
+}
+
 fn generate_statement(code: &StatementLoc, state: &State, gstate: &mut GeneratorState) -> Result<(), Error>
 {
     // Generate different kind of statements
@@ -125,10 +131,14 @@ fn generate_statement(code: &StatementLoc, state: &State, gstate: &mut Generator
             for code in statements {
                 generate_statement(&code, state, gstate)?;
             }
+            Ok(())
         },
-        Statement::Expression(expr) => generate_expr(&expr, state, gstate, code.pos, None)?,
+        Statement::Expression(expr) => generate_expr(&expr, state, gstate, code.pos, None),
+        Statement::For { init, condition, update, body } => generate_for_loop(init, condition, update, body.as_ref(), state, gstate, code.pos),
+        Statement::If { condition, body, else_body } => Err(Error::Unimplemented { feature: "if statement not implemented" }),
+        Statement::Break => Err(Error::Unimplemented { feature: "break statement not implemented" }),
+        Statement::Continue => Err(Error::Unimplemented { feature: "continue statement not implemented" }),
     }
-    Ok(())
 }
 
 pub fn generate_asm(state: &State, filename: &str) -> Result<(), Error> 
