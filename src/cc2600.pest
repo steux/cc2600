@@ -19,15 +19,21 @@ func_decl = { "void" ~ var_name ~ "(" ~ ("void")? ~ ")" ~ block }
 block = { "{" ~ statement* ~ "}" }
 statement = {
       do_while
-    | for_loop 
+    | for_loop
+    | if_statement
     | expr ~ ";"
     | block
+    | break_statement
+    | continue_statement
     }
 do_while = { "do" ~ statement ~ "while" ~ "(" ~ expr ~ ")" ~ ";" }
 for_loop = { "for" ~ "(" ~ expr ~ ";" ~ expr ~ ";" ~ expr ~ ")" ~ statement }
+if_statement = { "if" ~ "(" ~ expr ~ ")" ~ statement ~ ("else" ~ statement)* }
+break_statement = { "break" ~ ";" }
+continue_statement = { "continue" ~ ","}
 
 expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
-    infix    =  _{ mul | div | add | sub | bls | brs | lt | lte | gt | gte | eq | neq |
+    infix    =  _{ mul | div | add | sub | bls | brs | lte | lt | gte | gt | eq | neq |
                    and | xor | or | land | lor | assign | comma |
                    pass | mass | mulass | divass | blsass | brsass | andass | xorass | orass }
       mul    =   { "*" }  // Multiplication
