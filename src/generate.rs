@@ -13,7 +13,8 @@ struct GeneratorState<'a> {
     file: File,
     local_label_counter_for: u32,
     local_label_counter_if: u32,
-    loops: Vec<String>
+    loops: Vec<String>,
+    flags: FlagsState<'a>,
 }
 
 impl<'a> GeneratorState<'a> {
@@ -22,6 +23,11 @@ impl<'a> GeneratorState<'a> {
     }
     fn write_asm(&mut self, asm: &str, cycles: u32) -> Result<usize, std::io::Error> {
         self.file.write(format!("\t{:23}\t; {} cycles\n", asm, cycles).as_bytes())
+    }
+    fn write_label(&mut self, label: &str) -> Result<usize, std::io::Error> {
+        self.flags = FlagsState::Unknown;
+        self.write(label)?;
+        self.write(&"\n")
     }
 }
 
@@ -35,16 +41,17 @@ enum ExprType<'a> {
     NotRelevant
 }
 
-#[derive(Debug, PartialEq)]
-enum FlagsState {
+#[derive(Debug, PartialEq, Copy, Clone)]
+enum FlagsState<'a> {
     Unknown,
     A, X, Y,
-    Zero, Positive, Negative 
+    Zero, Positive, Negative,
+    Var((&'a str, Subscript)),
 }
 
 struct ExprOutput<'a> {
     t: ExprType<'a>,
-    flags: FlagsState,
+    flags: FlagsState<'a>,
 }
 
 fn generate_included_source_code_line<'a>(loc: usize, gstate: &'a mut GeneratorState) -> Option<&'a str>
@@ -247,7 +254,7 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
     }
 }
 
-fn generate_minusminus<'a>(expr: &Expr, state: &State<'a>, gstate: &mut GeneratorState, pos: usize) -> Result<ExprOutput<'a>, Error>
+fn generate_minusminus<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut GeneratorState, pos: usize) -> Result<ExprOutput<'a>, Error>
 {
     match expr {
         Expr::Var((var, sub)) => {
@@ -266,11 +273,11 @@ fn generate_minusminus<'a>(expr: &Expr, state: &State<'a>, gstate: &mut Generato
                     match sub {
                         Subscript::None => {
                             gstate.write_asm(&format!("DEC {}", variable), cycles)?;
-                            Ok(ExprOutput { t: ExprType::NotRelevant, flags: FlagsState::A })
+                            Ok(ExprOutput { t: ExprType::NotRelevant, flags: FlagsState::Var((var, *sub)) })
                         },
                         Subscript::X => {
-                            gstate.write_asm(&format!("DEC {}", variable), cycles + 1)?;
-                            Ok(ExprOutput { t: ExprType::NotRelevant, flags: FlagsState::A })
+                            gstate.write_asm(&format!("DEC {},X", variable), cycles + 1)?;
+                            Ok(ExprOutput { t: ExprType::NotRelevant, flags: FlagsState::Var((var, *sub)) })
                         },
                         Subscript::Y => Err(syntax_error(state, "Bad left value used with -- operator (no Y subscript allowed)", pos))
                         
@@ -279,6 +286,40 @@ fn generate_minusminus<'a>(expr: &Expr, state: &State<'a>, gstate: &mut Generato
             }
         },
         _ => Err(syntax_error(state, "Bad left value used with -- operator", pos)),
+    }
+}
+
+fn generate_plusplus<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut GeneratorState, pos: usize) -> Result<ExprOutput<'a>, Error>
+{
+    match expr {
+        Expr::Var((var, sub)) => {
+            match *var {
+                "X" => {
+                    gstate.write_asm("INX", 2)?;
+                    Ok(ExprOutput { t: ExprType::X, flags: FlagsState::X })
+                },
+                "Y" => {
+                    gstate.write_asm("INY", 2)?;
+                    Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
+                },
+                variable => {
+                    let v = state.get_variable(variable);
+                    let cycles = if v.zeropage { 5 } else { 6 };
+                    match sub {
+                        Subscript::None => {
+                            gstate.write_asm(&format!("INC {}", variable), cycles)?;
+                            Ok(ExprOutput { t: ExprType::NotRelevant, flags: FlagsState::Var((var, *sub)) })
+                        },
+                        Subscript::X => {
+                            gstate.write_asm(&format!("INC {},X", variable), cycles + 1)?;
+                            Ok(ExprOutput { t: ExprType::NotRelevant, flags: FlagsState::Var((var, *sub)) })
+                        },
+                        Subscript::Y => Err(syntax_error(state, "Bad left value used with ++ operator (no Y subscript allowed)", pos))
+                    }
+                }
+            }
+        },
+        _ => Err(syntax_error(state, "Bad left value used with ++ operator", pos)),
     }
 }
 
@@ -327,11 +368,12 @@ fn generate_expr<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut GeneratorS
             }
         },
         Expr::MinusMinus(v) => generate_minusminus(v, state, gstate, pos),
+        Expr::PlusPlus(v) => generate_plusplus(v, state, gstate, pos),
         _ => unreachable!() 
     }
 }
 
-fn generate_condition(condition: &Expr, state: &State, gstate: &mut GeneratorState, pos: usize, flags: FlagsState, negate: bool, label: &str) -> Result<(), Error>
+fn generate_condition(condition: &Expr, state: &State, gstate: &mut GeneratorState, pos: usize, negate: bool, label: &str) -> Result<(), Error>
 {
     debug!("Condition: {:?}", condition);
     match condition {
@@ -348,7 +390,7 @@ fn generate_condition(condition: &Expr, state: &State, gstate: &mut GeneratorSta
                                     // Special case: compare with 0
                                     if v == 0 {
                                         // Let's see if we can shortcut CPX or CPY
-                                        let flags_ok = (flags == FlagsState::X && left.t == ExprType::X) || (flags == FlagsState::Y && left.t == ExprType::Y);
+                                        let flags_ok = (gstate.flags == FlagsState::X && left.t == ExprType::X) || (gstate.flags == FlagsState::Y && left.t == ExprType::Y);
                                         if flags_ok {
                                             if negate {
                                                 match op {
@@ -392,37 +434,42 @@ fn generate_condition(condition: &Expr, state: &State, gstate: &mut GeneratorSta
     }
 }
 
-fn generate_for_loop(init: &Expr, condition: &Expr, update: &Expr, body: &StatementLoc, state: &State, gstate: &mut GeneratorState, pos: usize) -> Result<(), Error>
+fn generate_for_loop<'a>(init: &Expr<'a>, condition: &Expr, update: &Expr<'a>, body: &StatementLoc<'a>, state: &State<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
 {
-    let expr_output = generate_expr(init, state, gstate, pos)?;
     gstate.local_label_counter_for += 1;
     let forloop_label = format!(".forloop{}", gstate.local_label_counter_for);
-    let forend_label = format!(".forend{}", gstate.local_label_counter_for);
-    gstate.loops.push(forend_label.clone());
-    generate_condition(condition, state, gstate, pos, expr_output.flags, true, &forend_label)?;
-    gstate.write(&forloop_label)?;
-    gstate.write(&"\n")?;
+    let forloopend_label = format!(".forloopend{}", gstate.local_label_counter_for);
+    gstate.flags = generate_expr(init, state, gstate, pos)?.flags;
+    gstate.loops.push(forloopend_label.clone());
+    generate_condition(condition, state, gstate, pos, true, &forloopend_label)?;
+    gstate.write_label(&forloop_label)?;
     generate_statement(body, state, gstate)?;
-    let expr_output = generate_expr(update, state, gstate, pos)?;
-    generate_condition(condition, state, gstate, pos, expr_output.flags, false, &forloop_label)?;
-    gstate.write(&forend_label)?;
-    gstate.write(&"\n")?;
+    gstate.flags = generate_expr(update, state, gstate, pos)?.flags;
+    generate_condition(condition, state, gstate, pos, false, &forloop_label)?;
+    gstate.write_label(&forloopend_label)?;
     gstate.loops.pop();
     Ok(())
 }
 
-fn generate_statement(code: &StatementLoc, state: &State, gstate: &mut GeneratorState) -> Result<(), Error>
+fn generate_statement<'a>(code: &StatementLoc<'a>, state: &State<'a>, gstate: &mut GeneratorState<'a>) -> Result<FlagsState<'a>, Error>
 {
     // Generate different kind of statements
     match &code.statement {
         Statement::Block(statements) => {
             for code in statements {
-                generate_statement(&code, state, gstate)?;
+                gstate.flags = generate_statement(&code, state, gstate)?;
             }
-            Ok(())
+            Ok(gstate.flags)
         },
-        Statement::Expression(expr) => { generate_expr(&expr, state, gstate, code.pos)?; Ok(()) },
-        Statement::For { init, condition, update, body } => generate_for_loop(init, condition, update, body.as_ref(), state, gstate, code.pos),
+        Statement::Expression(expr) => { 
+            gstate.flags = generate_expr(&expr, state, gstate, code.pos)?.flags; 
+            Ok(gstate.flags) 
+        },
+        Statement::For { init, condition, update, body } => { 
+            generate_for_loop(init, condition, update, body.as_ref(), state, gstate, code.pos)?; 
+            gstate.flags = FlagsState::Unknown;
+            Ok(gstate.flags) 
+        },
         Statement::If { condition, body, else_body } => Err(Error::Unimplemented { feature: "if statement not implemented" }),
         Statement::Break => Err(Error::Unimplemented { feature: "break statement not implemented" }),
         Statement::Continue => Err(Error::Unimplemented { feature: "continue statement not implemented" }),
@@ -440,7 +487,8 @@ pub fn generate_asm(state: &State, filename: &str) -> Result<(), Error>
         file,
         local_label_counter_for: 0,
         local_label_counter_if: 0,
-        loops: Vec::new()
+        loops: Vec::new(),
+        flags: FlagsState::Unknown,
     };
 
     gstate.write("\tPROCESSOR 6502\n")?;

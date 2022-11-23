@@ -44,7 +44,7 @@ impl fmt::Display for Error {
                 }
             },
             Error::Unimplemented { feature } => {
-                write!(f, "Compiler error: Unimplemented feature {}", feature)
+                write!(f, "Compiler error: Unimplemented feature - {}", feature)
             },
         }
     }

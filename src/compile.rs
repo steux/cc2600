@@ -42,7 +42,7 @@ pub enum Operation {
     Lte
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Subscript {
     None,
     X,
