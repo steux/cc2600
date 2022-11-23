@@ -11,6 +11,9 @@ struct GeneratorState<'a> {
     last_included_position: usize,
     last_included_char: std::str::Chars<'a>,
     file: File,
+    local_label_counter_for: u32,
+    local_label_counter_if: u32,
+    loops: Vec<String>
 }
 
 impl<'a> GeneratorState<'a> {
@@ -22,14 +25,17 @@ impl<'a> GeneratorState<'a> {
     }
 }
 
+#[derive(Debug, PartialEq)]
 enum ExprType<'a> {
     Immediate(i32),
     Absolute(&'a str),
     AbsoluteX(&'a str),
     AbsoluteY(&'a str),
     A, X, Y,
+    NotRelevant
 }
 
+#[derive(Debug, PartialEq)]
 enum FlagsState {
     Unknown,
     A, X, Y,
@@ -38,7 +44,7 @@ enum FlagsState {
 
 struct ExprOutput<'a> {
     t: ExprType<'a>,
-    zero: FlagsState,
+    flags: FlagsState,
 }
 
 fn generate_included_source_code_line<'a>(loc: usize, gstate: &'a mut GeneratorState) -> Option<&'a str>
@@ -73,7 +79,6 @@ fn generate_included_source_code_line<'a>(loc: usize, gstate: &'a mut GeneratorS
     None
 }
 
-
 fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &mut GeneratorState, pos: usize) -> Result<ExprOutput<'a>, Error>
 {
     match lhs {
@@ -84,34 +89,35 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                     match expr_output.t {
                         ExprType::Immediate(v) => {
                             gstate.write_asm(&format!("LDX #{}", v), 2)?;
-                            Ok(ExprOutput { t: ExprType::X, zero: if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero }})
+                            Ok(ExprOutput { t: ExprType::X, flags: if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero }})
                         },
                         ExprType::Absolute(name) => {
                             let v = state.get_variable(name);
                             gstate.write_asm(&format!("LDX {}", name), if v.zeropage {3} else {4})?;
-                            Ok(ExprOutput { t: ExprType::X, zero: FlagsState::X })
+                            Ok(ExprOutput { t: ExprType::X, flags: FlagsState::X })
                         },
                         ExprType::AbsoluteX(name) => {
                             gstate.write_asm(&format!("LDA {},X", name), 4)?;
                             gstate.write_asm(&"TAX", 2)?;
-                            Ok(ExprOutput { t: ExprType::X, zero: FlagsState::X })
+                            Ok(ExprOutput { t: ExprType::X, flags: FlagsState::X })
                         },
                         ExprType::AbsoluteY(name) => {
                             gstate.write_asm(&format!("LDX {},Y", name), 4)?;
-                            Ok(ExprOutput { t: ExprType::X, zero: FlagsState::X })
+                            Ok(ExprOutput { t: ExprType::X, flags: FlagsState::X })
                         },
                         ExprType::A => {
                             gstate.write_asm(&"TAX", 2)?;
-                            Ok(ExprOutput { t: ExprType::X, zero: FlagsState::X })
+                            Ok(ExprOutput { t: ExprType::X, flags: FlagsState::X })
                         },
                         ExprType::X => {
-                            Ok(ExprOutput { t: ExprType::X, zero: FlagsState::X })
+                            Ok(ExprOutput { t: ExprType::X, flags: FlagsState::X })
                         },
                         ExprType::Y => {
                             gstate.write_asm(&"TYA", 2)?;
                             gstate.write_asm(&"TAX", 2)?;
-                            Ok(ExprOutput { t: ExprType::X, zero: FlagsState::X })
+                            Ok(ExprOutput { t: ExprType::X, flags: FlagsState::X })
                         },
+                        ExprType::NotRelevant => Err(syntax_error(state, "Bad right side in assignement", pos))
                     }
                 },
                 "Y" => {
@@ -119,36 +125,37 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                     match expr_output.t {
                         ExprType::Immediate(v) => {
                             gstate.write_asm(&format!("LDY #{}", v), 2)?;
-                            Ok(ExprOutput { t: ExprType::Y, zero: if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero }})
+                            Ok(ExprOutput { t: ExprType::Y, flags: if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero }})
                         },
                         ExprType::Absolute(name) => {
                             let v = state.get_variable(name);
                             gstate.write_asm(&format!("LDY {}", name), if v.zeropage {3} else {4})?;
-                            Ok(ExprOutput { t: ExprType::Y, zero: FlagsState::Y })
+                            Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
                         },
                         ExprType::AbsoluteX(name) => {
                             gstate.write_asm(&format!("LDY {},X", name), 4)?;
-                            Ok(ExprOutput { t: ExprType::Y, zero: FlagsState::Y })
+                            Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
                         },
                         ExprType::AbsoluteY(name) => {
                             gstate.write_asm(&format!("LDA {},X", name), 4)?;
                             gstate.write_asm(&"TAY", 2)?;
-                            Ok(ExprOutput { t: ExprType::Y, zero: FlagsState::Y })
+                            Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
                         },
                         ExprType::A => {
                             gstate.write_asm(&"TAY", 2)?;
-                            Ok(ExprOutput { t: ExprType::Y, zero: FlagsState::Y })
+                            Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
                         },
                         ExprType::X => {
                             gstate.write_asm(&"TXA", 2)?;
                             gstate.write_asm(&"TAY", 2)?;
-                            Ok(ExprOutput { t: ExprType::Y, zero: FlagsState::Y })
+                            Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
                         },
                         ExprType::Y => {
-                            Ok(ExprOutput { t: ExprType::Y, zero: FlagsState::Y })
+                            Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
                         },
+                        ExprType::NotRelevant => Err(syntax_error(state, "Bad right side in assignement", pos))
                     }
-                },
+                } ,
                 variable => {
                     let v = state.get_variable(variable);
                     let cycles = if v.zeropage { 3 } else { 4 };
@@ -161,7 +168,7 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                                 Subscript::X => gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?,
                                 Subscript::Y => gstate.write_asm(&format!("STA {},Y", variable), 5)?,
                             };
-                            Ok(ExprOutput { t: ExprType::A, zero: if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero }})
+                            Ok(ExprOutput { t: ExprType::A, flags: if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero }})
                         },
                         ExprType::Absolute(name) => {
                             let v = state.get_variable(name);
@@ -171,7 +178,7 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                                 Subscript::X => gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?,
                                 Subscript::Y => gstate.write_asm(&format!("STA {},Y", variable), 5)?,
                             };
-                            Ok(ExprOutput { t: ExprType::A, zero: FlagsState::A })
+                            Ok(ExprOutput { t: ExprType::A, flags: FlagsState::A })
                         },
                         ExprType::AbsoluteX(name) => {
                             gstate.write_asm(&format!("LDA {},X", name), 4)?;
@@ -180,7 +187,7 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                                 Subscript::X => gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?,
                                 Subscript::Y => gstate.write_asm(&format!("STA {},Y", variable), 5)?,
                             };
-                            Ok(ExprOutput { t: ExprType::A, zero: FlagsState::A })
+                            Ok(ExprOutput { t: ExprType::A, flags: FlagsState::A })
                         },
                         ExprType::AbsoluteY(name) => {
                             gstate.write_asm(&format!("LDA {},Y", name), 4)?;
@@ -189,7 +196,7 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                                 Subscript::X => gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?,
                                 Subscript::Y => gstate.write_asm(&format!("STA {},Y", variable), 5)?,
                             };
-                            Ok(ExprOutput { t: ExprType::A, zero: FlagsState::A })
+                            Ok(ExprOutput { t: ExprType::A, flags: FlagsState::A })
                         },
                         ExprType::A => {
                             match sub {
@@ -197,7 +204,7 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                                 Subscript::X => gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?,
                                 Subscript::Y => gstate.write_asm(&format!("STA {},Y", variable), 5)?,
                             };
-                            Ok(ExprOutput { t: ExprType::A, zero: expr_output.zero })
+                            Ok(ExprOutput { t: ExprType::A, flags: expr_output.flags })
                         },
                         ExprType::X => {
                             match sub {
@@ -213,7 +220,7 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                                     gstate.write_asm(&format!("STA {},Y", variable), 5)?
                                 },
                             };
-                            Ok(ExprOutput { t: ExprType::X, zero: expr_output.zero })
+                            Ok(ExprOutput { t: ExprType::X, flags: expr_output.flags })
                         },
                         ExprType::Y => {
                             match sub {
@@ -229,13 +236,49 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                                     gstate.write_asm(&format!("STA {},Y", variable), 5)?
                                 },
                             };
-                            Ok(ExprOutput { t: ExprType::Y, zero: expr_output.zero })
+                            Ok(ExprOutput { t: ExprType::Y, flags: expr_output.flags })
                         },
+                        ExprType::NotRelevant => Err(syntax_error(state, "Bad right side in assignement", pos))
                     }
                 }
             }
         },
         _ => Err(syntax_error(state, "Bad left value in assignement", pos)),
+    }
+}
+
+fn generate_minusminus<'a>(expr: &Expr, state: &State<'a>, gstate: &mut GeneratorState, pos: usize) -> Result<ExprOutput<'a>, Error>
+{
+    match expr {
+        Expr::Var((var, sub)) => {
+            match *var {
+                "X" => {
+                    gstate.write_asm("DEX", 2)?;
+                    Ok(ExprOutput { t: ExprType::X, flags: FlagsState::X })
+                },
+                "Y" => {
+                    gstate.write_asm("DEY", 2)?;
+                    Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
+                },
+                variable => {
+                    let v = state.get_variable(variable);
+                    let cycles = if v.zeropage { 5 } else { 6 };
+                    match sub {
+                        Subscript::None => {
+                            gstate.write_asm(&format!("DEC {}", variable), cycles)?;
+                            Ok(ExprOutput { t: ExprType::NotRelevant, flags: FlagsState::A })
+                        },
+                        Subscript::X => {
+                            gstate.write_asm(&format!("DEC {}", variable), cycles + 1)?;
+                            Ok(ExprOutput { t: ExprType::NotRelevant, flags: FlagsState::A })
+                        },
+                        Subscript::Y => Err(syntax_error(state, "Bad left value used with -- operator (no Y subscript allowed)", pos))
+                        
+                    }
+                }
+            }
+        },
+        _ => Err(syntax_error(state, "Bad left value used with -- operator", pos)),
     }
 }
 
@@ -258,7 +301,7 @@ fn generate_expr<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut GeneratorS
 
     debug!("Expression: {:?}", expr);
     match expr {
-        Expr::Integer(i) => Ok(ExprOutput { t: ExprType::Immediate(*i), zero: FlagsState::Unknown }),
+        Expr::Integer(i) => Ok(ExprOutput { t: ExprType::Immediate(*i), flags: FlagsState::Unknown }),
         Expr::BinOp {lhs, op, rhs} => {
             match op {
                 Operation::Assign => generate_assign(lhs, rhs, state, gstate, pos),
@@ -274,23 +317,98 @@ fn generate_expr<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut GeneratorS
         },
         Expr::Var((var, sub)) => {
             match *var {
-                "X" => Ok(ExprOutput { t: ExprType::X, zero: FlagsState::Unknown }),
-                "Y" => Ok(ExprOutput { t: ExprType::Y, zero: FlagsState::Unknown }),
+                "X" => Ok(ExprOutput { t: ExprType::X, flags: FlagsState::Unknown }),
+                "Y" => Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Unknown }),
                 variable => match sub {
-                    Subscript::None => Ok(ExprOutput { t: ExprType::Absolute(variable), zero: FlagsState::Unknown }),
-                    Subscript::X => Ok(ExprOutput { t: ExprType::AbsoluteX(variable), zero: FlagsState::Unknown }),
-                    Subscript::Y => Ok(ExprOutput { t: ExprType::AbsoluteY(variable), zero: FlagsState::Unknown }),
+                    Subscript::None => Ok(ExprOutput { t: ExprType::Absolute(variable), flags: FlagsState::Unknown }),
+                    Subscript::X => Ok(ExprOutput { t: ExprType::AbsoluteX(variable), flags: FlagsState::Unknown }),
+                    Subscript::Y => Ok(ExprOutput { t: ExprType::AbsoluteY(variable), flags: FlagsState::Unknown }),
                 }
             }
         },
+        Expr::MinusMinus(v) => generate_minusminus(v, state, gstate, pos),
         _ => unreachable!() 
+    }
+}
+
+fn generate_condition(condition: &Expr, state: &State, gstate: &mut GeneratorState, pos: usize, flags: FlagsState, negate: bool, label: &str) -> Result<(), Error>
+{
+    debug!("Condition: {:?}", condition);
+    match condition {
+        Expr::BinOp {lhs, op, rhs} => {
+            match op {
+                Operation::Eq | Operation::Neq => {
+                    let left = generate_expr(lhs, state, gstate, pos)?;
+                    match left.t {
+                        ExprType::X | ExprType::Y => {
+                            // This condition is using the special index registers
+                            let right = generate_expr(rhs, state, gstate, pos)?;
+                            match right.t {
+                                ExprType::Immediate(v) => {
+                                    // Special case: compare with 0
+                                    if v == 0 {
+                                        // Let's see if we can shortcut CPX or CPY
+                                        let flags_ok = (flags == FlagsState::X && left.t == ExprType::X) || (flags == FlagsState::Y && left.t == ExprType::Y);
+                                        if flags_ok {
+                                            if negate {
+                                                match op {
+                                                    Operation::Eq => {
+                                                        gstate.write_asm(&format!("BNE {}", label), 2)?;
+                                                        Ok(())
+                                                    },
+                                                    Operation::Neq => {
+                                                        gstate.write_asm(&format!("BEQ {}", label), 2)?;
+                                                        Ok(())
+                                                    },
+                                                    _ => unreachable!() 
+                                                }
+                                            } else {
+                                                match op {
+                                                    Operation::Eq => {
+                                                        gstate.write_asm(&format!("BEQ {}", label), 2)?;
+                                                        Ok(())
+                                                    },
+                                                    Operation::Neq => {
+                                                        gstate.write_asm(&format!("BNE {}", label), 2)?;
+                                                        Ok(())
+                                                    },
+                                                    _ => unreachable!() 
+                                                }
+                                            }
+                                        }
+                                        else { Err(Error::Unimplemented { feature: "for loop statement is partially implemented" }) } 
+                                    } else { Err(Error::Unimplemented { feature: "for loop statement is partially implemented" }) }
+                                },
+                                _ => Err(Error::Unimplemented { feature: "for loop statement is partially implemented" })
+                            }
+                        },
+                        _ => Err(Error::Unimplemented { feature: "for loop statement is partially implemented" })
+                    }
+                },
+                _ => Err(Error::Unimplemented { feature: "for loop statement is partially implemented" })
+            }
+        },
+        _ => Err(Error::Unimplemented { feature: "for loop statement is partially implemented" })
     }
 }
 
 fn generate_for_loop(init: &Expr, condition: &Expr, update: &Expr, body: &StatementLoc, state: &State, gstate: &mut GeneratorState, pos: usize) -> Result<(), Error>
 {
-    generate_expr(init, state, gstate, pos)?;
-    Err(Error::Unimplemented { feature: "for loop statement not implemented" })
+    let expr_output = generate_expr(init, state, gstate, pos)?;
+    gstate.local_label_counter_for += 1;
+    let forloop_label = format!(".forloop{}", gstate.local_label_counter_for);
+    let forend_label = format!(".forend{}", gstate.local_label_counter_for);
+    gstate.loops.push(forend_label.clone());
+    generate_condition(condition, state, gstate, pos, expr_output.flags, true, &forend_label)?;
+    gstate.write(&forloop_label)?;
+    gstate.write(&"\n")?;
+    generate_statement(body, state, gstate)?;
+    let expr_output = generate_expr(update, state, gstate, pos)?;
+    generate_condition(condition, state, gstate, pos, expr_output.flags, false, &forloop_label)?;
+    gstate.write(&forend_label)?;
+    gstate.write(&"\n")?;
+    gstate.loops.pop();
+    Ok(())
 }
 
 fn generate_statement(code: &StatementLoc, state: &State, gstate: &mut GeneratorState) -> Result<(), Error>
@@ -320,6 +438,9 @@ pub fn generate_asm(state: &State, filename: &str) -> Result<(), Error>
         last_included_position: 0,
         last_included_char: state.preprocessed_utf8.chars(),
         file,
+        local_label_counter_for: 0,
+        local_label_counter_if: 0,
+        loops: Vec::new()
     };
 
     gstate.write("\tPROCESSOR 6502\n")?;
@@ -336,6 +457,8 @@ pub fn generate_asm(state: &State, filename: &str) -> Result<(), Error>
     gstate.write("\n; Functions definitions\n")?;
     for f in state.sorted_functions().iter() {
         gstate.write(&format!("\n{}\tSUBROUTINE\n", f.0))?;
+        gstate.local_label_counter_for = 0;
+        gstate.local_label_counter_if = 0;
         generate_statement(&f.1.code, state, &mut gstate)?;
         gstate.write_asm("RTS", 6)?;
     }
