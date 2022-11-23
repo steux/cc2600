@@ -38,7 +38,6 @@ enum ExprType<'a> {
     AbsoluteX(&'a str),
     AbsoluteY(&'a str),
     A, X, Y,
-    NotRelevant
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -124,7 +123,6 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                             gstate.write_asm(&"TAX", 2)?;
                             Ok(ExprOutput { t: ExprType::X, flags: FlagsState::X })
                         },
-                        ExprType::NotRelevant => Err(syntax_error(state, "Bad right side in assignement", pos))
                     }
                 },
                 "Y" => {
@@ -160,7 +158,6 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                         ExprType::Y => {
                             Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
                         },
-                        ExprType::NotRelevant => Err(syntax_error(state, "Bad right side in assignement", pos))
                     }
                 } ,
                 variable => {
@@ -245,7 +242,6 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                             };
                             Ok(ExprOutput { t: ExprType::Y, flags: expr_output.flags })
                         },
-                        ExprType::NotRelevant => Err(syntax_error(state, "Bad right side in assignement", pos))
                     }
                 }
             }
@@ -273,11 +269,11 @@ fn generate_minusminus<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut Gene
                     match sub {
                         Subscript::None => {
                             gstate.write_asm(&format!("DEC {}", variable), cycles)?;
-                            Ok(ExprOutput { t: ExprType::NotRelevant, flags: FlagsState::Var((var, *sub)) })
+                            Ok(ExprOutput { t: ExprType::Absolute(variable), flags: FlagsState::Var((var, *sub)) })
                         },
                         Subscript::X => {
                             gstate.write_asm(&format!("DEC {},X", variable), cycles + 1)?;
-                            Ok(ExprOutput { t: ExprType::NotRelevant, flags: FlagsState::Var((var, *sub)) })
+                            Ok(ExprOutput { t: ExprType::AbsoluteX(variable), flags: FlagsState::Var((var, *sub)) })
                         },
                         Subscript::Y => Err(syntax_error(state, "Bad left value used with -- operator (no Y subscript allowed)", pos))
                         
@@ -308,11 +304,11 @@ fn generate_plusplus<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut Genera
                     match sub {
                         Subscript::None => {
                             gstate.write_asm(&format!("INC {}", variable), cycles)?;
-                            Ok(ExprOutput { t: ExprType::NotRelevant, flags: FlagsState::Var((var, *sub)) })
+                            Ok(ExprOutput { t: ExprType::Absolute(variable), flags: FlagsState::Var((var, *sub)) })
                         },
                         Subscript::X => {
                             gstate.write_asm(&format!("INC {},X", variable), cycles + 1)?;
-                            Ok(ExprOutput { t: ExprType::NotRelevant, flags: FlagsState::Var((var, *sub)) })
+                            Ok(ExprOutput { t: ExprType::AbsoluteX(variable), flags: FlagsState::Var((var, *sub)) })
                         },
                         Subscript::Y => Err(syntax_error(state, "Bad left value used with ++ operator (no Y subscript allowed)", pos))
                     }
