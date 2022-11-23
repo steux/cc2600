@@ -13,6 +13,15 @@ struct GeneratorState<'a> {
     file: File,
 }
 
+impl<'a> GeneratorState<'a> {
+    fn write(&mut self, s: &str) -> Result<usize, std::io::Error> {
+        self.file.write(s.as_bytes())
+    }
+    fn write_asm(&mut self, asm: &str, cycles: u32) -> Result<usize, std::io::Error> {
+        self.file.write(format!("\t{}\t; {} cycles\n", asm, cycles).as_bytes())
+    }
+}
+
 enum Hint {
     MoveToX,
     MoveToY,
@@ -66,7 +75,7 @@ fn generate_assign(lhs: &Expr, rhs: &Expr, state: &State, gstate: &mut Generator
                     generate_expr(rhs, state, gstate, pos, None)?;
                     let v = state.get_variable(variable);
                     let cycles = if v.zeropage { 3 } else { 4 };
-                    gstate.file.write(format!("\tSTA {}\t; {} cycles\n", variable, cycles).as_bytes())?;
+                    gstate.write_asm(&format!("STA {}", variable), cycles)?;
                 }
             }
         },
@@ -96,9 +105,9 @@ fn generate_expr(expr: &Expr, state: &State, gstate: &mut GeneratorState, pos: u
     match expr {
         Expr::Integer(i) => {
             match hint {
-                None => gstate.file.write(format!("\tLDA #{}\t; 2 cycles\n", i).as_bytes())?,
-                Some(Hint::MoveToX) => gstate.file.write(format!("\tLDX #{}\t; 2 cycles\n", i).as_bytes())?,
-                Some(Hint::MoveToY) => gstate.file.write(format!("\tLDY #{}\t; 2 cycles\n", i).as_bytes())?,
+                None => gstate.write_asm(&format!("LDA {}", i), 2)?,
+                Some(Hint::MoveToX) => gstate.write_asm(&format!("LDX {}", i), 2)?,
+                Some(Hint::MoveToY) => gstate.write_asm(&format!("LDY {}", i), 2)?,
             };
         },
         Expr::BinOp {lhs, op, rhs} => {
@@ -120,29 +129,26 @@ fn generate_expr(expr: &Expr, state: &State, gstate: &mut GeneratorState, pos: u
             match *var {
                 "X" => {
                     match hint {
-                        Some(Hint::MoveToX) => {
-                            gstate.file.write("\tNOP\t; 2 cycles\n".as_bytes())?;
-                        },
+                        Some(Hint::MoveToX) => { },
                         Some(Hint::MoveToY) => {
-                            gstate.file.write("\tTXA\t; 2 cycles\n".as_bytes())?;
-                            gstate.file.write("\tTAY\t; 2 cycles\n".as_bytes())?;
+                            gstate.write_asm("TXA", 2)?;
+                            gstate.write_asm("TAY", 2)?;
                         },
                         None => {
-                            gstate.file.write("\tTXA\t; 2 cycles\n".as_bytes())?;
+                            gstate.write_asm("TXA", 2)?;
                         }
                     }
                 },
                 "Y" => {
                     match hint {
                         Some(Hint::MoveToX) => {
-                            gstate.file.write("\tTYA\t; 2 cycles\n".as_bytes())?;
-                            gstate.file.write("\tTAX\t; 2 cycles\n".as_bytes())?;
+                            gstate.write_asm("TYA", 2)?;
+                            gstate.write_asm("TAX", 2)?;
                         },
                         Some(Hint::MoveToY) => {
-                            gstate.file.write("\tNOP\t; 2 cycles\n".as_bytes())?;
                         },
                         None => {
-                            gstate.file.write("\tTYA\t; 2 cycles\n".as_bytes())?;
+                            gstate.write_asm("TYA", 2)?;
                         }
                     }
                 },
@@ -151,13 +157,13 @@ fn generate_expr(expr: &Expr, state: &State, gstate: &mut GeneratorState, pos: u
                     let cycles = if v.zeropage { 3 } else { 4 };
                     match hint {
                         Some(Hint::MoveToX) => {
-                            gstate.file.write(format!("\tLDX {}\t; {} cycles\n", variable, cycles).as_bytes())?;
+                            gstate.write_asm(&format!("LDX {}", variable), cycles)?;
                         },
                         Some(Hint::MoveToY) => {
-                            gstate.file.write(format!("\tLDY {}\t; {} cycles\n", variable, cycles).as_bytes())?;
+                            gstate.write_asm(&format!("LDY {}", variable), cycles)?;
                         },
                         None => {
-                            gstate.file.write(format!("\tLDA {}\t; {} cycles\n", variable, cycles).as_bytes())?;
+                            gstate.write_asm(&format!("LDA {}", variable), cycles)?;
                         }
                     }
                 }
@@ -204,23 +210,22 @@ pub fn generate_asm(state: &State, filename: &str) -> Result<(), Error>
         file,
     };
 
-    gstate.file.write_all(b"\tPROCESSOR 6502\n")?;
-    //gstate.file.write_all(b"\tINCLUDE \"vcs.h\"\n\n")?;
-    gstate.file.write_all(b"\tSEG.U variables\n\tORG $80\n\n")?;
+    gstate.write("\tPROCESSOR 6502\n")?;
+    gstate.write("\tSEG.U variables\n\tORG $80\n\n")?;
     
     // Generate vaiables code
     for v in state.sorted_variables().iter() {
         gstate.file.write_all(format!("{:23}\tds {}\n", v.0, v.1.size).as_bytes())?; 
     }
 
-    gstate.file.write_all(b"\n\tSEG.U code\n\tORG $F000\n")?;
+    gstate.write("\n\tSEG.U code\n\tORG $F000\n")?;
 
     // Generate functions code
-    gstate.file.write_all("\n; Functions definitions\n".as_bytes())?;
+    gstate.write("\n; Functions definitions\n")?;
     for f in state.sorted_functions().iter() {
-        gstate.file.write_all(format!("\n{}\tSUBROUTINE\n", f.0).as_bytes())?;
+        gstate.write(&format!("\n{}\tSUBROUTINE\n", f.0))?;
         generate_statement(&f.1.code, state, &mut gstate)?;
-        gstate.file.write_all("\tRTS\t; 6 cycles\n".as_bytes())?;
+        gstate.write_asm("RTS", 6)?;
     }
 
     Ok(())
