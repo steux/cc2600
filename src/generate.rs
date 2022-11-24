@@ -7,6 +7,7 @@ use std::fs::File;
 use log::debug;
 
 struct GeneratorState<'a> {
+    compiler_state: &'a CompilerState<'a>,
     last_included_line_number: usize,
     last_included_position: usize,
     last_included_char: std::str::Chars<'a>,
@@ -85,20 +86,20 @@ fn generate_included_source_code_line<'a>(loc: usize, gstate: &'a mut GeneratorS
     None
 }
 
-fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &mut GeneratorState, pos: usize) -> Result<ExprOutput<'a>, Error>
+fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, gstate: &mut GeneratorState, pos: usize) -> Result<ExprOutput<'a>, Error>
 {
     match lhs {
         Expr::Var((var, sub)) => {
             match *var {
                 "X" => {
-                    let expr_output = generate_expr(rhs, state, gstate, pos)?;
+                    let expr_output = generate_expr(rhs, gstate, pos)?;
                     match expr_output.t {
                         ExprType::Immediate(v) => {
                             gstate.write_asm(&format!("LDX #{}", v), 2)?;
                             Ok(ExprOutput { t: ExprType::X, flags: if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero }})
                         },
                         ExprType::Absolute(name) => {
-                            let v = state.get_variable(name);
+                            let v = gstate.compiler_state.get_variable(name);
                             gstate.write_asm(&format!("LDX {}", name), if v.zeropage {3} else {4})?;
                             Ok(ExprOutput { t: ExprType::X, flags: FlagsState::X })
                         },
@@ -126,14 +127,14 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                     }
                 },
                 "Y" => {
-                    let expr_output = generate_expr(rhs, state, gstate, pos)?;
+                    let expr_output = generate_expr(rhs, gstate, pos)?;
                     match expr_output.t {
                         ExprType::Immediate(v) => {
                             gstate.write_asm(&format!("LDY #{}", v), 2)?;
                             Ok(ExprOutput { t: ExprType::Y, flags: if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero }})
                         },
                         ExprType::Absolute(name) => {
-                            let v = state.get_variable(name);
+                            let v = gstate.compiler_state.get_variable(name);
                             gstate.write_asm(&format!("LDY {}", name), if v.zeropage {3} else {4})?;
                             Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
                         },
@@ -161,9 +162,9 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                     }
                 } ,
                 variable => {
-                    let v = state.get_variable(variable);
+                    let v = gstate.compiler_state.get_variable(variable);
                     let cycles = if v.zeropage { 3 } else { 4 };
-                    let expr_output = generate_expr(rhs, state, gstate, pos)?;
+                    let expr_output = generate_expr(rhs, gstate, pos)?;
                     match expr_output.t {
                         ExprType::Immediate(v) => {
                             gstate.write_asm(&format!("LDA #{}", v), 2)?;
@@ -175,7 +176,7 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                             Ok(ExprOutput { t: ExprType::A, flags: if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero }})
                         },
                         ExprType::Absolute(name) => {
-                            let v = state.get_variable(name);
+                            let v = gstate.compiler_state.get_variable(name);
                             gstate.write_asm(&format!("LDA {}", name), if v.zeropage {3} else {4})?;
                             match sub {
                                 Subscript::None => gstate.write_asm(&format!("STA {}", variable), cycles)?,
@@ -246,11 +247,11 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, state: &State<'a>, gstate: &m
                 }
             }
         },
-        _ => Err(syntax_error(state, "Bad left value in assignement", pos)),
+        _ => Err(syntax_error(gstate.compiler_state, "Bad left value in assignement", pos)),
     }
 }
 
-fn generate_minusminus<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut GeneratorState, pos: usize) -> Result<ExprOutput<'a>, Error>
+fn generate_minusminus<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState, pos: usize) -> Result<ExprOutput<'a>, Error>
 {
     match expr {
         Expr::Var((var, sub)) => {
@@ -264,7 +265,7 @@ fn generate_minusminus<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut Gene
                     Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
                 },
                 variable => {
-                    let v = state.get_variable(variable);
+                    let v = gstate.compiler_state.get_variable(variable);
                     let cycles = if v.zeropage { 5 } else { 6 };
                     match sub {
                         Subscript::None => {
@@ -275,17 +276,17 @@ fn generate_minusminus<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut Gene
                             gstate.write_asm(&format!("DEC {},X", variable), cycles + 1)?;
                             Ok(ExprOutput { t: ExprType::AbsoluteX(variable), flags: FlagsState::Var((var, *sub)) })
                         },
-                        Subscript::Y => Err(syntax_error(state, "Bad left value used with -- operator (no Y subscript allowed)", pos))
+                        Subscript::Y => Err(syntax_error(gstate.compiler_state, "Bad left value used with -- operator (no Y subscript allowed)", pos))
                         
                     }
                 }
             }
         },
-        _ => Err(syntax_error(state, "Bad left value used with -- operator", pos)),
+        _ => Err(syntax_error(gstate.compiler_state, "Bad left value used with -- operator", pos)),
     }
 }
 
-fn generate_plusplus<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut GeneratorState, pos: usize) -> Result<ExprOutput<'a>, Error>
+fn generate_plusplus<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState, pos: usize) -> Result<ExprOutput<'a>, Error>
 {
     match expr {
         Expr::Var((var, sub)) => {
@@ -299,7 +300,7 @@ fn generate_plusplus<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut Genera
                     Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
                 },
                 variable => {
-                    let v = state.get_variable(variable);
+                    let v = gstate.compiler_state.get_variable(variable);
                     let cycles = if v.zeropage { 5 } else { 6 };
                     match sub {
                         Subscript::None => {
@@ -310,16 +311,16 @@ fn generate_plusplus<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut Genera
                             gstate.write_asm(&format!("INC {},X", variable), cycles + 1)?;
                             Ok(ExprOutput { t: ExprType::AbsoluteX(variable), flags: FlagsState::Var((var, *sub)) })
                         },
-                        Subscript::Y => Err(syntax_error(state, "Bad left value used with ++ operator (no Y subscript allowed)", pos))
+                        Subscript::Y => Err(syntax_error(gstate.compiler_state, "Bad left value used with ++ operator (no Y subscript allowed)", pos))
                     }
                 }
             }
         },
-        _ => Err(syntax_error(state, "Bad left value used with ++ operator", pos)),
+        _ => Err(syntax_error(gstate.compiler_state, "Bad left value used with ++ operator", pos)),
     }
 }
 
-fn generate_expr<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut GeneratorState, pos: usize) -> Result<ExprOutput<'a>, Error>
+fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState, pos: usize) -> Result<ExprOutput<'a>, Error>
 {
     // Include C source code into generated asm
     // debug!("{:?}, {}, {}, {}", expr, pos, gstate.last_included_position, gstate.last_included_line_number);
@@ -341,7 +342,7 @@ fn generate_expr<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut GeneratorS
         Expr::Integer(i) => Ok(ExprOutput { t: ExprType::Immediate(*i), flags: FlagsState::Unknown }),
         Expr::BinOp {lhs, op, rhs} => {
             match op {
-                Operation::Assign => generate_assign(lhs, rhs, state, gstate, pos),
+                Operation::Assign => generate_assign(lhs, rhs, gstate, pos),
                 Operation::Add => Err(Error::Unimplemented { feature: "Addition not implemented" }),
                 Operation::Sub => Err(Error::Unimplemented { feature: "Subtraction not implemented" }),
                 Operation::Eq => Err(Error::Unimplemented { feature: "Equal not implemented" }),
@@ -363,24 +364,24 @@ fn generate_expr<'a>(expr: &Expr<'a>, state: &State<'a>, gstate: &mut GeneratorS
                 }
             }
         },
-        Expr::MinusMinus(v) => generate_minusminus(v, state, gstate, pos),
-        Expr::PlusPlus(v) => generate_plusplus(v, state, gstate, pos),
+        Expr::MinusMinus(v) => generate_minusminus(v, gstate, pos),
+        Expr::PlusPlus(v) => generate_plusplus(v, gstate, pos),
         _ => unreachable!() 
     }
 }
 
-fn generate_condition(condition: &Expr, state: &State, gstate: &mut GeneratorState, pos: usize, negate: bool, label: &str) -> Result<(), Error>
+fn generate_condition(condition: &Expr, gstate: &mut GeneratorState, pos: usize, negate: bool, label: &str) -> Result<(), Error>
 {
     debug!("Condition: {:?}", condition);
     match condition {
         Expr::BinOp {lhs, op, rhs} => {
             match op {
                 Operation::Eq | Operation::Neq => {
-                    let left = generate_expr(lhs, state, gstate, pos)?;
+                    let left = generate_expr(lhs, gstate, pos)?;
                     match left.t {
                         ExprType::X | ExprType::Y => {
                             // This condition is using the special index registers
-                            let right = generate_expr(rhs, state, gstate, pos)?;
+                            let right = generate_expr(rhs, gstate, pos)?;
                             match right.t {
                                 ExprType::Immediate(v) => {
                                     // Special case: compare with 0
@@ -430,39 +431,39 @@ fn generate_condition(condition: &Expr, state: &State, gstate: &mut GeneratorSta
     }
 }
 
-fn generate_for_loop<'a>(init: &Expr<'a>, condition: &Expr, update: &Expr<'a>, body: &StatementLoc<'a>, state: &State<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
+fn generate_for_loop<'a>(init: &Expr<'a>, condition: &Expr, update: &Expr<'a>, body: &StatementLoc<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
 {
     gstate.local_label_counter_for += 1;
     let forloop_label = format!(".forloop{}", gstate.local_label_counter_for);
     let forloopend_label = format!(".forloopend{}", gstate.local_label_counter_for);
-    gstate.flags = generate_expr(init, state, gstate, pos)?.flags;
+    gstate.flags = generate_expr(init, gstate, pos)?.flags;
     gstate.loops.push(forloopend_label.clone());
-    generate_condition(condition, state, gstate, pos, true, &forloopend_label)?;
+    generate_condition(condition, gstate, pos, true, &forloopend_label)?;
     gstate.write_label(&forloop_label)?;
-    generate_statement(body, state, gstate)?;
-    gstate.flags = generate_expr(update, state, gstate, pos)?.flags;
-    generate_condition(condition, state, gstate, pos, false, &forloop_label)?;
+    generate_statement(body, gstate)?;
+    gstate.flags = generate_expr(update, gstate, pos)?.flags;
+    generate_condition(condition, gstate, pos, false, &forloop_label)?;
     gstate.write_label(&forloopend_label)?;
     gstate.loops.pop();
     Ok(())
 }
 
-fn generate_statement<'a>(code: &StatementLoc<'a>, state: &State<'a>, gstate: &mut GeneratorState<'a>) -> Result<FlagsState<'a>, Error>
+fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'a>) -> Result<FlagsState<'a>, Error>
 {
     // Generate different kind of statements
     match &code.statement {
         Statement::Block(statements) => {
             for code in statements {
-                gstate.flags = generate_statement(&code, state, gstate)?;
+                gstate.flags = generate_statement(&code, gstate)?;
             }
             Ok(gstate.flags)
         },
         Statement::Expression(expr) => { 
-            gstate.flags = generate_expr(&expr, state, gstate, code.pos)?.flags; 
+            gstate.flags = generate_expr(&expr, gstate, code.pos)?.flags; 
             Ok(gstate.flags) 
         },
         Statement::For { init, condition, update, body } => { 
-            generate_for_loop(init, condition, update, body.as_ref(), state, gstate, code.pos)?; 
+            generate_for_loop(init, condition, update, body.as_ref(), gstate, code.pos)?; 
             gstate.flags = FlagsState::Unknown;
             Ok(gstate.flags) 
         },
@@ -472,14 +473,15 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, state: &State<'a>, gstate: &m
     }
 }
 
-pub fn generate_asm(state: &State, filename: &str) -> Result<(), Error> 
+pub fn generate_asm(compiler_state: &CompilerState, filename: &str) -> Result<(), Error> 
 {
     let file = File::create(filename)?;
 
     let mut gstate = GeneratorState {
+        compiler_state,
         last_included_line_number: 0,
         last_included_position: 0,
-        last_included_char: state.preprocessed_utf8.chars(),
+        last_included_char: compiler_state.preprocessed_utf8.chars(),
         file,
         local_label_counter_for: 0,
         local_label_counter_if: 0,
@@ -491,7 +493,7 @@ pub fn generate_asm(state: &State, filename: &str) -> Result<(), Error>
     gstate.write("\tSEG.U variables\n\tORG $80\n\n")?;
     
     // Generate vaiables code
-    for v in state.sorted_variables().iter() {
+    for v in compiler_state.sorted_variables().iter() {
         gstate.file.write_all(format!("{:23}\tds {}\n", v.0, v.1.size).as_bytes())?; 
     }
 
@@ -499,11 +501,11 @@ pub fn generate_asm(state: &State, filename: &str) -> Result<(), Error>
 
     // Generate functions code
     gstate.write("\n; Functions definitions\n")?;
-    for f in state.sorted_functions().iter() {
+    for f in compiler_state.sorted_functions().iter() {
         gstate.write(&format!("\n{}\tSUBROUTINE\n", f.0))?;
         gstate.local_label_counter_for = 0;
         gstate.local_label_counter_if = 0;
-        generate_statement(&f.1.code, state, &mut gstate)?;
+        generate_statement(&f.1.code, &mut gstate)?;
         gstate.write_asm("RTS", 6)?;
     }
 

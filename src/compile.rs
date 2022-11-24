@@ -94,7 +94,7 @@ pub struct Function<'a> {
     pub code: StatementLoc<'a>,
 }
 
-pub struct State<'a> {
+pub struct CompilerState<'a> {
     variables: HashMap<String, Variable>,
     functions: HashMap<String, Function<'a>>,
     pratt: PrattParser<Rule>,
@@ -102,7 +102,7 @@ pub struct State<'a> {
     pub preprocessed_utf8: &'a str,
 }
 
-impl<'a> State<'a> {
+impl<'a> CompilerState<'a> {
     pub fn sorted_variables(&self) -> Vec<(&String, &Variable)> {
         let mut v: Vec<(&String, &Variable)> = self.variables.iter().collect();
         v.sort_by(|a, b| a.1.order.cmp(&b.1.order));
@@ -118,7 +118,7 @@ impl<'a> State<'a> {
     }
 }
 
-pub fn syntax_error<'a>(state: &State<'a>, message: &str, loc: usize) -> Error
+pub fn syntax_error<'a>(state: &CompilerState<'a>, message: &str, loc: usize) -> Error
 {
     let mut line_number: usize = 0;
     let mut char_number = 0;
@@ -151,7 +151,7 @@ fn parse_int(p: Pair<Rule>) -> i32
     }
 }
 
-fn parse_var<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<(&'a str, Subscript), Error>
+fn parse_var<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<(&'a str, Subscript), Error>
 {
     let mut p = pairs.into_iter();
     let px = p.next().unwrap();
@@ -179,7 +179,7 @@ fn parse_var<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<(&'a str, 
     }
 }
 
-fn parse_expr<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<Expr<'a>, Error>
+fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<Expr<'a>, Error>
 {
     state.pratt
         .map_primary(|primary| -> Result<Expr<'a>, Error> {
@@ -221,7 +221,7 @@ fn parse_expr<'a>(state: &State<'a>, pairs: Pairs<'a, Rule>) -> Result<Expr<'a>,
         .parse(pairs)
 }
 
-fn compile_var_decl(state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error>
+fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(), Error>
 {
     let mut var_type = VariableType::SignedChar;
     for pair in pairs {
@@ -255,7 +255,7 @@ fn compile_var_decl(state: &mut State, pairs: Pairs<Rule>) -> Result<(), Error>
     Ok(())
 }
 
-fn compile_statement<'a>(state: &State<'a>, pair: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
+fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
 {
     let pos = pair.as_span().start();
     match pair.as_rule() {
@@ -311,7 +311,7 @@ fn compile_statement<'a>(state: &State<'a>, pair: Pair<'a, Rule>) -> Result<Stat
     }
 }
 
-fn compile_block<'a>(state: &State<'a>, p: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
+fn compile_block<'a>(state: &CompilerState<'a>, p: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
 {
     let pos = p.as_span().start();
     let mut statements = Vec::<StatementLoc>::new();
@@ -331,7 +331,7 @@ fn compile_block<'a>(state: &State<'a>, p: Pair<'a, Rule>) -> Result<StatementLo
     })
 }
 
-fn compile_func_decl<'a>(state: &mut State<'a>, pairs: Pairs<'a, Rule>) -> Result<(), Error>
+fn compile_func_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<(), Error>
 {
     let mut p = pairs.into_iter();
     let pair = p.next().unwrap();
@@ -361,7 +361,7 @@ fn compile_func_decl<'a>(state: &mut State<'a>, pairs: Pairs<'a, Rule>) -> Resul
     Ok(())
 }
 
-fn compile_decl<'a>(state: &mut State<'a>, pairs: Pairs<'a, Rule>) -> Result<(), Error> 
+fn compile_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<(), Error> 
 {
     for pair in pairs {
         match pair.as_rule() {
@@ -413,7 +413,7 @@ pub fn compile(args: &Args) -> Result<(), Error> {
     let preprocessed_utf8 = std::str::from_utf8(&preprocessed)?;
     
     // Prepare the state
-    let mut state = State {
+    let mut state = CompilerState {
         variables: HashMap::new(),
         functions: HashMap::new(),
         pratt,
