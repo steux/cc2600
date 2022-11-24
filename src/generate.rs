@@ -16,6 +16,7 @@ struct GeneratorState<'a> {
     local_label_counter_if: u32,
     loops: Vec<String>,
     flags: FlagsState<'a>,
+    acc_in_use: bool,
 }
 
 impl<'a> GeneratorState<'a> {
@@ -105,8 +106,10 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, gstate: &mut GeneratorState, 
                             Ok(ExprOutput { t: ExprType::X, flags: FlagsState::X })
                         },
                         ExprType::AbsoluteX(name) => {
+                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&format!("LDA {},X", name), 4)?;
                             gstate.write_asm(&"TAX", 2)?;
+                            if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
                             Ok(ExprOutput { t: ExprType::X, flags: FlagsState::X })
                         },
                         ExprType::AbsoluteY(name) => {
@@ -121,8 +124,10 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, gstate: &mut GeneratorState, 
                             Ok(ExprOutput { t: ExprType::X, flags: FlagsState::X })
                         },
                         ExprType::Y => {
+                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&"TYA", 2)?;
                             gstate.write_asm(&"TAX", 2)?;
+                            if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
                             Ok(ExprOutput { t: ExprType::X, flags: FlagsState::X })
                         },
                     }
@@ -144,8 +149,10 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, gstate: &mut GeneratorState, 
                             Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
                         },
                         ExprType::AbsoluteY(name) => {
+                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&format!("LDA {},X", name), 4)?;
                             gstate.write_asm(&"TAY", 2)?;
+                            if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
                             Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
                         },
                         ExprType::A => {
@@ -153,8 +160,10 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, gstate: &mut GeneratorState, 
                             Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
                         },
                         ExprType::X => {
+                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&"TXA", 2)?;
                             gstate.write_asm(&"TAY", 2)?;
+                            if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
                             Ok(ExprOutput { t: ExprType::Y, flags: FlagsState::Y })
                         },
                         ExprType::Y => {
@@ -168,15 +177,18 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, gstate: &mut GeneratorState, 
                     let expr_output = generate_expr(rhs, gstate, pos)?;
                     match expr_output.t {
                         ExprType::Immediate(v) => {
+                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&format!("LDA #{}", v), 2)?;
                             match sub {
                                 Subscript::None => gstate.write_asm(&format!("STA {}", variable), cycles)?,
                                 Subscript::X => gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?,
                                 Subscript::Y => gstate.write_asm(&format!("STA {},Y", variable), 5)?,
                             };
+                            if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
                             Ok(ExprOutput { t: ExprType::A, flags: if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero }})
                         },
                         ExprType::Absolute(name) => {
+                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             let v = gstate.compiler_state.get_variable(name);
                             gstate.write_asm(&format!("LDA {}", name), if v.zeropage {3} else {4})?;
                             match sub {
@@ -184,24 +196,29 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, gstate: &mut GeneratorState, 
                                 Subscript::X => gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?,
                                 Subscript::Y => gstate.write_asm(&format!("STA {},Y", variable), 5)?,
                             };
+                            if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
                             Ok(ExprOutput { t: ExprType::A, flags: FlagsState::A })
                         },
                         ExprType::AbsoluteX(name) => {
+                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&format!("LDA {},X", name), 4)?;
                             match sub {
                                 Subscript::None => gstate.write_asm(&format!("STA {}", variable), cycles)?,
                                 Subscript::X => gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?,
                                 Subscript::Y => gstate.write_asm(&format!("STA {},Y", variable), 5)?,
                             };
+                            if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
                             Ok(ExprOutput { t: ExprType::A, flags: FlagsState::A })
                         },
                         ExprType::AbsoluteY(name) => {
+                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&format!("LDA {},Y", name), 4)?;
                             match sub {
                                 Subscript::None => gstate.write_asm(&format!("STA {}", variable), cycles)?,
                                 Subscript::X => gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?,
                                 Subscript::Y => gstate.write_asm(&format!("STA {},Y", variable), 5)?,
                             };
+                            if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
                             Ok(ExprOutput { t: ExprType::A, flags: FlagsState::A })
                         },
                         ExprType::A => {
@@ -214,32 +231,44 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, gstate: &mut GeneratorState, 
                         },
                         ExprType::X => {
                             match sub {
-                                Subscript::None => gstate.write_asm(&format!("STX {}", variable), cycles)?,
+                                Subscript::None => {
+                                    gstate.write_asm(&format!("STX {}", variable), cycles)?;
+                                },
                                 Subscript::X => {
+                                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                                     gstate.write_asm(&"TXA", 2)?;
-                                    gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?
+                                    gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
+                                    if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
                                 },
                                 Subscript::Y => if v.zeropage {
-                                    gstate.write_asm(&format!("STX {},Y", variable), 4)?
+                                    gstate.write_asm(&format!("STX {},Y", variable), 4)?;
                                 } else {
+                                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                                     gstate.write_asm(&"TXA", 2)?;
-                                    gstate.write_asm(&format!("STA {},Y", variable), 5)?
+                                    gstate.write_asm(&format!("STA {},Y", variable), 5)?;
+                                    if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
                                 },
                             };
                             Ok(ExprOutput { t: ExprType::X, flags: expr_output.flags })
                         },
                         ExprType::Y => {
                             match sub {
-                                Subscript::None => gstate.write_asm(&format!("STY {}", variable), cycles)?,
+                                Subscript::None => {
+                                    gstate.write_asm(&format!("STY {}", variable), cycles)?;
+                                },
                                 Subscript::X => if v.zeropage {
-                                    gstate.write_asm(&format!("STY {},X", variable), 4)?
+                                    gstate.write_asm(&format!("STY {},X", variable), 4)?;
                                 } else {
+                                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                                     gstate.write_asm(&"TYA", 2)?;
-                                    gstate.write_asm(&format!("STA {},X", variable), 5)?
+                                    gstate.write_asm(&format!("STA {},X", variable), 5)?;
+                                    if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
                                 },
                                 Subscript::Y => {
+                                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                                     gstate.write_asm(&"TYA", 2)?;
-                                    gstate.write_asm(&format!("STA {},Y", variable), 5)?
+                                    gstate.write_asm(&format!("STA {},Y", variable), 5)?;
+                                    if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
                                 },
                             };
                             Ok(ExprOutput { t: ExprType::Y, flags: expr_output.flags })
@@ -376,54 +405,46 @@ fn generate_condition(condition: &Expr, gstate: &mut GeneratorState, pos: usize,
     debug!("Condition: {:?}", condition);
     match condition {
         Expr::BinOp {lhs, op, rhs} => {
-            match op {
-                Operation::Eq | Operation::Neq => {
-                    let left = generate_expr(lhs, gstate, pos)?;
-                    match left.t {
-                        ExprType::X | ExprType::Y => {
-                            // This condition is using the special index registers
-                            let right = generate_expr(rhs, gstate, pos)?;
-                            match right.t {
-                                ExprType::Immediate(v) => {
-                                    // Special case: compare with 0
-                                    if v == 0 {
-                                        // Let's see if we can shortcut CPX or CPY
-                                        let flags_ok = (gstate.flags == FlagsState::X && left.t == ExprType::X) || (gstate.flags == FlagsState::Y && left.t == ExprType::Y);
-                                        if flags_ok {
-                                            if negate {
-                                                match op {
-                                                    Operation::Eq => {
-                                                        gstate.write_asm(&format!("BNE {}", label), 2)?;
-                                                        Ok(())
-                                                    },
-                                                    Operation::Neq => {
-                                                        gstate.write_asm(&format!("BEQ {}", label), 2)?;
-                                                        Ok(())
-                                                    },
-                                                    _ => unreachable!() 
-                                                }
-                                            } else {
-                                                match op {
-                                                    Operation::Eq => {
-                                                        gstate.write_asm(&format!("BEQ {}", label), 2)?;
-                                                        Ok(())
-                                                    },
-                                                    Operation::Neq => {
-                                                        gstate.write_asm(&format!("BNE {}", label), 2)?;
-                                                        Ok(())
-                                                    },
-                                                    _ => unreachable!() 
-                                                }
-                                            }
-                                        }
-                                        else { Err(Error::Unimplemented { feature: "condition statement is partially implemented" }) } 
-                                    } else { Err(Error::Unimplemented { feature: "condition statement is partially implemented" }) }
-                                },
-                                _ => Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
+            let left = generate_expr(lhs, gstate, pos)?;
+            let right = generate_expr(rhs, gstate, pos)?;
+            match right.t {
+                ExprType::Immediate(v) => {
+                    // Special case: compare with 0
+                    if v == 0 {
+                        // Let's see if we can shortcut compare instruction 
+                        let flags_ok = (gstate.flags == FlagsState::X && left.t == ExprType::X) || (gstate.flags == FlagsState::Y && left.t == ExprType::Y);
+                        if flags_ok {
+                            if negate {
+                                match op {
+                                    Operation::Eq => {
+                                        gstate.write_asm(&format!("BNE {}", label), 2)?;
+                                        Ok(())
+                                    },
+                                    Operation::Neq => {
+                                        gstate.write_asm(&format!("BEQ {}", label), 2)?;
+                                        Ok(())
+                                    },
+                                    _ => unreachable!() 
+                                }
+                            } else {
+                                match op {
+                                    Operation::Eq => {
+                                        gstate.write_asm(&format!("BEQ {}", label), 2)?;
+                                        Ok(())
+                                    },
+                                    Operation::Neq => {
+                                        gstate.write_asm(&format!("BNE {}", label), 2)?;
+                                        Ok(())
+                                    },
+                                    _ => unreachable!() 
+                                }
                             }
-                        },
-                        _ => Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
-                    }
+                        } else { Err(Error::Unimplemented { feature: "condition statement is partially implemented" }) } 
+                    } else { Err(Error::Unimplemented { feature: "condition statement is partially implemented" }) }
+                },
+                ExprType::Absolute(variable) => {
+                    let v = gstate.compiler_state.get_variable(variable);
+                    Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
                 },
                 _ => Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
             }
@@ -478,6 +499,7 @@ fn generate_if<'a>(condition: &Expr, body: &StatementLoc<'a>, else_body: Option<
 
 fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'a>) -> Result<FlagsState<'a>, Error>
 {
+    gstate.acc_in_use = false;
     // Generate different kind of statements
     match &code.statement {
         Statement::Block(statements) => {
@@ -522,6 +544,7 @@ pub fn generate_asm(compiler_state: &CompilerState, filename: &str) -> Result<()
         local_label_counter_if: 0,
         loops: Vec::new(),
         flags: FlagsState::Unknown,
+        acc_in_use: false,
     };
 
     gstate.write("\tPROCESSOR 6502\n")?;
