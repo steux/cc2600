@@ -26,7 +26,8 @@ impl<'a> GeneratorState<'a> {
         self.file.write(format!("\t{:23}\t; {} cycles\n", asm, cycles).as_bytes())
     }
     fn write_label(&mut self, label: &str) -> Result<usize, std::io::Error> {
-        self.flags = FlagsState::Unknown;
+        self.flags = FlagsState::Unknown; // There is a label, so there are some jumps to it -
+                                          // flags are then unknown at that point
         self.write(label)?;
         self.write(&"\n")
     }
@@ -415,36 +416,63 @@ fn generate_condition(condition: &Expr, gstate: &mut GeneratorState, pos: usize,
                                                 }
                                             }
                                         }
-                                        else { Err(Error::Unimplemented { feature: "for loop statement is partially implemented" }) } 
-                                    } else { Err(Error::Unimplemented { feature: "for loop statement is partially implemented" }) }
+                                        else { Err(Error::Unimplemented { feature: "condition statement is partially implemented" }) } 
+                                    } else { Err(Error::Unimplemented { feature: "condition statement is partially implemented" }) }
                                 },
-                                _ => Err(Error::Unimplemented { feature: "for loop statement is partially implemented" })
+                                _ => Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
                             }
                         },
-                        _ => Err(Error::Unimplemented { feature: "for loop statement is partially implemented" })
+                        _ => Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
                     }
                 },
-                _ => Err(Error::Unimplemented { feature: "for loop statement is partially implemented" })
+                _ => Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
             }
         },
-        _ => Err(Error::Unimplemented { feature: "for loop statement is partially implemented" })
+        _ => Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
     }
 }
 
 fn generate_for_loop<'a>(init: &Expr<'a>, condition: &Expr, update: &Expr<'a>, body: &StatementLoc<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
 {
     gstate.local_label_counter_for += 1;
-    let forloop_label = format!(".forloop{}", gstate.local_label_counter_for);
-    let forloopend_label = format!(".forloopend{}", gstate.local_label_counter_for);
+    let for_label = format!(".for{}", gstate.local_label_counter_for);
+    let forupdate_label = format!(".forupdate{}", gstate.local_label_counter_for);
+    let forend_label = format!(".forend{}", gstate.local_label_counter_for);
     gstate.flags = generate_expr(init, gstate, pos)?.flags;
-    gstate.loops.push(forloopend_label.clone());
-    generate_condition(condition, gstate, pos, true, &forloopend_label)?;
-    gstate.write_label(&forloop_label)?;
+    gstate.loops.push(forend_label.clone());
+    generate_condition(condition, gstate, pos, true, &forend_label)?;
+    gstate.write_label(&for_label)?;
     generate_statement(body, gstate)?;
+    gstate.write_label(&forupdate_label)?;
     gstate.flags = generate_expr(update, gstate, pos)?.flags;
-    generate_condition(condition, gstate, pos, false, &forloop_label)?;
-    gstate.write_label(&forloopend_label)?;
+    generate_condition(condition, gstate, pos, false, &for_label)?;
+    gstate.write_label(&forend_label)?;
     gstate.loops.pop();
+    Ok(())
+}
+
+fn generate_if<'a>(condition: &Expr, body: &StatementLoc<'a>, else_body: Option<&StatementLoc<'a>>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
+{
+    gstate.local_label_counter_if += 1;
+    let ifend_label = format!(".ifend{}", gstate.local_label_counter_if);
+    match else_body {
+        None => {
+            generate_condition(condition, gstate, pos, true, &ifend_label)?;
+            generate_statement(body, gstate)?;
+            gstate.write_label(&ifend_label)?;
+        },
+        Some(else_statement) => {
+            let else_label = format!(".else{}", gstate.local_label_counter_if);
+            generate_condition(condition, gstate, pos, true, &else_label)?;
+            let saved_flags = gstate.flags;
+            generate_statement(body, gstate)?;
+            gstate.write_asm(&format!("JMP {}", ifend_label), 3)?;
+            gstate.write_label(&else_label)?;
+            gstate.flags = saved_flags;
+            generate_statement(else_statement, gstate)?;
+            gstate.write_label(&ifend_label)?;
+        }
+    };
     Ok(())
 }
 
@@ -467,7 +495,14 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
             gstate.flags = FlagsState::Unknown;
             Ok(gstate.flags) 
         },
-        Statement::If { condition, body, else_body } => Err(Error::Unimplemented { feature: "if statement not implemented" }),
+        Statement::If { condition, body, else_body } => { 
+            match else_body {
+                None => generate_if(condition, body.as_ref(), None, gstate, code.pos)?,
+                Some(ebody) => generate_if(condition, body.as_ref(), Some(ebody.as_ref()), gstate, code.pos)?,
+            }; 
+            gstate.flags = FlagsState::Unknown;
+            Ok(gstate.flags) 
+        },
         Statement::Break => Err(Error::Unimplemented { feature: "break statement not implemented" }),
         Statement::Continue => Err(Error::Unimplemented { feature: "continue statement not implemented" }),
     }
