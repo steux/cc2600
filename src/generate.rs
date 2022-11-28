@@ -83,7 +83,7 @@ fn generate_included_source_code_line<'a>(loc: usize, gstate: &'a mut GeneratorS
     None
 }
 
-fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
 {
     match lhs {
         Expr::Var((var, sub)) => {
@@ -204,9 +204,15 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, gstate: &mut GeneratorState<'
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&format!("LDA #{}", v), 2)?;
                             match sub {
-                                Subscript::None => gstate.write_asm(&format!("STA {}", variable), cycles)?,
-                                Subscript::X => gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?,
-                                Subscript::Y => gstate.write_asm(&format!("STA {},Y", variable), 5)?,
+                                Subscript::None => {
+                                    gstate.write_asm(&format!("STA {}", variable), cycles)?;
+                                },
+                                Subscript::X => {
+                                    gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
+                                },
+                                Subscript::Y => {
+                                    gstate.write_asm(&format!("STA {},Y", variable), 5)?;
+                                }
                             };
                             if gstate.acc_in_use { 
                                 gstate.write_asm("PLA", 3)?; 
@@ -214,16 +220,22 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, gstate: &mut GeneratorState<'
                             } else {
                                 gstate.flags = if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero };
                             }
-                            Ok(ExprType::A)
+                            Ok(ExprType::Immediate(v))
                         },
                         ExprType::Absolute(name) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             let v = gstate.compiler_state.get_variable(name);
                             gstate.write_asm(&format!("LDA {}", name), if v.zeropage {3} else {4})?;
                             match sub {
-                                Subscript::None => gstate.write_asm(&format!("STA {}", variable), cycles)?,
-                                Subscript::X => gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?,
-                                Subscript::Y => gstate.write_asm(&format!("STA {},Y", variable), 5)?,
+                                Subscript::None => {
+                                    gstate.write_asm(&format!("STA {}", variable), cycles)?;
+                                },
+                                Subscript::X => {
+                                    gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
+                                },
+                                Subscript::Y => {
+                                    gstate.write_asm(&format!("STA {},Y", variable), 5)?;
+                                }
                             };
                             if gstate.acc_in_use {
                                 gstate.write_asm("PLA", 3)?;
@@ -231,15 +243,21 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, gstate: &mut GeneratorState<'
                             } else {
                                 gstate.flags = FlagsState::Var((name, Subscript::None));
                             }
-                            Ok(ExprType::A)
+                            Ok(ExprType::Absolute(name))
                         },
                         ExprType::AbsoluteX(name) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&format!("LDA {},X", name), 4)?;
                             match sub {
-                                Subscript::None => gstate.write_asm(&format!("STA {}", variable), cycles)?,
-                                Subscript::X => gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?,
-                                Subscript::Y => gstate.write_asm(&format!("STA {},Y", variable), 5)?,
+                                Subscript::None => {
+                                    gstate.write_asm(&format!("STA {}", variable), cycles)?;
+                                },
+                                Subscript::X => {
+                                    gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
+                                },
+                                Subscript::Y => {
+                                    gstate.write_asm(&format!("STA {},Y", variable), 5)?;
+                                }
                             };
                             if gstate.acc_in_use {
                                 gstate.write_asm("PLA", 3)?;
@@ -247,32 +265,46 @@ fn generate_assign<'a>(lhs: &Expr, rhs: &Expr<'a>, gstate: &mut GeneratorState<'
                             } else {
                                 gstate.flags = FlagsState::Var((name, Subscript::X));
                             }
-                            Ok(ExprType::A)
+                            Ok(ExprType::AbsoluteX(name))
                         },
                         ExprType::AbsoluteY(name) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&format!("LDA {},Y", name), 4)?;
                             match sub {
-                                Subscript::None => gstate.write_asm(&format!("STA {}", variable), cycles)?,
-                                Subscript::X => gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?,
-                                Subscript::Y => gstate.write_asm(&format!("STA {},Y", variable), 5)?,
+                                Subscript::None => {
+                                    gstate.write_asm(&format!("STA {}", variable), cycles)?;
+                                },
+                                Subscript::X => {
+                                    gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
+                                },
+                                Subscript::Y => {
+                                    gstate.write_asm(&format!("STA {},Y", variable), 5)?;
+                                }
                             };
                             if gstate.acc_in_use {
                                 gstate.write_asm("PLA", 3)?;
                                 gstate.flags = FlagsState::Unknown;
                             } else {
-                                gstate.flags = FlagsState::Var((name, Subscript::X));
+                                gstate.flags = FlagsState::Var((name, Subscript::Y));
                             }
-                            gstate.flags = FlagsState::Var((name, Subscript::Y));
-                            Ok(ExprType::A)
+                            Ok(ExprType::AbsoluteY(name))
                         },
                         ExprType::A => {
-                            match sub {
-                                Subscript::None => gstate.write_asm(&format!("STA {}", variable), cycles)?,
-                                Subscript::X => gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?,
-                                Subscript::Y => gstate.write_asm(&format!("STA {},Y", variable), 5)?,
+                            let e = match sub {
+                                Subscript::None => {
+                                    gstate.write_asm(&format!("STA {}", variable), cycles)?;
+                                    ExprType::Absolute(variable)
+                                },
+                                Subscript::X => {
+                                    gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
+                                    ExprType::AbsoluteX(variable)
+                                },
+                                Subscript::Y => {
+                                    gstate.write_asm(&format!("STA {},Y", variable), 5)?;
+                                    ExprType::AbsoluteY(variable)
+                                }
                             };
-                            Ok(ExprType::A)
+                            Ok(e)
                         },
                         ExprType::X => {
                             match sub {
