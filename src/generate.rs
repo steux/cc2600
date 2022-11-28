@@ -39,6 +39,7 @@ impl<'a> GeneratorState<'a> {
 enum ExprType<'a> {
     Nothing,
     Immediate(i32),
+    Tmp(bool),
     Absolute(&'a str),
     AbsoluteX(&'a str),
     AbsoluteY(&'a str),
@@ -98,6 +99,11 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             gstate.flags = if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero };
                             Ok(ExprType::X) 
                         },
+                        ExprType::Tmp(_) => {
+                            gstate.write_asm("LDX tmp", 3)?;
+                            gstate.flags = FlagsState::X;
+                            Ok(ExprType::X)
+                        },
                         ExprType::Absolute(name) => {
                             let v = gstate.compiler_state.get_variable(name);
                             gstate.write_asm(&format!("LDX {}", name), if v.zeropage {3} else {4})?;
@@ -152,6 +158,11 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             gstate.write_asm(&format!("LDY #{}", v), 2)?;
                             gstate.flags = if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero };
                             Ok(ExprType::Y) 
+                        },
+                        ExprType::Tmp(_) => {
+                            gstate.write_asm("LDY tmp", 3)?;
+                            gstate.flags = FlagsState::X;
+                            Ok(ExprType::X)
                         },
                         ExprType::Absolute(name) => {
                             let v = gstate.compiler_state.get_variable(name);
@@ -227,6 +238,26 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                                 gstate.flags = if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero };
                             }
                             Ok(ExprType::Immediate(v))
+                        },
+                        ExprType::Tmp(_) => {
+                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+                            gstate.write_asm("LDA tmp", 3)?;
+                            match sub {
+                                Subscript::None => {
+                                    gstate.write_asm(&format!("STA {}", variable), cycles)?;
+                                },
+                                Subscript::X => {
+                                    gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
+                                },
+                                Subscript::Y => {
+                                    gstate.write_asm(&format!("STA {},Y", variable), 5)?;
+                                }
+                            };
+                            if gstate.acc_in_use {
+                                gstate.write_asm("PLA", 3)?;
+                            }
+                            gstate.flags = FlagsState::Unknown;
+                            Ok(expr_output)
                         },
                         ExprType::Absolute(name) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
@@ -464,7 +495,7 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
     if acc_in_use {
         gstate.write_asm("STA tmp", 3)?;
         gstate.write_asm("PLA", 3)?;
-        Ok(ExprType::Absolute("tmp"))
+        Ok(ExprType::Tmp(signed))
     } else {
         Ok(ExprType::A(signed))
     }
