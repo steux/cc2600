@@ -15,8 +15,8 @@ use crate::generate::generate_asm;
 #[grammar = "cc2600.pest"]
 struct Cc2600Parser;
 
-#[derive(Debug, Copy, Clone)]
-enum VariableType {
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum VariableType {
     UnsignedChar,
     SignedChar,
 }
@@ -24,12 +24,12 @@ enum VariableType {
 #[derive(Debug)]
 pub struct Variable {
     order: usize,
-    var_type: VariableType,
+    pub var_type: VariableType,
     pub zeropage: bool,
     pub size: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Operation {
     Add,
     Sub,

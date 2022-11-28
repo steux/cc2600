@@ -14,7 +14,7 @@ struct GeneratorState<'a> {
     file: File,
     local_label_counter_for: u32,
     local_label_counter_if: u32,
-    loops: Vec<String>,
+    loops: Vec<(String,String)>,
     flags: FlagsState<'a>,
     acc_in_use: bool,
 }
@@ -400,6 +400,21 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState, pos: usize) -
     }
 }
 
+fn flags_ok(flags: &FlagsState, expr_type: &ExprType) -> bool
+{
+    match flags {
+        FlagsState::X => *expr_type == ExprType::X,
+        FlagsState::Y => *expr_type == ExprType::Y,
+        FlagsState::A => *expr_type == ExprType::A,
+        FlagsState::Var((s, sub)) => match sub {
+            Subscript::None => *expr_type == ExprType::Absolute(s),
+            Subscript::X => *expr_type == ExprType::AbsoluteX(s),
+            Subscript::Y => *expr_type == ExprType::AbsoluteY(s),
+        },
+        _ => false
+    }
+}
+
 fn generate_condition(condition: &Expr, gstate: &mut GeneratorState, pos: usize, negate: bool, label: &str) -> Result<(), Error>
 {
     debug!("Condition: {:?}", condition);
@@ -407,44 +422,67 @@ fn generate_condition(condition: &Expr, gstate: &mut GeneratorState, pos: usize,
         Expr::BinOp {lhs, op, rhs} => {
             let left = generate_expr(lhs, gstate, pos)?;
             let right = generate_expr(rhs, gstate, pos)?;
-            match right.t {
-                ExprType::Immediate(v) => {
-                    // Special case: compare with 0
-                    if v == 0 {
-                        // Let's see if we can shortcut compare instruction 
-                        let flags_ok = (gstate.flags == FlagsState::X && left.t == ExprType::X) || (gstate.flags == FlagsState::Y && left.t == ExprType::Y);
-                        if flags_ok {
-                            if negate {
-                                match op {
-                                    Operation::Eq => {
-                                        gstate.write_asm(&format!("BNE {}", label), 2)?;
-                                        Ok(())
-                                    },
-                                    Operation::Neq => {
-                                        gstate.write_asm(&format!("BEQ {}", label), 2)?;
-                                        Ok(())
-                                    },
-                                    _ => unreachable!() 
-                                }
-                            } else {
-                                match op {
-                                    Operation::Eq => {
-                                        gstate.write_asm(&format!("BEQ {}", label), 2)?;
-                                        Ok(())
-                                    },
-                                    Operation::Neq => {
-                                        gstate.write_asm(&format!("BNE {}", label), 2)?;
-                                        Ok(())
-                                    },
-                                    _ => unreachable!() 
-                                }
-                            }
-                        } else { Err(Error::Unimplemented { feature: "condition statement is partially implemented" }) } 
-                    } else { Err(Error::Unimplemented { feature: "condition statement is partially implemented" }) }
+    
+            let operator = if negate {
+                match op {
+                    Operation::Eq => Operation::Neq,
+                    Operation::Neq => Operation::Eq,
+                    Operation::Gt => Operation::Lte,
+                    Operation::Gte => Operation::Lt,
+                    Operation::Lt => Operation::Gte,
+                    Operation::Lte => Operation::Lt,
+                    _ => unreachable!()
+                }
+            } else { *op };
+           
+            if let ExprType::Immediate(v) = right.t {
+                if v == 0 {
+                // Let's see if we can shortcut compare instruction 
+                    if flags_ok(&gstate.flags, &left.t) {
+                        match operator {
+                            Operation::Eq => {
+                                gstate.write_asm(&format!("BNE {}", label), 2)?;
+                                return Ok(());
+                            },
+                            Operation::Neq => {
+                                gstate.write_asm(&format!("BEQ {}", label), 2)?;
+                                return Ok(());
+                            },
+                            _ => unreachable!(),
+                        }
+                    } 
+                }
+            }
+
+            // Compare instruction
+            let signed;
+            match left.t {
+                ExprType::Absolute(varname) => {
+                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+                    let v = gstate.compiler_state.get_variable(varname);
+                    signed = v.var_type == VariableType::SignedChar;
+                    let cycles = if v.zeropage { 3 } else { 4 };
+                    gstate.write_asm(&format!("LDA {}", varname), cycles)?;
+                    match right.t {
+                        ExprType::AbsoluteY(name) => {
+                            gstate.write_asm(&format!("CMP {},Y", name), 4)?;
+                        },
+                        _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
+                    } 
+                    if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
                 },
-                ExprType::Absolute(variable) => {
-                    let v = gstate.compiler_state.get_variable(variable);
-                    Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
+                _ => { return Err(Error::Unimplemented { feature: "condition statement is partially implemented" }); },
+            }
+
+            // Branch instruction
+            match operator {
+                Operation::Lt => {
+                    if signed {
+                        gstate.write_asm(&format!("BMI {}", label), 2)?;
+                    } else {
+                        gstate.write_asm(&format!("BCC {}", label), 2)?;
+                    } 
+                    Ok(())
                 },
                 _ => Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
             }
@@ -460,7 +498,7 @@ fn generate_for_loop<'a>(init: &Expr<'a>, condition: &Expr, update: &Expr<'a>, b
     let forupdate_label = format!(".forupdate{}", gstate.local_label_counter_for);
     let forend_label = format!(".forend{}", gstate.local_label_counter_for);
     gstate.flags = generate_expr(init, gstate, pos)?.flags;
-    gstate.loops.push(forend_label.clone());
+    gstate.loops.push((forupdate_label.clone(), forend_label.clone()));
     generate_condition(condition, gstate, pos, true, &forend_label)?;
     gstate.write_label(&for_label)?;
     generate_statement(body, gstate)?;
