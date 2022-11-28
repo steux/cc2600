@@ -454,6 +454,14 @@ fn generate_plusplus<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: 
     }
 }
 
+fn generate_neg<'a>(expr: &Expr<'a>, _gstate: &mut GeneratorState<'a>, _pos: usize) -> Result<ExprType<'a>, Error>
+{
+    match expr {
+        Expr::Integer(i) => Ok(ExprType::Immediate(-*i)),
+        _ => { return Err(Error::Unimplemented { feature: "negation statement is partially implemented" }); },
+    }
+}
+
 fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
 {
     // Include C source code into generated asm
@@ -500,8 +508,7 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
         },
         Expr::MinusMinus(v) => generate_minusminus(v, gstate, pos),
         Expr::PlusPlus(v) => generate_plusplus(v, gstate, pos),
-        //Expr::Neg(v) => generate_neg(v, gstate, pos),
-        _ => unreachable!() 
+        Expr::Neg(v) => generate_neg(v, gstate, pos),
     }
 }
 
@@ -560,6 +567,7 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
 
             // Compare instruction
             let signed;
+            let cmp;
             match left {
                 ExprType::Absolute(varname) => {
                     if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
@@ -567,13 +575,21 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                     signed = v.var_type == VariableType::SignedChar;
                     let cycles = if v.zeropage { 3 } else { 4 };
                     gstate.write_asm(&format!("LDA {}", varname), cycles)?;
-                    match right {
-                        ExprType::AbsoluteY(name) => {
-                            gstate.write_asm(&format!("CMP {},Y", name), 4)?;
-                        },
-                        _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
-                    } 
-                    if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
+                    cmp = true;
+                },
+                ExprType::AbsoluteX(varname) => {
+                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+                    let v = gstate.compiler_state.get_variable(varname);
+                    signed = v.var_type == VariableType::SignedChar;
+                    gstate.write_asm(&format!("LDA {},X", varname), 4)?;
+                    cmp = true;
+                },
+                ExprType::AbsoluteY(varname) => {
+                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+                    let v = gstate.compiler_state.get_variable(varname);
+                    signed = v.var_type == VariableType::SignedChar;
+                    gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
+                    cmp = true;
                 },
                 ExprType::Y => {
                     signed = false;
@@ -582,6 +598,7 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                             let v = gstate.compiler_state.get_variable(varname);
                             let cycles = if v.zeropage { 3 } else { 4 };
                             gstate.write_asm(&format!("CPY {}", varname), cycles)?;
+                            cmp = false;
                         },
                         _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
                     } 
@@ -589,6 +606,31 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                 _ => { return Err(Error::Unimplemented { feature: "condition statement is partially implemented" }); },
             }
 
+            if cmp {
+                match right {
+                    ExprType::Immediate(v) => {
+                        gstate.write_asm(&format!("CMP #{}", v), 2)?;
+                    },
+                    ExprType::Absolute(name) => {
+                        let v = gstate.compiler_state.get_variable(name);
+                        let cycles = if v.zeropage { 3 } else { 4 };
+                        gstate.write_asm(&format!("CMP {}", name), cycles)?;
+                    },
+                    ExprType::AbsoluteX(name) => {
+                        gstate.write_asm(&format!("CMP {},X", name), 4)?;
+                    },
+                    ExprType::AbsoluteY(name) => {
+                        gstate.write_asm(&format!("CMP {},Y", name), 4)?;
+                    },
+                    _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
+                } 
+                if gstate.acc_in_use { 
+                    gstate.write_asm("PLA", 3)?; 
+                }
+            }
+
+            gstate.flags = FlagsState::Unknown;
+            
             // Branch instruction
             match operator {
                 Operation::Neq => {
