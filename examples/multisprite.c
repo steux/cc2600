@@ -126,7 +126,8 @@ void update_overlap()
     X = sorted_by_y[X];
     if (sp_y[X] > sp_y[Y] + SPRITE_INTERVAL) {
       sp_overlap[Y] = 0;
-    } else {
+    }
+    else {
       i = sp_y[Y] + SPRITE_INTERVAL;
       k = Y;
       l = 1;

@@ -42,7 +42,7 @@ enum ExprType<'a> {
     Absolute(&'a str),
     AbsoluteX(&'a str),
     AbsoluteY(&'a str),
-    A, X, Y,
+    A(bool), X, Y,
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -121,9 +121,10 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             gstate.flags = FlagsState::X;
                             Ok(ExprType::X)
                         },
-                        ExprType::A => {
+                        ExprType::A(_) => {
                             gstate.write_asm(&"TAX", 2)?;
                             gstate.flags = FlagsState::X;
+                            gstate.acc_in_use = false;
                             Ok(ExprType::X)
                         },
                         ExprType::X => {
@@ -175,8 +176,9 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             }
                             Ok(ExprType::Y)
                         },
-                        ExprType::A => {
+                        ExprType::A(_)=> {
                             gstate.write_asm(&"TAY", 2)?;
+                            gstate.acc_in_use = false;
                             gstate.flags = FlagsState::Y;
                             Ok(ExprType::Y)
                         },
@@ -293,7 +295,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             }
                             Ok(ExprType::AbsoluteY(name))
                         },
-                        ExprType::A => {
+                        ExprType::A(_) => {
                             let e = match sub {
                                 Subscript::None => {
                                     gstate.write_asm(&format!("STA {}", variable), cycles)?;
@@ -308,6 +310,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                                     ExprType::AbsoluteY(variable)
                                 }
                             };
+                            gstate.acc_in_use = false;
                             Ok(e)
                         },
                         ExprType::X => {
@@ -380,6 +383,90 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
             }
         },
         _ => Err(syntax_error(gstate.compiler_state, "Bad left value in assignement", pos)),
+    }
+}
+
+fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+{
+    let acc_in_use = gstate.acc_in_use;
+    if acc_in_use { gstate.write_asm("PHA", 3)?; }
+    let left = generate_expr(lhs, gstate, pos)?;
+    let right = generate_expr(rhs, gstate, pos)?;
+    match left {
+        ExprType::Immediate(l) => {
+            match right {
+                ExprType::Immediate(r) => {
+                    match op {
+                        Operation::Add => return Ok(ExprType::Immediate(l + r)),
+                        Operation::Sub => return Ok(ExprType::Immediate(l - r)),
+                        _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
+                    } 
+                },
+                _ => gstate.write_asm(&format!("LDA #{}", l), 2)?,
+            };
+        },
+        ExprType::Absolute(varname) => {
+            let v = gstate.compiler_state.get_variable(varname);
+            let cycles = if v.zeropage { 3 } else { 4 };
+            gstate.write_asm(&format!("LDA {}", varname), cycles)?;
+        },
+        ExprType::AbsoluteX(varname) => {
+            gstate.write_asm(&format!("LDA {},X", varname), 4)?;
+        },
+        ExprType::AbsoluteY(varname) => {
+            gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
+        },
+        ExprType::X => {
+            gstate.write_asm("TXA", 2)?;
+        },
+        ExprType::Y => {
+            gstate.write_asm("TYA", 2)?;
+        },
+        _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
+    }
+    gstate.acc_in_use = true;
+    let operation = match op {
+        Operation::Add => {
+            gstate.write_asm("CLC", 2)?;
+            "ADC"
+        },
+        Operation::Sub => {
+            gstate.write_asm("SEC", 2)?;
+            "SBC"
+        },
+        _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
+    };
+    let signed;
+    match right {
+        ExprType::Immediate(v) => {
+            gstate.write_asm(&format!("{} #{}", operation, v), 2)?;
+            signed = if v > 127 { false } else { true };
+        },
+        ExprType::Absolute(varname) => {
+            let v = gstate.compiler_state.get_variable(varname);
+            signed = v.var_type == VariableType::SignedChar;
+            let cycles = if v.zeropage { 3 } else { 4 };
+            gstate.write_asm(&format!("{} {}", operation, varname), cycles)?;
+        },
+        ExprType::AbsoluteX(varname) => {
+            let v = gstate.compiler_state.get_variable(varname);
+            signed = v.var_type == VariableType::SignedChar;
+            gstate.write_asm(&format!("{} {},X", operation, varname), 4)?;
+        },
+        ExprType::AbsoluteY(varname) => {
+            let v = gstate.compiler_state.get_variable(varname);
+            signed = v.var_type == VariableType::SignedChar;
+            gstate.write_asm(&format!("{} {},Y", operation, varname), 4)?;
+        },
+        _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
+    };
+    gstate.flags = FlagsState::Unknown;
+    if acc_in_use {
+        gstate.write_asm("STA tmp", 3)?;
+        gstate.write_asm("PLA", 3)?;
+        Ok(ExprType::Absolute("tmp"))
+    } else {
+        Ok(ExprType::A(signed))
     }
 }
 
@@ -490,8 +577,7 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
         Expr::BinOp {lhs, op, rhs} => {
             match op {
                 Operation::Assign => generate_assign(lhs, rhs, gstate, pos),
-                Operation::Add => Err(Error::Unimplemented { feature: "Addition not implemented" }),
-                Operation::Sub => Err(Error::Unimplemented { feature: "Subtraction not implemented" }),
+                Operation::Add | Operation::Sub => generate_arithm(lhs, op, rhs, gstate, pos),
                 Operation::Eq => Err(Error::Unimplemented { feature: "Equal not implemented" }),
                 Operation::Neq => Err(Error::Unimplemented { feature: "Not equal not implemented" }),
                 Operation::Gt => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
@@ -537,10 +623,29 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
     debug!("Condition: {:?}", condition);
     match condition {
         Expr::BinOp {lhs, op, rhs} => {
-            let left = generate_expr(lhs, gstate, pos)?;
-            let right = generate_expr(rhs, gstate, pos)?;
-    
-            let operator = if negate {
+            let l = generate_expr(lhs, gstate, pos)?;
+            let r = generate_expr(rhs, gstate, pos)?;
+            let left;
+            let right;
+
+            let switch = match &l {
+                ExprType::X | ExprType::Y => {
+                    left = &l; right = &r;
+                    false
+                }, 
+                _ => match &r {
+                    ExprType::A(_) => {
+                        left = &r; right = &l;
+                        true 
+                    },
+                    _ => {
+                        left = &l; right = &r;
+                        false
+                    }
+                }
+            };
+           
+            let opx = if negate {
                 match op {
                     Operation::Eq => Operation::Neq,
                     Operation::Neq => Operation::Eq,
@@ -551,8 +656,20 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                     _ => unreachable!()
                 }
             } else { *op };
-           
-            if let ExprType::Immediate(v) = right {
+          
+            let operator = if switch {
+                match op {
+                    Operation::Eq => Operation::Eq,
+                    Operation::Neq => Operation::Neq,
+                    Operation::Gt => Operation::Lt,
+                    Operation::Gte => Operation::Lte,
+                    Operation::Lt => Operation::Gt,
+                    Operation::Lte => Operation::Gte,
+                    _ => unreachable!()
+                }
+            } else { opx };
+
+            if let ExprType::Immediate(v) = *right {
                 if v == 0 {
                 // Let's see if we can shortcut compare instruction 
                     if flags_ok(&gstate.flags, &left) {
@@ -597,15 +714,52 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                     gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
                     cmp = true;
                 },
+                ExprType::A(sign) => {
+                    cmp = true;
+                    signed = *sign;
+                    gstate.acc_in_use = false;
+                },
                 ExprType::Y => {
                     signed = false;
                     match right {
+                        ExprType::Immediate(v) => {
+                            gstate.write_asm(&format!("CPY #{}", v), 2)?;
+                            cmp = false;
+                        },
                         ExprType::Absolute(varname) => {
                             let v = gstate.compiler_state.get_variable(varname);
                             let cycles = if v.zeropage { 3 } else { 4 };
                             gstate.write_asm(&format!("CPY {}", varname), cycles)?;
                             cmp = false;
                         },
+                        ExprType::A(_) => {
+                            gstate.write_asm("STA tmp", 3)?;
+                            gstate.write_asm("CPY tmp", 3)?;
+                            cmp = false;
+                            gstate.acc_in_use = false;
+                        }
+                        _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
+                    } 
+                },
+                ExprType::X => {
+                    signed = false;
+                    match right {
+                        ExprType::Immediate(v) => {
+                            gstate.write_asm(&format!("CPX #{}", v), 2)?;
+                            cmp = false;
+                        },
+                        ExprType::Absolute(varname) => {
+                            let v = gstate.compiler_state.get_variable(varname);
+                            let cycles = if v.zeropage { 3 } else { 4 };
+                            gstate.write_asm(&format!("CPX {}", varname), cycles)?;
+                            cmp = false;
+                        },
+                        ExprType::A(_) => {
+                            gstate.write_asm(&format!("STA tmp"), 3)?;
+                            gstate.write_asm(&format!("CPX tmp"), 3)?;
+                            cmp = false;
+                            gstate.acc_in_use = false;
+                        }
                         _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
                     } 
                 },
@@ -872,6 +1026,7 @@ pub fn generate_asm(compiler_state: &CompilerState, filename: &str) -> Result<()
     gstate.write("\tSEG.U variables\n\tORG $80\n\n")?;
     
     // Generate vaiables code
+    gstate.file.write_all("tmp\tds 1\n".as_bytes())?; 
     for v in compiler_state.sorted_variables().iter() {
         gstate.file.write_all(format!("{:23}\tds {}\n", v.0, v.1.size).as_bytes())?; 
     }
