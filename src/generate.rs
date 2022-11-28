@@ -471,16 +471,65 @@ fn generate_condition(condition: &Expr, gstate: &mut GeneratorState, pos: usize,
                     } 
                     if gstate.acc_in_use { gstate.write_asm("PLA", 3)?; }
                 },
+                ExprType::Y => {
+                    signed = false;
+                    match right.t {
+                        ExprType::Absolute(varname) => {
+                            let v = gstate.compiler_state.get_variable(varname);
+                            let cycles = if v.zeropage { 3 } else { 4 };
+                            gstate.write_asm(&format!("CPY {}", varname), cycles)?;
+                        },
+                        _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
+                    } 
+                },
                 _ => { return Err(Error::Unimplemented { feature: "condition statement is partially implemented" }); },
             }
 
             // Branch instruction
             match operator {
+                Operation::Neq => {
+                    gstate.write_asm(&format!("BNE {}", label), 2)?;
+                    return Ok(());
+                },
+                Operation::Eq => {
+                    gstate.write_asm(&format!("BEQ {}", label), 2)?;
+                    return Ok(());
+                },
                 Operation::Lt => {
                     if signed {
                         gstate.write_asm(&format!("BMI {}", label), 2)?;
                     } else {
                         gstate.write_asm(&format!("BCC {}", label), 2)?;
+                    } 
+                    Ok(())
+                },
+                Operation::Gt => {
+                    let label_here = format!(".ifhere{}", gstate.local_label_counter_if);
+                    if signed {
+                        gstate.write_asm(&format!("BEQ {}", label_here), 2)?;
+                        gstate.write_asm(&format!("BPL {}", label), 2)?;
+                    } else {
+                        gstate.write_asm(&format!("BEQ {}", label_here), 2)?;
+                        gstate.write_asm(&format!("BCS {}", label), 2)?;
+                    }
+                    gstate.write_label(&label_here)?;
+                    Ok(())
+                },
+                Operation::Lte => {
+                    if signed {
+                        gstate.write_asm(&format!("BMI {}", label), 2)?;
+                        gstate.write_asm(&format!("BEQ {}", label), 2)?;
+                    } else {
+                        gstate.write_asm(&format!("BCC {}", label), 2)?;
+                        gstate.write_asm(&format!("BEQ {}", label), 2)?;
+                    } 
+                    Ok(())
+                },
+                Operation::Gte => {
+                    if signed {
+                        gstate.write_asm(&format!("BPL {}", label), 2)?;
+                    } else {
+                        gstate.write_asm(&format!("BCS {}", label), 2)?;
                     } 
                     Ok(())
                 },
@@ -516,9 +565,23 @@ fn generate_if<'a>(condition: &Expr, body: &StatementLoc<'a>, else_body: Option<
     let ifend_label = format!(".ifend{}", gstate.local_label_counter_if);
     match else_body {
         None => {
-            generate_condition(condition, gstate, pos, true, &ifend_label)?;
-            generate_statement(body, gstate)?;
-            gstate.write_label(&ifend_label)?;
+            match body.statement {
+                Statement::Break => {
+                    let brk_label = {
+                        match gstate.loops.last() {
+                            None => return Err(syntax_error(gstate.compiler_state, "Break statement outside loop", pos)),
+                            Some((_, bl)) => bl.clone(),
+                        }
+                    };
+                    generate_condition(condition, gstate, pos, false, &brk_label)?;
+                },
+                _ => {
+                    generate_condition(condition, gstate, pos, true, &ifend_label)?;
+                    generate_statement(body, gstate)?;
+                    gstate.write_label(&ifend_label)?;
+                }
+
+            }
         },
         Some(else_statement) => {
             let else_label = format!(".else{}", gstate.local_label_counter_if);
