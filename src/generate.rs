@@ -440,11 +440,11 @@ fn generate_condition(condition: &Expr, gstate: &mut GeneratorState, pos: usize,
                 // Let's see if we can shortcut compare instruction 
                     if flags_ok(&gstate.flags, &left.t) {
                         match operator {
-                            Operation::Eq => {
+                            Operation::Neq => {
                                 gstate.write_asm(&format!("BNE {}", label), 2)?;
                                 return Ok(());
                             },
-                            Operation::Neq => {
+                            Operation::Eq => {
                                 gstate.write_asm(&format!("BEQ {}", label), 2)?;
                                 return Ok(());
                             },
@@ -535,6 +535,16 @@ fn generate_if<'a>(condition: &Expr, body: &StatementLoc<'a>, else_body: Option<
     Ok(())
 }
 
+fn generate_break<'a>(gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
+{
+    let brk_label = match gstate.loops.last() {
+        None => return Err(syntax_error(gstate.compiler_state, "Break statement outside loop", pos)),
+        Some((_, bl)) => bl,
+    };
+    gstate.write_asm(&format!("JMP {}", brk_label), 3)?;
+    Ok(())
+}
+
 fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'a>) -> Result<FlagsState<'a>, Error>
 {
     gstate.acc_in_use = false;
@@ -547,23 +557,20 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
             Ok(gstate.flags)
         },
         Statement::Expression(expr) => { 
-            gstate.flags = generate_expr(&expr, gstate, code.pos)?.flags; 
-            Ok(gstate.flags) 
+            Ok(generate_expr(&expr, gstate, code.pos)?.flags) 
         },
         Statement::For { init, condition, update, body } => { 
             generate_for_loop(init, condition, update, body.as_ref(), gstate, code.pos)?; 
-            gstate.flags = FlagsState::Unknown;
-            Ok(gstate.flags) 
+            Ok(FlagsState::Unknown) 
         },
         Statement::If { condition, body, else_body } => { 
             match else_body {
                 None => generate_if(condition, body.as_ref(), None, gstate, code.pos)?,
                 Some(ebody) => generate_if(condition, body.as_ref(), Some(ebody.as_ref()), gstate, code.pos)?,
             }; 
-            gstate.flags = FlagsState::Unknown;
-            Ok(gstate.flags) 
+            Ok(FlagsState::Unknown) 
         },
-        Statement::Break => Err(Error::Unimplemented { feature: "break statement not implemented" }),
+        Statement::Break => { generate_break(gstate, code.pos)?; Ok(FlagsState::Unknown) }
         Statement::Continue => Err(Error::Unimplemented { feature: "continue statement not implemented" }),
     }
 }
