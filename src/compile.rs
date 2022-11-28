@@ -50,7 +50,8 @@ pub enum Subscript {
 }
 
 #[derive(Debug)]
-pub enum Expr<'a>{
+pub enum Expr<'a> {
+    Nothing,
     Integer(i32),
     Var((&'a str, Subscript)),
     BinOp {
@@ -79,7 +80,8 @@ pub enum Statement<'a> {
         else_body: Option<Box<StatementLoc<'a>>>
     },
     Break,
-    Continue
+    Continue,
+    Return
 }
 
 #[derive(Debug)]
@@ -257,6 +259,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
 
 fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
 {
+    debug!("Compile statement: {:?}", pair);
     let pos = pair.as_span().start();
     match pair.as_rule() {
         Rule::expr => {
@@ -270,7 +273,11 @@ fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Res
         },
         Rule::for_loop => {
             let mut p = pair.into_inner();
-            let init = parse_expr(state, p.next().unwrap().into_inner())?;
+            let i = p.next().unwrap();
+            let init = match i.as_rule() {
+                Rule::nothing => Expr::Nothing,
+                _ => parse_expr(state, i.into_inner())?
+            };
             let condition = parse_expr(state, p.next().unwrap().into_inner())?;
             let update = parse_expr(state, p.next().unwrap().into_inner())?;
             let body = compile_statement(state, p.next().unwrap().into_inner().next().unwrap())?;
@@ -302,6 +309,11 @@ fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Res
         Rule::continue_statement => {
             Ok(StatementLoc {
                 pos, statement: Statement::Continue
+            })
+        },
+        Rule::return_statement => {
+            Ok(StatementLoc {
+                pos, statement: Statement::Return
             })
         },
         _ => {

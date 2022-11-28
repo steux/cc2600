@@ -36,6 +36,7 @@ impl<'a> GeneratorState<'a> {
 
 #[derive(Debug, PartialEq)]
 enum ExprType<'a> {
+    Nothing,
     Immediate(i32),
     Absolute(&'a str),
     AbsoluteX(&'a str),
@@ -139,6 +140,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             }
                             Ok(ExprType::X)
                         },
+                        ExprType::Nothing => unreachable!()
                     }
                 },
                 "Y" => {
@@ -193,8 +195,9 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             gstate.flags = FlagsState::Y;
                             Ok(ExprType::Y)
                         },
+                        ExprType::Nothing => unreachable!()
                     }
-                } ,
+                },
                 variable => {
                     let v = gstate.compiler_state.get_variable(variable);
                     let cycles = if v.zeropage { 3 } else { 4 };
@@ -370,6 +373,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             };
                             Ok(ExprType::Y)
                         },
+                        ExprType::Nothing => unreachable!()
                     }
                 }
             }
@@ -509,6 +513,7 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
         Expr::MinusMinus(v) => generate_minusminus(v, gstate, pos),
         Expr::PlusPlus(v) => generate_plusplus(v, gstate, pos),
         Expr::Neg(v) => generate_neg(v, gstate, pos),
+        Expr::Nothing => Ok(ExprType::Nothing),
     }
 }
 
@@ -721,6 +726,15 @@ fn generate_if<'a>(condition: &Expr<'a>, body: &StatementLoc<'a>, else_body: Opt
                     };
                     generate_condition(condition, gstate, pos, false, &brk_label)?;
                 },
+                Statement::Continue => {
+                    let cont_label = {
+                        match gstate.loops.last() {
+                            None => return Err(syntax_error(gstate.compiler_state, "Break statement outside loop", pos)),
+                            Some((cl, _)) => cl.clone(),
+                        }
+                    };
+                    generate_condition(condition, gstate, pos, false, &cont_label)?;
+                },
                 _ => {
                     generate_condition(condition, gstate, pos, true, &ifend_label)?;
                     generate_statement(body, gstate)?;
@@ -754,6 +768,22 @@ fn generate_break<'a>(gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(),
     Ok(())
 }
 
+fn generate_continue<'a>(gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
+{
+    let cont_label = match gstate.loops.last() {
+        None => return Err(syntax_error(gstate.compiler_state, "Break statement outside loop", pos)),
+        Some((cl, _)) => cl,
+    };
+    gstate.write_asm(&format!("JMP {}", cont_label), 3)?;
+    Ok(())
+}
+
+fn generate_return<'a>(gstate: &mut GeneratorState<'a>) -> Result<(), Error>
+{
+    gstate.write_asm("RTS", 6)?;
+    Ok(())
+}
+
 fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'a>) -> Result<(), Error>
 {
     gstate.acc_in_use = false;
@@ -777,7 +807,8 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
             }; 
         },
         Statement::Break => { generate_break(gstate, code.pos)?; }
-        Statement::Continue => return Err(Error::Unimplemented { feature: "continue statement not implemented" }),
+        Statement::Continue => { generate_continue(gstate, code.pos)?; }
+        Statement::Return => { generate_return(gstate)?; }
     }
     Ok(())
 }

@@ -24,6 +24,7 @@ statement = {
     | if_statement
     | break_statement
     | continue_statement
+    | return_statement
     | expr ~ ";"
     | block
     }
@@ -32,7 +33,8 @@ while_do = { "while" ~ "(" ~ expr ~ ")"~ statement }
 for_loop = { "for" ~ "(" ~ (expr | nothing) ~ ";" ~ expr ~ ";" ~ expr ~ ")" ~ statement }
 if_statement = { "if" ~ "(" ~ expr ~ ")" ~ statement ~ ("else" ~ statement)* }
 break_statement = { "break" ~ ";" }
-continue_statement = { "continue" ~ ","}
+continue_statement = { "continue" ~ ";"}
+return_statement = { "return" ~ ";"}
 nothing = { "" }
 
 expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
