@@ -79,6 +79,14 @@ pub enum Statement<'a> {
         body: Box<StatementLoc<'a>>,
         else_body: Option<Box<StatementLoc<'a>>>
     },
+    While {
+        condition: Expr<'a>,
+        body: Box<StatementLoc<'a>>,
+    },
+    DoWhile {
+        body: Box<StatementLoc<'a>>,
+        condition: Expr<'a>,
+    },
     Break,
     Continue,
     Return
@@ -298,6 +306,26 @@ fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Res
             Ok(StatementLoc {
                 pos, statement: Statement::If {
                     condition, body: Box::new(body), else_body 
+                }
+            })
+        },
+        Rule::do_while => {
+            let mut p = pair.into_inner();
+            let condition = parse_expr(state, p.next().unwrap().into_inner())?;
+            let body = compile_statement(state, p.next().unwrap().into_inner().next().unwrap())?;
+            Ok(StatementLoc {
+                pos, statement: Statement::DoWhile {
+                    body: Box::new(body), condition  
+                }
+            })
+        },
+        Rule::while_do => {
+            let mut p = pair.into_inner();
+            let condition = parse_expr(state, p.next().unwrap().into_inner())?;
+            let body = compile_statement(state, p.next().unwrap().into_inner().next().unwrap())?;
+            Ok(StatementLoc {
+                pos, statement: Statement::While {
+                    condition, body: Box::new(body) 
                 }
             })
         },

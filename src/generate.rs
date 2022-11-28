@@ -14,6 +14,7 @@ struct GeneratorState<'a> {
     file: File,
     local_label_counter_for: u32,
     local_label_counter_if: u32,
+    local_label_counter_while: u32,
     loops: Vec<(String,String)>,
     flags: FlagsState<'a>,
     acc_in_use: bool,
@@ -758,6 +759,36 @@ fn generate_if<'a>(condition: &Expr<'a>, body: &StatementLoc<'a>, else_body: Opt
     Ok(())
 }
 
+fn generate_while<'a>(condition: &Expr<'a>, body: &StatementLoc<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
+{
+    gstate.local_label_counter_while += 1;
+    let while_label = format!(".while{}", gstate.local_label_counter_while);
+    let whileend_label = format!(".whileend{}", gstate.local_label_counter_while);
+    gstate.loops.push((while_label.clone(), whileend_label.clone()));
+    gstate.write_label(&while_label)?;
+    generate_condition(condition, gstate, pos, true, &whileend_label)?;
+    generate_statement(body, gstate)?;
+    gstate.write_label(&whileend_label)?;
+    gstate.loops.pop();
+    Ok(())
+}
+
+fn generate_do_while<'a>(body: &StatementLoc<'a>, condition: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
+{
+    gstate.local_label_counter_while += 1;
+    let dowhile_label = format!(".dowhile{}", gstate.local_label_counter_while);
+    let dowhilecondition_label = format!(".dowhilecondition{}", gstate.local_label_counter_while);
+    let dowhileend_label = format!(".dowhileend{}", gstate.local_label_counter_while);
+    gstate.loops.push((dowhilecondition_label.clone(), dowhileend_label.clone()));
+    gstate.write_label(&dowhile_label)?;
+    generate_statement(body, gstate)?;
+    gstate.write_label(&dowhilecondition_label)?;
+    generate_condition(condition, gstate, pos, false, &dowhile_label)?;
+    gstate.write_label(&dowhileend_label)?;
+    gstate.loops.pop();
+    Ok(())
+}
+
 fn generate_break<'a>(gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
 {
     let brk_label = match gstate.loops.last() {
@@ -800,6 +831,12 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
         Statement::For { init, condition, update, body } => { 
             generate_for_loop(init, condition, update, body.as_ref(), gstate, code.pos)?; 
         },
+        Statement::While { condition, body } => { 
+            generate_while(condition, body.as_ref(), gstate, code.pos)?; 
+        },
+        Statement::DoWhile { body, condition } => { 
+            generate_do_while(body.as_ref(), condition, gstate, code.pos)?; 
+        },
         Statement::If { condition, body, else_body } => { 
             match else_body {
                 None => generate_if(condition, body.as_ref(), None, gstate, code.pos)?,
@@ -825,6 +862,7 @@ pub fn generate_asm(compiler_state: &CompilerState, filename: &str) -> Result<()
         file,
         local_label_counter_for: 0,
         local_label_counter_if: 0,
+        local_label_counter_while: 0,
         loops: Vec::new(),
         flags: FlagsState::Unknown,
         acc_in_use: false,
