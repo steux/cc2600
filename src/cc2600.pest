@@ -14,7 +14,9 @@ superchip = { "superchip" }
 var_sign = { ("signed" | "unsigned")? } 
 var_simple_type = { "char" | "short" }
 var_name = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
-var_name_ex = { pointer? ~ var_const? ~ var_name ~ ("[" ~ int ~ "]")? }
+var_name_ex = { pointer? ~ var_const? ~ var_name ~ ("[" ~ int ~ "]")? ~ ("=" ~ var_def)? }
+var_def = { int | array_def }
+array_def = { "{" ~ (int ~ ",")* ~ int ~ "}" }
 pointer = { "*" }
 
 func_decl = { inline? ~ "void" ~ var_name ~ "(" ~ ("void")? ~ ")" ~ block }

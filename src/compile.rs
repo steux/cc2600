@@ -29,6 +29,13 @@ pub enum VariableMemory {
     Superchip,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum VariableDefinition {
+    None,
+    Value(i32),
+    Array(Vec<i32>),
+}
+
 #[derive(Debug)]
 pub struct Variable {
     order: usize,
@@ -37,6 +44,7 @@ pub struct Variable {
     pub signed: bool,
     pub memory: VariableMemory,
     pub size: usize,
+    pub def: VariableDefinition 
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -262,21 +270,39 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
             Rule::var_name_ex => {
                 let mut name = "";
                 let mut size:usize = 1;
+                let mut def = VariableDefinition::None;
                 for p in pair.into_inner() {
                     match p.as_rule() {
                         Rule::pointer => var_type = VariableType::CharPtr,
                         Rule::var_const => var_const = true,
                         Rule::var_name => name = p.as_str(),
                         Rule::int => size = p.as_str().parse::<usize>().unwrap(), 
+                        Rule::var_def => {
+                            let px = p.into_inner().next().unwrap();
+                            match px.as_rule() {
+                                Rule::int => def = VariableDefinition::Value(parse_int(px.into_inner().next().unwrap())),
+                                Rule::array_def => {
+                                    let mut v = Vec::new();
+                                    for pxx in px.into_inner() {
+                                        v.push(parse_int(pxx.into_inner().next().unwrap()));
+                                    }
+                                    def = VariableDefinition::Array(v);
+                                },
+                                _ => unreachable!()
+
+                            } 
+                        },
                         _ => unreachable!()
                     }
                 }
+
                 if name != "X" && name != "Y" {
                     state.variables.insert(name.to_string(), Variable {
                         order: state.variables.len(),
                         signed,
                         memory,
                         var_const,
+                        def,
                         var_type, size});
                 }
             },

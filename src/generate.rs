@@ -104,7 +104,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             Ok(ExprType::X) 
                         },
                         ExprType::Tmp(_) => {
-                            gstate.write_asm("LDX tmp", 3)?;
+                            gstate.write_asm("LDX cctmp", 3)?;
                             gstate.flags = FlagsState::X;
                             Ok(ExprType::X)
                         },
@@ -168,7 +168,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             Ok(ExprType::Y) 
                         },
                         ExprType::Tmp(_) => {
-                            gstate.write_asm("LDY tmp", 3)?;
+                            gstate.write_asm("LDY cctmp", 3)?;
                             gstate.flags = FlagsState::X;
                             Ok(ExprType::X)
                         },
@@ -258,7 +258,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                         },
                         ExprType::Tmp(_) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                            gstate.write_asm("LDA tmp", 3)?;
+                            gstate.write_asm("LDA cctmp", 3)?;
                             match sub_output {
                                 ExprType::Nothing => {
                                     gstate.write_asm(&format!("STA {}", variable), cycles)?;
@@ -551,7 +551,7 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
     };
     gstate.flags = FlagsState::Unknown;
     if acc_in_use {
-        gstate.write_asm("STA tmp", 3)?;
+        gstate.write_asm("STA cctmp", 3)?;
         gstate.write_asm("PLA", 3)?;
         Ok(ExprType::Tmp(signed))
     } else {
@@ -847,8 +847,8 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                             cmp = false;
                         },
                         ExprType::A(_) => {
-                            gstate.write_asm("STA tmp", 3)?;
-                            gstate.write_asm("CPY tmp", 3)?;
+                            gstate.write_asm("STA cctmp", 3)?;
+                            gstate.write_asm("CPY cctmp", 3)?;
                             cmp = false;
                             gstate.acc_in_use = false;
                         }
@@ -873,8 +873,8 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                             cmp = false;
                         },
                         ExprType::A(_) => {
-                            gstate.write_asm(&format!("STA tmp"), 3)?;
-                            gstate.write_asm(&format!("CPX tmp"), 3)?;
+                            gstate.write_asm(&format!("STA cctmp"), 3)?;
+                            gstate.write_asm(&format!("CPX cctmp"), 3)?;
                             cmp = false;
                             gstate.acc_in_use = false;
                         }
@@ -1044,6 +1044,7 @@ fn generate_while<'a>(condition: &Expr<'a>, body: &StatementLoc<'a>, gstate: &mu
     gstate.write_label(&while_label)?;
     generate_condition(condition, gstate, pos, true, &whileend_label)?;
     generate_statement(body, gstate)?;
+    gstate.write_asm(&format!("JMP {}", while_label), 3)?;
     gstate.write_label(&whileend_label)?;
     gstate.loops.pop();
     Ok(())
@@ -1144,16 +1145,27 @@ pub fn generate_asm(compiler_state: &CompilerState, filename: &str) -> Result<()
         acc_in_use: false,
     };
 
-    gstate.write("\tPROCESSOR 6502\n")?;
-    gstate.write("\tSEG.U variables\n\tORG $80\n\n")?;
+    gstate.write("\tPROCESSOR 6502\n\n")?;
     
-    // Generate vaiables code
-    gstate.file.write_all("tmp\tds 1\n".as_bytes())?; 
     for v in compiler_state.sorted_variables().iter() {
-        gstate.file.write_all(format!("{:23}\tds {}\n", v.0, v.1.size).as_bytes())?; 
+        if v.1.var_const {
+            if let VariableDefinition::Value(val) = &v.1.def  {
+                gstate.write(&format!("{:23}\tEQU ${:x}\n", v.0, val))?; 
+            }
+        }
     }
 
-    gstate.write("\n\tSEG.U code\n\tORG $F000\n")?;
+    gstate.write("\n\tSEG.U VARS\n\tORG $80\n\n")?;
+    
+    // Generate variables code
+    gstate.file.write_all("cctmp                  \tds 1\n".as_bytes())?; 
+    for v in compiler_state.sorted_variables().iter() {
+        if !v.1.var_const && v.1.memory == VariableMemory::Zeropage && v.1.def == VariableDefinition::None {
+            gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size))?; 
+        }
+    }
+
+    gstate.write("\n\tSEG CODE\n\tORG $F000\n")?;
 
     // Generate functions code
     gstate.write("\n; Functions definitions\n")?;
@@ -1164,6 +1176,9 @@ pub fn generate_asm(compiler_state: &CompilerState, filename: &str) -> Result<()
         generate_statement(&f.1.code, &mut gstate)?;
         gstate.write_asm("RTS", 6)?;
     }
+   
+    // Generate startup code
+    gstate.write("\n\tECHO ([$FFFC-.]d), \"bytes free\"\n\n\tORG $FFFA\n\n\t.word main\t; NMI\n\t.word main\t; RESET\n\t.word main\t; IRQ\n\nEND\n")?;
 
     Ok(())
 }
