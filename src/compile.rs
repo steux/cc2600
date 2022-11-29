@@ -17,15 +17,25 @@ struct Cc2600Parser;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum VariableType {
-    UnsignedChar,
-    SignedChar,
+    Char,
+    Short,
+    CharPtr,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum VariableMemory {
+    ROM,
+    Zeropage,
+    Superchip,
 }
 
 #[derive(Debug)]
 pub struct Variable {
     order: usize,
     pub var_type: VariableType,
-    pub zeropage: bool,
+    pub var_const: bool,
+    pub signed: bool,
+    pub memory: VariableMemory,
     pub size: usize,
 }
 
@@ -101,6 +111,7 @@ pub struct StatementLoc<'a> {
 #[derive(Debug)]
 pub struct Function<'a> {
     order: usize,
+    pub inline: bool,
     pub code: StatementLoc<'a>,
 }
 
@@ -233,26 +244,46 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
 
 fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(), Error>
 {
-    let mut var_type = VariableType::SignedChar;
+    let mut var_type = VariableType::Char;
+    let mut var_const = false;
+    let mut signed = true;
+    let mut memory = VariableMemory::Zeropage;
     for pair in pairs {
         match pair.as_rule() {
             Rule::var_type => {
-                let sign = pair.into_inner().next().unwrap();
-                if sign.as_str().eq("unsigned") {
-                    var_type = VariableType::UnsignedChar;
+                for p in pair.into_inner() {
+                    match p.as_rule() {
+                        Rule::var_const => var_const = true,
+                        Rule::superchip => memory = VariableMemory::Superchip,
+                        Rule::var_sign => if p.as_str().eq("unsigned") {
+                            signed = false;
+                        },
+                        Rule::var_simple_type => if p.as_str().eq("short") {
+                            var_type = VariableType::Short;
+
+                        },
+                        _ => unreachable!()
+                    }
                 }
             },
             Rule::var_name_ex => {
-                let mut p = pair.into_inner();
-                let name = p.next().unwrap().as_str().to_string();
-                let size = match p.next() {
-                    Some(x) => x.as_str().parse::<usize>().unwrap(),
-                    None => 1 
-                };
+                let mut name = "";
+                let mut size:usize = 1;
+                for p in pair.into_inner() {
+                    match p.as_rule() {
+                        Rule::pointer => var_type = VariableType::CharPtr,
+                        Rule::var_const => memory = VariableMemory::ROM,
+                        Rule::var_name => name = p.as_str(),
+                        Rule::int => size = p.as_str().parse::<usize>().unwrap(), 
+                        _ => unreachable!()
+                    }
+                }
                 if name != "X" && name != "Y" {
-                    state.variables.insert(name, Variable {
+                    state.variables.insert(name.to_string(), Variable {
                         order: state.variables.len(),
-                        zeropage: true,
+                        signed,
+                        memory,
+                        var_const,
                         var_type, size});
                 }
             },
@@ -373,8 +404,13 @@ fn compile_block<'a>(state: &CompilerState<'a>, p: Pair<'a, Rule>) -> Result<Sta
 
 fn compile_func_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<(), Error>
 {
+    let mut inline = false;
     let mut p = pairs.into_iter();
-    let pair = p.next().unwrap();
+    let mut pair = p.next().unwrap();
+    if pair.as_rule() == Rule::inline { 
+        inline = true; 
+        pair = p.next().unwrap();
+    }
     match pair.as_rule() {
         Rule::var_name => {
             let name = pair.as_str();
@@ -384,6 +420,7 @@ fn compile_func_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) 
                     let code = compile_block(state, pair)?;
                     state.functions.insert(name.to_string(), Function {
                         order: state.functions.len(),
+                        inline,
                         code 
                     });
                 },

@@ -6,6 +6,8 @@ use std::fs::File;
 
 use log::debug;
 
+// TODO: write tests
+
 struct GeneratorState<'a> {
     compiler_state: &'a CompilerState<'a>,
     last_included_line_number: usize,
@@ -106,7 +108,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                         },
                         ExprType::Absolute(name) => {
                             let v = gstate.compiler_state.get_variable(name);
-                            gstate.write_asm(&format!("LDX {}", name), if v.zeropage {3} else {4})?;
+                            gstate.write_asm(&format!("LDX {}", name), if v.memory == VariableMemory::Zeropage {3} else {4})?;
                             gstate.flags = FlagsState::X;
                             Ok(ExprType::X)
                         },
@@ -166,7 +168,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                         },
                         ExprType::Absolute(name) => {
                             let v = gstate.compiler_state.get_variable(name);
-                            gstate.write_asm(&format!("LDY {}", name), if v.zeropage {3} else {4})?;
+                            gstate.write_asm(&format!("LDY {}", name), if v.memory == VariableMemory::Zeropage {3} else {4})?;
                             gstate.flags = FlagsState::Y;
                             Ok(ExprType::Y)
                         },
@@ -214,7 +216,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                 },
                 variable => {
                     let v = gstate.compiler_state.get_variable(variable);
-                    let cycles = if v.zeropage { 3 } else { 4 };
+                    let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                     let expr_output = generate_expr(rhs, gstate, pos)?;
                     match expr_output {
                         ExprType::Immediate(v) => {
@@ -262,7 +264,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                         ExprType::Absolute(name) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             let v = gstate.compiler_state.get_variable(name);
-                            gstate.write_asm(&format!("LDA {}", name), if v.zeropage {3} else {4})?;
+                            gstate.write_asm(&format!("LDA {}", name), if v.memory == VariableMemory::Zeropage {3} else {4})?;
                             match sub {
                                 Subscript::None => {
                                     gstate.write_asm(&format!("STA {}", variable), cycles)?;
@@ -360,7 +362,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                                         gstate.flags = FlagsState::X;
                                     }
                                 },
-                                Subscript::Y => if v.zeropage {
+                                Subscript::Y => if v.memory == VariableMemory::Zeropage {
                                     gstate.write_asm(&format!("STX {},Y", variable), 4)?;
                                 } else {
                                     if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
@@ -381,7 +383,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                                 Subscript::None => {
                                     gstate.write_asm(&format!("STY {}", variable), cycles)?;
                                 },
-                                Subscript::X => if v.zeropage {
+                                Subscript::X => if v.memory == VariableMemory::Zeropage {
                                     gstate.write_asm(&format!("STY {},X", variable), 4)?;
                                 } else {
                                     if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
@@ -438,7 +440,7 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
         },
         ExprType::Absolute(varname) => {
             let v = gstate.compiler_state.get_variable(varname);
-            let cycles = if v.zeropage { 3 } else { 4 };
+            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
             gstate.write_asm(&format!("LDA {}", varname), cycles)?;
         },
         ExprType::AbsoluteX(varname) => {
@@ -475,18 +477,18 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
         },
         ExprType::Absolute(varname) => {
             let v = gstate.compiler_state.get_variable(varname);
-            signed = v.var_type == VariableType::SignedChar;
-            let cycles = if v.zeropage { 3 } else { 4 };
+            signed = v.signed; 
+            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
             gstate.write_asm(&format!("{} {}", operation, varname), cycles)?;
         },
         ExprType::AbsoluteX(varname) => {
             let v = gstate.compiler_state.get_variable(varname);
-            signed = v.var_type == VariableType::SignedChar;
+            signed = v.signed; 
             gstate.write_asm(&format!("{} {},X", operation, varname), 4)?;
         },
         ExprType::AbsoluteY(varname) => {
             let v = gstate.compiler_state.get_variable(varname);
-            signed = v.var_type == VariableType::SignedChar;
+            signed = v.signed; 
             gstate.write_asm(&format!("{} {},Y", operation, varname), 4)?;
         },
         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
@@ -518,7 +520,7 @@ fn generate_minusminus<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos
                 },
                 variable => {
                     let v = gstate.compiler_state.get_variable(variable);
-                    let cycles = if v.zeropage { 5 } else { 6 };
+                    let cycles = if v.memory == VariableMemory::Zeropage { 5 } else { 6 };
                     match sub {
                         Subscript::None => {
                             gstate.write_asm(&format!("DEC {}", variable), cycles)?;
@@ -556,7 +558,7 @@ fn generate_plusplus<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: 
                 },
                 variable => {
                     let v = gstate.compiler_state.get_variable(variable);
-                    let cycles = if v.zeropage { 5 } else { 6 };
+                    let cycles = if v.memory == VariableMemory::Zeropage { 5 } else { 6 };
                     match sub {
                         Subscript::None => {
                             gstate.write_asm(&format!("INC {}", variable), cycles)?;
@@ -726,22 +728,22 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                 ExprType::Absolute(varname) => {
                     if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                     let v = gstate.compiler_state.get_variable(varname);
-                    signed = v.var_type == VariableType::SignedChar;
-                    let cycles = if v.zeropage { 3 } else { 4 };
+                    signed = v.signed;
+                    let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                     gstate.write_asm(&format!("LDA {}", varname), cycles)?;
                     cmp = true;
                 },
                 ExprType::AbsoluteX(varname) => {
                     if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                     let v = gstate.compiler_state.get_variable(varname);
-                    signed = v.var_type == VariableType::SignedChar;
+                    signed = v.signed;
                     gstate.write_asm(&format!("LDA {},X", varname), 4)?;
                     cmp = true;
                 },
                 ExprType::AbsoluteY(varname) => {
                     if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                     let v = gstate.compiler_state.get_variable(varname);
-                    signed = v.var_type == VariableType::SignedChar;
+                    signed = v.signed;
                     gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
                     cmp = true;
                 },
@@ -759,7 +761,7 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                         },
                         ExprType::Absolute(varname) => {
                             let v = gstate.compiler_state.get_variable(varname);
-                            let cycles = if v.zeropage { 3 } else { 4 };
+                            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                             gstate.write_asm(&format!("CPY {}", varname), cycles)?;
                             cmp = false;
                         },
@@ -781,7 +783,7 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                         },
                         ExprType::Absolute(varname) => {
                             let v = gstate.compiler_state.get_variable(varname);
-                            let cycles = if v.zeropage { 3 } else { 4 };
+                            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                             gstate.write_asm(&format!("CPX {}", varname), cycles)?;
                             cmp = false;
                         },
@@ -804,7 +806,7 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                     },
                     ExprType::Absolute(name) => {
                         let v = gstate.compiler_state.get_variable(name);
-                        let cycles = if v.zeropage { 3 } else { 4 };
+                        let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                         gstate.write_asm(&format!("CMP {}", name), cycles)?;
                     },
                     ExprType::AbsoluteX(name) => {
