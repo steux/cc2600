@@ -22,6 +22,7 @@ statement = {
     | while_do
     | for_loop
     | if_statement
+    | switch_statement
     | break_statement
     | continue_statement
     | return_statement
@@ -32,10 +33,13 @@ do_while = { "do" ~ statement ~ "while" ~ "(" ~ expr ~ ")" ~ ";" }
 while_do = { "while" ~ "(" ~ expr ~ ")"~ statement }
 for_loop = { "for" ~ "(" ~ (expr | nothing) ~ ";" ~ expr ~ ";" ~ expr ~ ")" ~ statement }
 if_statement = { "if" ~ "(" ~ expr ~ ")" ~ statement ~ ("else" ~ statement)* }
+switch_statement = { "switch" ~ "(" ~ expr ~ ")" ~ "{" ~ cases ~ "}" }
 break_statement = { "break" ~ ";" }
 continue_statement = { "continue" ~ ";"}
 return_statement = { "return" ~ ";"}
 nothing = { "" }
+
+cases = { ("case" ~ int ~ ":" ~ statement*)* ~ ("default" ~ ":" ~ statement*) }
 
 expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
     infix    =  _{ mul | div | add | sub | bls | brs | lte | lt | gte | gt | eq | neq |
@@ -84,7 +88,8 @@ var         = { var_name ~ subscript? }
 subscript   = { "[" ~ index ~ "]" }
 index       = { "X" | "Y" }
       
-int = { hexadecimal | octal | decimal }
-decimal     = @{ (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT+ | ASCII_DIGIT) }
+int = { hexadecimal | octal | decimal | character }
+decimal     = @{ ("-")* ~ (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT+ | ASCII_DIGIT) }
 hexadecimal = @{ "0x" ~ ASCII_HEX_DIGIT+ }
 octal       = @{ "0" ~ ASCII_OCT_DIGIT+ }
+character   = @{ "'" ~ (ASCII_ALPHANUMERIC | "\n" | "\t" | "\r") ~ "'" }
