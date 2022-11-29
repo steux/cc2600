@@ -52,18 +52,11 @@ pub enum Operation {
     Lte
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub enum Subscript {
-    None,
-    X,
-    Y
-}
-
 #[derive(Debug)]
 pub enum Expr<'a> {
     Nothing,
     Integer(i32),
-    Var((&'a str, Subscript)),
+    Var((&'a str, Box<Expr<'a>>)),
     BinOp {
         lhs: Box<Expr<'a>>,
         op: Operation,
@@ -172,24 +165,24 @@ fn parse_int(p: Pair<Rule>) -> i32
     }
 }
 
-fn parse_var<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<(&'a str, Subscript), Error>
+fn parse_var<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<(&'a str, Box<Expr<'a>>), Error>
 {
     let mut p = pairs.into_iter();
     let px = p.next().unwrap();
     let varname = px.as_str();
     let subscript = match p.next() {
         Some(pair) => {
-            match pair.as_str() {
-                "[X]" => Subscript::X,
-                "[Y]" => Subscript::Y,
-                _ => return Err(syntax_error(state, "Bad array subscript (only X and Y are supported)", pair.as_span().start()))  
-            }
+            let expr = parse_expr(state, pair.into_inner())?;
+            Box::new(expr)
         },
-        None => Subscript::None
+        None => Box::new(Expr::Nothing), 
     };
     if varname.eq("X") || varname.eq("Y") {
-        if subscript == Subscript::None { return Ok((varname, subscript)); }
-        else { return Err(syntax_error(state, &format!("No subscript for {} index", varname), px.as_span().start())); }
+        match *subscript {
+            Expr::Nothing => return Ok((varname, subscript)),
+            _ => return Err(syntax_error(state, &format!("No subscript for {} index", varname), px.as_span().start())),
+
+        }
     }
     match state.variables.get(varname) {
         Some(_var) => {
@@ -253,7 +246,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
             Rule::var_type => {
                 for p in pair.into_inner() {
                     match p.as_rule() {
-                        Rule::var_const => var_const = true,
+                        Rule::var_const => memory = VariableMemory::ROM,
                         Rule::superchip => memory = VariableMemory::Superchip,
                         Rule::var_sign => if p.as_str().eq("unsigned") {
                             signed = false;
@@ -272,7 +265,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                 for p in pair.into_inner() {
                     match p.as_rule() {
                         Rule::pointer => var_type = VariableType::CharPtr,
-                        Rule::var_const => memory = VariableMemory::ROM,
+                        Rule::var_const => var_const = true,
                         Rule::var_name => name = p.as_str(),
                         Rule::int => size = p.as_str().parse::<usize>().unwrap(), 
                         _ => unreachable!()

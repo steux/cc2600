@@ -89,8 +89,7 @@ expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ pos
     primary  =  _{ int | var | "(" ~ expr ~ ")" }
 
 var         = { var_name ~ subscript? }
-subscript   = { "[" ~ index ~ "]" }
-index       = { "X" | "Y" }
+subscript   = { "[" ~ expr ~ "]" }
       
 int = { hexadecimal | octal | decimal | character }
 decimal     = @{ ("-")* ~ (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT+ | ASCII_DIGIT) }

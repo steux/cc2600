@@ -42,7 +42,7 @@ enum ExprType<'a> {
     Nothing,
     Immediate(i32),
     Tmp(bool),
-    Absolute(&'a str),
+    Absolute(&'a str, u16),
     AbsoluteX(&'a str),
     AbsoluteY(&'a str),
     A(bool), X, Y,
@@ -53,7 +53,9 @@ enum FlagsState<'a> {
     Unknown,
     X, Y,
     Zero, Positive, Negative,
-    Var((&'a str, Subscript)),
+    Absolute(&'a str, u16),
+    AbsoluteX(&'a str),
+    AbsoluteY(&'a str),
 }
 
 fn generate_included_source_code_line<'a>(loc: usize, gstate: &'a mut GeneratorState) -> Option<&'a str>
@@ -106,9 +108,13 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             gstate.flags = FlagsState::X;
                             Ok(ExprType::X)
                         },
-                        ExprType::Absolute(name) => {
+                        ExprType::Absolute(name, offset) => {
                             let v = gstate.compiler_state.get_variable(name);
-                            gstate.write_asm(&format!("LDX {}", name), if v.memory == VariableMemory::Zeropage {3} else {4})?;
+                            if offset > 0 {
+                                gstate.write_asm(&format!("LDX {}+{}", name, offset), if v.memory == VariableMemory::Zeropage {3} else {4})?;
+                            } else {
+                                gstate.write_asm(&format!("LDX {}", name), if v.memory == VariableMemory::Zeropage {3} else {4})?;
+                            }
                             gstate.flags = FlagsState::X;
                             Ok(ExprType::X)
                         },
@@ -166,9 +172,13 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             gstate.flags = FlagsState::X;
                             Ok(ExprType::X)
                         },
-                        ExprType::Absolute(name) => {
+                        ExprType::Absolute(name, offset) => {
                             let v = gstate.compiler_state.get_variable(name);
-                            gstate.write_asm(&format!("LDY {}", name), if v.memory == VariableMemory::Zeropage {3} else {4})?;
+                            if offset > 0 {
+                                gstate.write_asm(&format!("LDY {}+{}", name, offset), if v.memory == VariableMemory::Zeropage {3} else {4})?;
+                            } else {
+                                gstate.write_asm(&format!("LDY {}", name), if v.memory == VariableMemory::Zeropage {3} else {4})?;
+                            }
                             gstate.flags = FlagsState::Y;
                             Ok(ExprType::Y)
                         },
@@ -218,20 +228,25 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                     let v = gstate.compiler_state.get_variable(variable);
                     let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                     let expr_output = generate_expr(rhs, gstate, pos)?;
+                    let sub_output = generate_expr(sub, gstate, pos)?;
                     match expr_output {
                         ExprType::Immediate(v) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&format!("LDA #{}", v), 2)?;
-                            match sub {
-                                Subscript::None => {
+                            match sub_output {
+                                ExprType::Nothing => {
                                     gstate.write_asm(&format!("STA {}", variable), cycles)?;
                                 },
-                                Subscript::X => {
+                                ExprType::X => {
                                     gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
                                 },
-                                Subscript::Y => {
+                                ExprType::Y => {
                                     gstate.write_asm(&format!("STA {},Y", variable), 5)?;
-                                }
+                                },
+                                ExprType::Immediate(v) => {
+                                    gstate.write_asm(&format!("STA {}+{}", variable, v), cycles)?;
+                                },
+                                _ => return Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                             };
                             if gstate.acc_in_use { 
                                 gstate.write_asm("PLA", 3)?; 
@@ -244,16 +259,20 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                         ExprType::Tmp(_) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm("LDA tmp", 3)?;
-                            match sub {
-                                Subscript::None => {
+                            match sub_output {
+                                ExprType::Nothing => {
                                     gstate.write_asm(&format!("STA {}", variable), cycles)?;
                                 },
-                                Subscript::X => {
+                                ExprType::X => {
                                     gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
                                 },
-                                Subscript::Y => {
+                                ExprType::Y => {
                                     gstate.write_asm(&format!("STA {},Y", variable), 5)?;
-                                }
+                                },
+                                ExprType::Immediate(v) => {
+                                    gstate.write_asm(&format!("STA {}+{}", variable, v), cycles)?;
+                                },
+                                _ => return Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                             };
                             if gstate.acc_in_use {
                                 gstate.write_asm("PLA", 3)?;
@@ -261,97 +280,118 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             gstate.flags = FlagsState::Unknown;
                             Ok(expr_output)
                         },
-                        ExprType::Absolute(name) => {
+                        ExprType::Absolute(name, offset) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             let v = gstate.compiler_state.get_variable(name);
-                            gstate.write_asm(&format!("LDA {}", name), if v.memory == VariableMemory::Zeropage {3} else {4})?;
-                            match sub {
-                                Subscript::None => {
+                            if offset > 0 {
+                                gstate.write_asm(&format!("LDA {}+{}", name, offset), if v.memory == VariableMemory::Zeropage {3} else {4})?;
+                            } else {
+                                gstate.write_asm(&format!("LDA {}", name), if v.memory == VariableMemory::Zeropage {3} else {4})?;
+                            }
+                            match sub_output {
+                                ExprType::Nothing => {
                                     gstate.write_asm(&format!("STA {}", variable), cycles)?;
                                 },
-                                Subscript::X => {
+                                ExprType::X => {
                                     gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
                                 },
-                                Subscript::Y => {
+                                ExprType::Y => {
                                     gstate.write_asm(&format!("STA {},Y", variable), 5)?;
-                                }
+                                },
+                                ExprType::Immediate(v) => {
+                                    gstate.write_asm(&format!("STA {}+{}", variable, v), cycles)?;
+                                },
+                                _ => return Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                             };
                             if gstate.acc_in_use {
                                 gstate.write_asm("PLA", 3)?;
                                 gstate.flags = FlagsState::Unknown;
                             } else {
-                                gstate.flags = FlagsState::Var((name, Subscript::None));
+                                gstate.flags = FlagsState::Absolute(name, offset);
                             }
-                            Ok(ExprType::Absolute(name))
+                            Ok(ExprType::Absolute(name, offset))
                         },
                         ExprType::AbsoluteX(name) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&format!("LDA {},X", name), 4)?;
-                            match sub {
-                                Subscript::None => {
+                            match sub_output {
+                                ExprType::Nothing => {
                                     gstate.write_asm(&format!("STA {}", variable), cycles)?;
                                 },
-                                Subscript::X => {
+                                ExprType::X => {
                                     gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
                                 },
-                                Subscript::Y => {
+                                ExprType::Y => {
                                     gstate.write_asm(&format!("STA {},Y", variable), 5)?;
-                                }
+                                },
+                                ExprType::Immediate(v) => {
+                                    gstate.write_asm(&format!("STA {}+{}", variable, v), cycles)?;
+                                },
+                                _ => return Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                             };
                             if gstate.acc_in_use {
                                 gstate.write_asm("PLA", 3)?;
                                 gstate.flags = FlagsState::Unknown;
                             } else {
-                                gstate.flags = FlagsState::Var((name, Subscript::X));
+                                gstate.flags = FlagsState::AbsoluteX(name);
                             }
                             Ok(ExprType::AbsoluteX(name))
                         },
                         ExprType::AbsoluteY(name) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&format!("LDA {},Y", name), 4)?;
-                            match sub {
-                                Subscript::None => {
+                            match sub_output {
+                                ExprType::Nothing => {
                                     gstate.write_asm(&format!("STA {}", variable), cycles)?;
                                 },
-                                Subscript::X => {
+                                ExprType::X => {
                                     gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
                                 },
-                                Subscript::Y => {
+                                ExprType::Y => {
                                     gstate.write_asm(&format!("STA {},Y", variable), 5)?;
-                                }
+                                },
+                                ExprType::Immediate(v) => {
+                                    gstate.write_asm(&format!("STA {}+{}", variable, v), cycles)?;
+                                },
+                                _ => return Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                             };
                             if gstate.acc_in_use {
                                 gstate.write_asm("PLA", 3)?;
                                 gstate.flags = FlagsState::Unknown;
                             } else {
-                                gstate.flags = FlagsState::Var((name, Subscript::Y));
+                                gstate.flags = FlagsState::AbsoluteY(name);
                             }
                             Ok(ExprType::AbsoluteY(name))
                         },
                         ExprType::A(_) => {
-                            let e = match sub {
-                                Subscript::None => {
+                            let e = match sub_output {
+                                ExprType::Nothing => {
                                     gstate.write_asm(&format!("STA {}", variable), cycles)?;
-                                    ExprType::Absolute(variable)
+                                    ExprType::Absolute(variable, 0)
                                 },
-                                Subscript::X => {
+                                ExprType::X => {
                                     gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
                                     ExprType::AbsoluteX(variable)
                                 },
-                                Subscript::Y => {
+                                ExprType::Y => {
                                     gstate.write_asm(&format!("STA {},Y", variable), 5)?;
                                     ExprType::AbsoluteY(variable)
                                 }
+                                ExprType::Immediate(v) => {
+                                    gstate.write_asm(&format!("STA {}+{}", variable, v), cycles)?;
+                                    ExprType::Absolute(variable, v as u16)
+                                },
+                                _ => return Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                             };
                             gstate.acc_in_use = false;
                             Ok(e)
                         },
                         ExprType::X => {
-                            match sub {
-                                Subscript::None => {
+                            match sub_output {
+                                ExprType::Nothing => {
                                     gstate.write_asm(&format!("STX {}", variable), cycles)?;
                                 },
-                                Subscript::X => {
+                                ExprType::X => {
                                     if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                                     gstate.write_asm(&"TXA", 2)?;
                                     gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
@@ -362,7 +402,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                                         gstate.flags = FlagsState::X;
                                     }
                                 },
-                                Subscript::Y => if v.memory == VariableMemory::Zeropage {
+                                ExprType::Y => if v.memory == VariableMemory::Zeropage {
                                     gstate.write_asm(&format!("STX {},Y", variable), 4)?;
                                 } else {
                                     if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
@@ -375,15 +415,19 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                                         gstate.flags = FlagsState::X;
                                     }
                                 },
+                                ExprType::Immediate(v) => {
+                                    gstate.write_asm(&format!("STX {}+{}", variable, v), cycles)?;
+                                },
+                                _ => return Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                             };
                             Ok(ExprType::X)
                         },
                         ExprType::Y => {
-                            match sub {
-                                Subscript::None => {
+                            match sub_output {
+                                ExprType::Nothing => {
                                     gstate.write_asm(&format!("STY {}", variable), cycles)?;
                                 },
-                                Subscript::X => if v.memory == VariableMemory::Zeropage {
+                                ExprType::X => if v.memory == VariableMemory::Zeropage {
                                     gstate.write_asm(&format!("STY {},X", variable), 4)?;
                                 } else {
                                     if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
@@ -396,7 +440,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                                         gstate.flags = FlagsState::Y;
                                     }
                                 },
-                                Subscript::Y => {
+                                ExprType::Y => {
                                     if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                                     gstate.write_asm(&"TYA", 2)?;
                                     gstate.write_asm(&format!("STA {},Y", variable), 5)?;
@@ -407,6 +451,10 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                                         gstate.flags = FlagsState::Y;
                                     }
                                 },
+                                ExprType::Immediate(v) => {
+                                    gstate.write_asm(&format!("STY {}+{}", variable, v), cycles)?;
+                                },
+                                _ => return Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                             };
                             Ok(ExprType::Y)
                         },
@@ -438,10 +486,14 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
                 _ => gstate.write_asm(&format!("LDA #{}", l), 2)?,
             };
         },
-        ExprType::Absolute(varname) => {
+        ExprType::Absolute(varname, offset) => {
             let v = gstate.compiler_state.get_variable(varname);
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-            gstate.write_asm(&format!("LDA {}", varname), cycles)?;
+            if offset > 0 {
+                gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
+            } else {
+                gstate.write_asm(&format!("LDA {}", varname), cycles)?;
+            }
         },
         ExprType::AbsoluteX(varname) => {
             gstate.write_asm(&format!("LDA {},X", varname), 4)?;
@@ -475,11 +527,15 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
             gstate.write_asm(&format!("{} #{}", operation, v), 2)?;
             signed = if v > 127 { false } else { true };
         },
-        ExprType::Absolute(varname) => {
+        ExprType::Absolute(varname, offset) => {
             let v = gstate.compiler_state.get_variable(varname);
             signed = v.signed; 
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-            gstate.write_asm(&format!("{} {}", operation, varname), cycles)?;
+            if offset > 0 {
+                gstate.write_asm(&format!("{} {}+{}", operation, varname, offset), cycles)?;
+            } else {
+                gstate.write_asm(&format!("{} {}", operation, varname), cycles)?;
+            }
         },
         ExprType::AbsoluteX(varname) => {
             let v = gstate.compiler_state.get_variable(varname);
@@ -521,18 +577,25 @@ fn generate_minusminus<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos
                 variable => {
                     let v = gstate.compiler_state.get_variable(variable);
                     let cycles = if v.memory == VariableMemory::Zeropage { 5 } else { 6 };
-                    match sub {
-                        Subscript::None => {
+                    let sub_output = generate_expr(sub, gstate, pos)?;
+                    match sub_output {
+                        ExprType::Nothing => {
                             gstate.write_asm(&format!("DEC {}", variable), cycles)?;
-                            gstate.flags = FlagsState::Var((var, *sub));
-                            Ok(ExprType::Absolute(variable))
+                            gstate.flags = FlagsState::Absolute(variable, 0);
+                            Ok(ExprType::Absolute(variable, 0))
                         },
-                        Subscript::X => {
+                        ExprType::X => {
                             gstate.write_asm(&format!("DEC {},X", variable), cycles + 1)?;
-                            gstate.flags = FlagsState::Var((var, *sub));
+                            gstate.flags = FlagsState::AbsoluteX(variable);
                             Ok(ExprType::AbsoluteX(variable))
                         },
-                        Subscript::Y => Err(syntax_error(gstate.compiler_state, "Bad left value used with ++ operator (no Y subscript allowed)", pos))
+                        ExprType::Y => Err(syntax_error(gstate.compiler_state, "Bad left value used with ++ operator (no Y subscript allowed)", pos)),
+                        ExprType::Immediate(v) => {
+                            gstate.write_asm(&format!("DEC {}+{}", variable, v), cycles)?;
+                            gstate.flags = FlagsState::Absolute(variable, v as u16);
+                            Ok(ExprType::Absolute(variable, v as u16))
+                        },
+                        _ => return Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                     }
                 }
             }
@@ -559,18 +622,25 @@ fn generate_plusplus<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: 
                 variable => {
                     let v = gstate.compiler_state.get_variable(variable);
                     let cycles = if v.memory == VariableMemory::Zeropage { 5 } else { 6 };
-                    match sub {
-                        Subscript::None => {
+                    let sub_output = generate_expr(sub, gstate, pos)?;
+                    match sub_output {
+                        ExprType::Nothing => {
                             gstate.write_asm(&format!("INC {}", variable), cycles)?;
-                            gstate.flags = FlagsState::Var((var, *sub));
-                            Ok(ExprType::Absolute(variable))
+                            gstate.flags = FlagsState::Absolute(variable, 0);
+                            Ok(ExprType::Absolute(variable, 0))
                         },
-                        Subscript::X => {
+                        ExprType::X => {
                             gstate.write_asm(&format!("INC {},X", variable), cycles + 1)?;
-                            gstate.flags = FlagsState::Var((var, *sub));
+                            gstate.flags = FlagsState::AbsoluteX(variable);
                             Ok(ExprType::AbsoluteX(variable))
                         },
-                        Subscript::Y => Err(syntax_error(gstate.compiler_state, "Bad left value used with ++ operator (no Y subscript allowed)", pos))
+                        ExprType::Y => Err(syntax_error(gstate.compiler_state, "Bad left value used with ++ operator (no Y subscript allowed)", pos)),
+                        ExprType::Immediate(v) => {
+                            gstate.write_asm(&format!("INC {}+{}", variable, v), cycles)?;
+                            gstate.flags = FlagsState::Absolute(variable, v as u16);
+                            Ok(ExprType::Absolute(variable, v as u16))
+                        },
+                        _ => return Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                     }
                 }
             }
@@ -623,13 +693,18 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
             match *var {
                 "X" => Ok(ExprType::X),
                 "Y" => Ok(ExprType::Y),
-                variable => match sub {
-                    Subscript::None => Ok(ExprType::Absolute(variable)),
-                    Subscript::X => Ok(ExprType::AbsoluteX(variable)),
-                    Subscript::Y => Ok(ExprType::AbsoluteY(variable)),
-                }
+                variable => { 
+                    let sub_output = generate_expr(sub, gstate, pos)?;
+                    match sub_output {
+                        ExprType::Nothing => Ok(ExprType::Absolute(variable, 0)),
+                        ExprType::X => Ok(ExprType::AbsoluteX(variable)),
+                        ExprType::Y => Ok(ExprType::AbsoluteY(variable)),
+                        ExprType::Immediate(v) => Ok(ExprType::Absolute(variable, v as u16)),
+                        _ => return Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
+                    }
+                },
             }
-        },
+        }
         Expr::MinusMinus(v) => generate_minusminus(v, gstate, pos),
         Expr::PlusPlus(v) => generate_plusplus(v, gstate, pos),
         Expr::Neg(v) => generate_neg(v, gstate, pos),
@@ -642,11 +717,9 @@ fn flags_ok(flags: &FlagsState, expr_type: &ExprType) -> bool
     match flags {
         FlagsState::X => *expr_type == ExprType::X,
         FlagsState::Y => *expr_type == ExprType::Y,
-        FlagsState::Var((s, sub)) => match sub {
-            Subscript::None => *expr_type == ExprType::Absolute(s),
-            Subscript::X => *expr_type == ExprType::AbsoluteX(s),
-            Subscript::Y => *expr_type == ExprType::AbsoluteY(s),
-        },
+        FlagsState::Absolute(var, offset) => *expr_type == ExprType::Absolute(*var, *offset),
+        FlagsState::AbsoluteX(var) => *expr_type == ExprType::AbsoluteX(var),
+        FlagsState::AbsoluteY(var) => *expr_type == ExprType::AbsoluteY(var),
         _ => false
     }
 }
@@ -725,12 +798,16 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
             let signed;
             let cmp;
             match left {
-                ExprType::Absolute(varname) => {
+                ExprType::Absolute(varname, offset) => {
                     if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                     let v = gstate.compiler_state.get_variable(varname);
                     signed = v.signed;
                     let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                    gstate.write_asm(&format!("LDA {}", varname), cycles)?;
+                    if *offset > 0 {
+                        gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
+                    } else {
+                        gstate.write_asm(&format!("LDA {}", varname), cycles)?;
+                    }
                     cmp = true;
                 },
                 ExprType::AbsoluteX(varname) => {
@@ -759,10 +836,14 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                             gstate.write_asm(&format!("CPY #{}", v), 2)?;
                             cmp = false;
                         },
-                        ExprType::Absolute(varname) => {
+                        ExprType::Absolute(varname, offset) => {
                             let v = gstate.compiler_state.get_variable(varname);
                             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            gstate.write_asm(&format!("CPY {}", varname), cycles)?;
+                            if *offset > 0 {
+                                gstate.write_asm(&format!("CPY {}+{}", varname, offset), cycles)?;
+                            } else {
+                                gstate.write_asm(&format!("CPY {}", varname), cycles)?;
+                            }
                             cmp = false;
                         },
                         ExprType::A(_) => {
@@ -781,10 +862,14 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                             gstate.write_asm(&format!("CPX #{}", v), 2)?;
                             cmp = false;
                         },
-                        ExprType::Absolute(varname) => {
+                        ExprType::Absolute(varname, offset) => {
                             let v = gstate.compiler_state.get_variable(varname);
                             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            gstate.write_asm(&format!("CPX {}", varname), cycles)?;
+                            if *offset > 0 {
+                                gstate.write_asm(&format!("CPX {}+{}", varname, offset), cycles)?;
+                            } else {
+                                gstate.write_asm(&format!("CPX {}", varname), cycles)?;
+                            }
                             cmp = false;
                         },
                         ExprType::A(_) => {
@@ -804,10 +889,14 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                     ExprType::Immediate(v) => {
                         gstate.write_asm(&format!("CMP #{}", v), 2)?;
                     },
-                    ExprType::Absolute(name) => {
+                    ExprType::Absolute(name, offset) => {
                         let v = gstate.compiler_state.get_variable(name);
                         let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                        gstate.write_asm(&format!("CMP {}", name), cycles)?;
+                        if *offset > 0 {
+                            gstate.write_asm(&format!("CMP {}+{}", name, offset), cycles)?;
+                        } else {
+                            gstate.write_asm(&format!("CMP {}", name), cycles)?;
+                        }
                     },
                     ExprType::AbsoluteX(name) => {
                         gstate.write_asm(&format!("CMP {},X", name), 4)?;
