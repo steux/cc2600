@@ -1,8 +1,7 @@
 use crate::error::Error;
 use crate::compile::*;
 
-use std::io::prelude::*;
-use std::fs::File;
+use std::io::Write;
 
 use log::debug;
 
@@ -13,21 +12,26 @@ struct GeneratorState<'a> {
     last_included_line_number: usize,
     last_included_position: usize,
     last_included_char: std::str::Chars<'a>,
-    file: File,
+    writer: &'a mut dyn Write,
     local_label_counter_for: u32,
     local_label_counter_if: u32,
     local_label_counter_while: u32,
     loops: Vec<(String,String)>,
     flags: FlagsState<'a>,
     acc_in_use: bool,
+    insert_code: bool,
 }
 
 impl<'a> GeneratorState<'a> {
     fn write(&mut self, s: &str) -> Result<usize, std::io::Error> {
-        self.file.write(s.as_bytes())
+        self.writer.write(s.as_bytes())
     }
     fn write_asm(&mut self, asm: &str, cycles: u32) -> Result<usize, std::io::Error> {
-        self.file.write(format!("\t{:23}\t; {} cycles\n", asm, cycles).as_bytes())
+        if self.insert_code {
+            self.writer.write(format!("\t{:23}\t; {} cycles\n", asm, cycles).as_bytes())
+        } else {
+            self.writer.write(format!("\t{}\n", asm).as_bytes())
+        }
     }
     fn write_label(&mut self, label: &str) -> Result<usize, std::io::Error> {
         self.flags = FlagsState::Unknown; // There is a label, so there are some jumps to it -
@@ -1087,17 +1091,18 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
 {
     // Include C source code into generated asm
     // debug!("{:?}, {}, {}, {}", expr, pos, gstate.last_included_position, gstate.last_included_line_number);
-    let included_source_code = generate_included_source_code_line(code.pos, gstate);
-    let line_to_be_written = if let Some(line) = included_source_code {
-        Some(line.to_string())
-    } else {
-        None
-    };
-    // debug!("{:?}, {}, {}", line_to_be_written, gstate.last_included_position, gstate.last_included_line_number);
-    if let Some(l) = line_to_be_written {
-        let f = &mut gstate.file; 
-        f.write_all(b";")?;
-        f.write_all(l.as_bytes())?; // Should include the '\n'
+    if gstate.insert_code {
+        let included_source_code = generate_included_source_code_line(code.pos, gstate);
+        let line_to_be_written = if let Some(line) = included_source_code {
+            Some(line.to_string())
+        } else {
+            None
+        };
+        // debug!("{:?}, {}, {}", line_to_be_written, gstate.last_included_position, gstate.last_included_line_number);
+        if let Some(l) = line_to_be_written {
+            gstate.write(";")?;
+            gstate.write(&l)?; // Should include the '\n'
+        }
     }
 
     gstate.acc_in_use = false;
@@ -1134,22 +1139,21 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
     Ok(())
 }
 
-pub fn generate_asm(compiler_state: &CompilerState, filename: &str) -> Result<(), Error> 
+pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, insert_code: bool) -> Result<(), Error> 
 {
-    let file = File::create(filename)?;
-
     let mut gstate = GeneratorState {
         compiler_state,
         last_included_line_number: 0,
         last_included_position: 0,
         last_included_char: compiler_state.preprocessed_utf8.chars(),
-        file,
+        writer,
         local_label_counter_for: 0,
         local_label_counter_if: 0,
         local_label_counter_while: 0,
         loops: Vec::new(),
         flags: FlagsState::Unknown,
         acc_in_use: false,
+        insert_code
     };
 
     gstate.write("\tPROCESSOR 6502\n\n")?;
@@ -1165,7 +1169,7 @@ pub fn generate_asm(compiler_state: &CompilerState, filename: &str) -> Result<()
     gstate.write("\n\tSEG.U VARS\n\tORG $80\n\n")?;
     
     // Generate variables code
-    gstate.file.write_all("cctmp                  \tds 1\n".as_bytes())?; 
+    gstate.write("cctmp                  \tds 1\n")?; 
     for v in compiler_state.sorted_variables().iter() {
         if !v.1.var_const && v.1.memory == VariableMemory::Zeropage && v.1.def == VariableDefinition::None {
             gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size))?; 

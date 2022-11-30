@@ -3,6 +3,8 @@ mod error;
 mod compile;
 mod generate;
 
+use std::fs::File;
+use std::io::BufReader;
 use compile::compile;
 
 extern crate pest;
@@ -28,18 +30,61 @@ pub struct Args {
 
     /// Output file name
     #[arg(short, long, default_value="out.a")]
-    output: String
+    output: String,
+
+    /// Insert C code as comments
+    #[arg(long, default_value="true")]
+    insert_code: bool
 }
 
 fn main() {
     env_logger::init();
     let args = Args::parse();
 
-    match compile(&args) {
+    let f = match File::open(&args.input) {
+        Ok(file) => file,
+        Err(err) => {
+            eprintln!("{}", err);
+            std::process::exit(1);
+        }
+    };
+    let reader = BufReader::new(f);
+    let mut writer = match File::create(&args.output) {
+        Ok(file) => file,
+        Err(err) => {
+            eprintln!("{}", err);
+            std::process::exit(1);
+        }
+    };
+
+    match compile(reader, &mut writer, &args) {
         Err(e) => {
             eprintln!("{}", e);
             std::process::exit(1) 
         },
         Ok(_) => std::process::exit(0) 
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Args;
+    use super::compile::compile;
+    use std::str;
+
+    #[test]
+    fn for_statement_test1() {
+        let args = Args {
+            input: "string".to_string(),
+            output: "string".to_string(),
+            include_directories: Vec::new(),
+            defines: Vec::new(),
+            insert_code: false
+        };
+        let input = "unsigned char i; void main() { for (i = 0; i < 10; i++); }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        assert!(result.contains("LDA #0\n\tSTA i\n\tLDA i\n\tCMP #10\n\tBCS .forend1\n.for1\n.forupdate1\n\tINC i\n\tLDA i\n\tCMP #10\n\tBCC .for1\n.forend1\n"));
     }
 }

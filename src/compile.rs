@@ -1,10 +1,9 @@
-use std::io::BufReader;
-use std::fs::File;
 use std::collections::HashMap;
 
 use log::debug;
 
 use pest::{Parser, pratt_parser::{Op, PrattParser, Assoc}, iterators::{Pair, Pairs}, error::LineColLocation};
+use std::io::{BufRead, Write};
 
 use crate::error::Error;
 use crate::cpp;
@@ -488,10 +487,8 @@ fn compile_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Re
     Ok(())
 }
 
-pub fn compile(args: &Args) -> Result<(), Error> {
+pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> Result<(), Error> {
     let mut preprocessed = Vec::new();
-    let f = File::open(&args.input)?;
-    let f = BufReader::new(f);
     
     let pratt =
         PrattParser::new()
@@ -515,7 +512,7 @@ pub fn compile(args: &Args) -> Result<(), Error> {
     }
 
     // Start preprocessor
-    let mapped_lines = cpp::process(f, &mut preprocessed, &mut context)?;
+    let mapped_lines = cpp::process(input, &mut preprocessed, &mut context)?;
     debug!("Mapped lines = {:?}", mapped_lines);
 
     let preprocessed_utf8 = std::str::from_utf8(&preprocessed)?;
@@ -570,7 +567,7 @@ pub fn compile(args: &Args) -> Result<(), Error> {
     };
 
     // Generate assembly code from compilation output (abstract syntax tree)
-    generate_asm(&mut state, &args.output)?;
+    generate_asm(&mut state, output, args.insert_code)?;
     Ok(())
 }
 
