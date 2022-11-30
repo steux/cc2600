@@ -10,5 +10,6 @@ void main()
 {
   *COLUBK = BLUE;
   *COLUPF = BLACK;
+  strobe(VSYNC);
   while(1);
 }

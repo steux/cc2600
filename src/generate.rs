@@ -1038,6 +1038,24 @@ fn generate_asm_statement<'a>(s: &'a str, gstate: &mut GeneratorState<'a>) -> Re
     Ok(())
 }
 
+fn generate_strobe_statement<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
+{
+    match expr {
+        Expr::Var((name, _)) => {
+            let v = gstate.compiler_state.get_variable(name);
+            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
+            match v.var_type {
+                VariableType::CharPtr => {
+                    gstate.write_asm(&format!("STA {}", name), cycles)?;
+                    Ok(())
+                },
+                _ => Err(syntax_error(gstate.compiler_state, "Strobe only works on memory pointers", pos)),
+            }
+        },
+        _ => Err(syntax_error(gstate.compiler_state, "Strobe only works on memory pointers", pos)),
+    }
+}
+
 fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'a>) -> Result<(), Error>
 {
     // Include C source code into generated asm
@@ -1086,6 +1104,7 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
         Statement::Continue => { generate_continue(gstate, code.pos)?; }
         Statement::Return => { generate_return(gstate)?; }
         Statement::Asm(s) => { generate_asm_statement(s, gstate)?; }
+        Statement::Strobe(s) => { generate_strobe_statement(s, gstate, code.pos)?; }
     }
     Ok(())
 }

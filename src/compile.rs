@@ -102,6 +102,7 @@ pub enum Statement<'a> {
     Continue,
     Return,
     Asm(&'a str),
+    Strobe(Expr<'a>)
 }
 
 #[derive(Debug)]
@@ -402,6 +403,12 @@ fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Res
             let s = pair.into_inner().next().unwrap().into_inner().next().unwrap().as_str();
             Ok(StatementLoc {
                 pos, statement: Statement::Asm(s)
+            })
+        },
+        Rule::strobe_statement => {
+            let s = parse_expr(state, pair.into_inner())?;
+            Ok(StatementLoc {
+                pos, statement: Statement::Strobe(s)
             })
         },
         Rule::nothing => {

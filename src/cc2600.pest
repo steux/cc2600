@@ -36,6 +36,7 @@ statement = {
     | block
     | nothing ~ ";"
     | asm_statement
+    | strobe_statement
     }
 do_while = { "do" ~ statement ~ "while" ~ "(" ~ expr ~ ")" ~ ";" }
 while_do = { "while" ~ "(" ~ expr ~ ")"~ statement }
@@ -46,6 +47,7 @@ break_statement = { "break" ~ ";" }
 continue_statement = { "continue" ~ ";"}
 return_statement = { "return" ~ ";"}
 asm_statement = { "asm" ~ "(" ~ quoted_string ~ ")" ~ ";"}
+strobe_statement = { "strobe" ~ "(" ~ expr ~ ")" ~ ";"}
 nothing = { "" }
 
 cases = { ("case" ~ int ~ ":" ~ statement*)* ~ ("default" ~ ":" ~ statement*) }
