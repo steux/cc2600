@@ -1,10 +1,14 @@
 #include "vcs.h"
 
-unsigned char X;
+unsigned char X, Y;
+
+const unsigned char RED = 0x34;
+const unsigned char BLUE = 0x84;
+const unsigned char BLACK = 0x00;
 
 void main()
 {
-  asm("SEI");
-  X = 1;
-  while (X == 1);
+  *COLUBK = BLUE;
+  *COLUPF = BLACK;
+  while(1);
 }

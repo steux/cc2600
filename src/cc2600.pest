@@ -82,7 +82,7 @@ expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ pos
       xorass =   { "^=" } // Or assign
       orass  =   { "|=" } // Or assign
       comma  =   { "," }  // Comma (discard left)
-    prefix   =  _{ neg | ppp | mmp }
+    prefix   =  _{ neg | ppp | mmp | addr | deref }
       ppp    =   { "++" } // Increment
       mmp    =   { "--" } // Decrement
       neg    =   { "-" }  // Negation
