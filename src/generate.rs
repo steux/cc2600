@@ -5,7 +5,7 @@ use std::io::Write;
 
 use log::debug;
 
-// TODO: write tests
+// TODO: implement holdback on write (in order to remove PLA/PHA and LDA/STA pairs) 
 
 struct GeneratorState<'a> {
     compiler_state: &'a CompilerState<'a>,
@@ -1140,7 +1140,42 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
     }
    
     // Generate startup code
-    gstate.write("\n\tECHO ([$FFFC-.]d), \"bytes free\"\n\n\tORG $FFFA\n\n\t.word main\t; NMI\n\t.word main\t; RESET\n\t.word main\t; IRQ\n\n\tEND\n")?;
+    gstate.write("
+Powerup
+        SEI		; Set the interrupt masking flag in the processor status register.
+      ; The VCS has no interrupts, but the Atari 7800 which can run VCS
+      ; software does have interrupts so we need to turn them off to be
+      ; compatible with the 7800.
+
+        CLD		; Clear the BCD mode flag in the processor status register.  At
+      ; powerup the processor status register flags can be in any state.
+      ; We do not want to perform math in BCD mode at this time, so we
+      ; make sure it is turned off.
+
+        LDX #$FF	; We set the stack pointer (SP) register in the processor to point
+        TXS		; at the highest address of RAM.  If we use the stack then it will
+      ; consume memory space growing downward, starting at that top address.
+
+        LDA #0		; This loop clears every byte of RAM in the VCS, and every writable
+.loop	  STA $00,X	; register in the TIA chip to the known state of zero.   Remember at
+        DEX		; power up the bits of RAM and Registers are in an unknown state.
+        BNE .loop	; If we neglected to put them into a known state, then our program 
+      ; may behave differently each time it runs.  We chose to set them all
+      ; to zero, because in the TIA setting a register to zero tends to
+      ; turn features off.  We will later turn back on only the features
+      ; of the TIA we wish to use in our program.
+
+        JMP main
+
+        ECHO ([$FFFC-.]d), \"bytes free\"
+
+        ORG $FFFA
+
+        .word Powerup\t; NMI
+        .word Powerup\t; RESET
+        .word Powerup\t; IRQ
+
+        END\n")?;
 
     Ok(())
 }
