@@ -659,21 +659,6 @@ fn generate_neg<'a>(expr: &Expr<'a>, _gstate: &mut GeneratorState<'a>, _pos: usi
 
 fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
 {
-    // Include C source code into generated asm
-    // debug!("{:?}, {}, {}, {}", expr, pos, gstate.last_included_position, gstate.last_included_line_number);
-    let included_source_code = generate_included_source_code_line(pos, gstate);
-    let line_to_be_written = if let Some(line) = included_source_code {
-        Some(line.to_string())
-    } else {
-        None
-    };
-    // debug!("{:?}, {}, {}", line_to_be_written, gstate.last_included_position, gstate.last_included_line_number);
-    if let Some(l) = line_to_be_written {
-        let f = &mut gstate.file; 
-        f.write_all(b";")?;
-        f.write_all(l.as_bytes())?; // Should include the '\n'
-    }
-
     debug!("Expression: {:?}", expr);
     match expr {
         Expr::Integer(i) => Ok(ExprType::Immediate(*i)),
@@ -1092,8 +1077,29 @@ fn generate_return<'a>(gstate: &mut GeneratorState<'a>) -> Result<(), Error>
     Ok(())
 }
 
+fn generate_asm_statement<'a>(s: &'a str, gstate: &mut GeneratorState<'a>) -> Result<(), Error>
+{
+    gstate.write(&format!("\t{s}\n"))?;
+    Ok(())
+}
+
 fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'a>) -> Result<(), Error>
 {
+    // Include C source code into generated asm
+    // debug!("{:?}, {}, {}, {}", expr, pos, gstate.last_included_position, gstate.last_included_line_number);
+    let included_source_code = generate_included_source_code_line(code.pos, gstate);
+    let line_to_be_written = if let Some(line) = included_source_code {
+        Some(line.to_string())
+    } else {
+        None
+    };
+    // debug!("{:?}, {}, {}", line_to_be_written, gstate.last_included_position, gstate.last_included_line_number);
+    if let Some(l) = line_to_be_written {
+        let f = &mut gstate.file; 
+        f.write_all(b";")?;
+        f.write_all(l.as_bytes())?; // Should include the '\n'
+    }
+
     gstate.acc_in_use = false;
     // Generate different kind of statements
     match &code.statement {
@@ -1123,6 +1129,7 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
         Statement::Break => { generate_break(gstate, code.pos)?; }
         Statement::Continue => { generate_continue(gstate, code.pos)?; }
         Statement::Return => { generate_return(gstate)?; }
+        Statement::Asm(s) => { generate_asm_statement(s, gstate)?; }
     }
     Ok(())
 }
@@ -1178,7 +1185,7 @@ pub fn generate_asm(compiler_state: &CompilerState, filename: &str) -> Result<()
     }
    
     // Generate startup code
-    gstate.write("\n\tECHO ([$FFFC-.]d), \"bytes free\"\n\n\tORG $FFFA\n\n\t.word main\t; NMI\n\t.word main\t; RESET\n\t.word main\t; IRQ\n\nEND\n")?;
+    gstate.write("\n\tECHO ([$FFFC-.]d), \"bytes free\"\n\n\tORG $FFFA\n\n\t.word main\t; NMI\n\t.word main\t; RESET\n\t.word main\t; IRQ\n\n\tEND\n")?;
 
     Ok(())
 }

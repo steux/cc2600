@@ -34,15 +34,18 @@ statement = {
     | return_statement
     | expr ~ ";"
     | block
+    | nothing ~ ";"
+    | asm_statement
     }
 do_while = { "do" ~ statement ~ "while" ~ "(" ~ expr ~ ")" ~ ";" }
 while_do = { "while" ~ "(" ~ expr ~ ")"~ statement }
-for_loop = { "for" ~ "(" ~ (expr | nothing) ~ ";" ~ expr ~ ";" ~ expr ~ ")" ~ statement }
+for_loop = { "for" ~ "(" ~ (expr | nothing) ~ ";" ~ (expr | nothing) ~ ";" ~ (expr | nothing) ~ ")" ~ statement }
 if_statement = { "if" ~ "(" ~ expr ~ ")" ~ statement ~ ("else" ~ statement)* }
 switch_statement = { "switch" ~ "(" ~ expr ~ ")" ~ "{" ~ cases ~ "}" }
 break_statement = { "break" ~ ";" }
 continue_statement = { "continue" ~ ";"}
 return_statement = { "return" ~ ";"}
+asm_statement = { "asm" ~ "(" ~ quoted_string ~ ")" ~ ";"}
 nothing = { "" }
 
 cases = { ("case" ~ int ~ ":" ~ statement*)* ~ ("default" ~ ":" ~ statement*) }
@@ -93,8 +96,11 @@ expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ pos
 var         = { var_name ~ subscript? }
 subscript   = { "[" ~ expr ~ "]" }
       
-int = { hexadecimal | octal | decimal | character }
+int = { hexadecimal | octal | decimal | quoted_character }
 decimal     = @{ ("-")* ~ (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT+ | ASCII_DIGIT) }
 hexadecimal = @{ "0x" ~ ASCII_HEX_DIGIT+ }
 octal       = @{ "0" ~ ASCII_OCT_DIGIT+ }
-character   = @{ "'" ~ (ASCII_ALPHANUMERIC | "\n" | "\t" | "\r") ~ "'" }
+character   = @{ (ASCII_ALPHANUMERIC | "\n" | "\t" | "\r") }
+quoted_character   = ${ "'" ~ character ~ "'" }
+string      = @{ character* } 
+quoted_string      = ${ "\"" ~ string ~ "\""}

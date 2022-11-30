@@ -100,7 +100,8 @@ pub enum Statement<'a> {
     },
     Break,
     Continue,
-    Return
+    Return,
+    Asm(&'a str),
 }
 
 #[derive(Debug)]
@@ -392,6 +393,17 @@ fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Res
         Rule::return_statement => {
             Ok(StatementLoc {
                 pos, statement: Statement::Return
+            })
+        },
+        Rule::asm_statement => {
+            let s = pair.into_inner().next().unwrap().into_inner().next().unwrap().as_str();
+            Ok(StatementLoc {
+                pos, statement: Statement::Asm(s)
+            })
+        },
+        Rule::nothing => {
+            Ok(StatementLoc {
+                pos, statement: Statement::Expression(Expr::Nothing)
             })
         },
         _ => {
