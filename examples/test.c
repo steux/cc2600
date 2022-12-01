@@ -25,7 +25,7 @@ void main()
     *COLUPF = BLACK;
 
     for (X = 192; X != 0; X--) {
-      *COLUBK = X; 
+      (*COLUBK)++; 
       strobe(WSYNC);
     }
 

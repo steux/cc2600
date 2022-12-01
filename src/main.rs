@@ -87,4 +87,38 @@ mod tests {
         let result = str::from_utf8(&output).unwrap();
         assert!(result.contains("LDA #0\n\tSTA i\n\tLDA i\n\tCMP #10\n\tBCS .forend1\n.for1\n.forupdate1\n\tINC i\n\tLDA i\n\tCMP #10\n\tBCC .for1\n.forend1\n"));
     }
+    
+    #[test]
+    fn plusplus_statement_test1() {
+        let args = Args {
+            input: "string".to_string(),
+            output: "string".to_string(),
+            include_directories: Vec::new(),
+            defines: Vec::new(),
+            insert_code: false
+        };
+        let input = "unsigned char i, j; void main() { i = 0; j = i++; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA #0\n\tSTA i\n\tLDA i\n\tSTA j\n\tINC i\n"));
+    }
+    
+    #[test]
+    fn plusplus_statement_test2() {
+        let args = Args {
+            input: "string".to_string(),
+            output: "string".to_string(),
+            include_directories: Vec::new(),
+            defines: Vec::new(),
+            insert_code: false
+        };
+        let input = "unsigned char i, j; void main() { i = 0; j = ++i; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA #0\n\tSTA i\n\tINC i\n\tLDA i\n\tSTA j"));
+    }
 }

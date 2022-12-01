@@ -20,6 +20,7 @@ struct GeneratorState<'a> {
     flags: FlagsState<'a>,
     acc_in_use: bool,
     insert_code: bool,
+    deferred_plusplus: Vec<(ExprType<'a>, usize, bool)>
 }
 
 impl<'a> GeneratorState<'a> {
@@ -39,9 +40,17 @@ impl<'a> GeneratorState<'a> {
         self.write(label)?;
         self.write(&"\n")
     }
+    fn purge_deferred_plusplus(&mut self) -> Result<(), Error> {
+        let def = self.deferred_plusplus.clone();
+        self.deferred_plusplus.clear();
+        for d in def {
+            generate_plusplus(&d.0, self, d.1, d.2)?;
+        }
+        Ok(())
+    }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum ExprType<'a> {
     Nothing,
     Immediate(i32),
@@ -475,93 +484,64 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
     }
 }
 
-fn generate_minusminus<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+fn generate_plusplus<'a>(expr_type: &ExprType<'a>, gstate: &mut GeneratorState<'a>, pos: usize, plusplus: bool) -> Result<ExprType<'a>, Error>
 {
-    match expr {
-        Expr::Var((var, sub)) => {
-            match *var {
-                "X" => {
-                    gstate.write_asm("DEX", 2)?;
-                    gstate.flags = FlagsState::X;
-                    Ok(ExprType::X)
-                },
-                "Y" => {
-                    gstate.write_asm("DEY", 2)?;
-                    gstate.flags = FlagsState::Y;
-                    Ok(ExprType::Y)
-                },
-                variable => {
-                    let v = gstate.compiler_state.get_variable(variable);
-                    let cycles = if v.memory == VariableMemory::Zeropage { 5 } else { 6 };
-                    let sub_output = generate_expr(sub, gstate, pos)?;
-                    match sub_output {
-                        ExprType::Nothing => {
-                            gstate.write_asm(&format!("DEC {}", variable), cycles)?;
-                            gstate.flags = FlagsState::Absolute(variable, 0);
-                            Ok(ExprType::Absolute(variable, 0))
-                        },
-                        ExprType::X => {
-                            gstate.write_asm(&format!("DEC {},X", variable), cycles + 1)?;
-                            gstate.flags = FlagsState::AbsoluteX(variable);
-                            Ok(ExprType::AbsoluteX(variable))
-                        },
-                        ExprType::Y => Err(syntax_error(gstate.compiler_state, "Bad left value used with ++ operator (no Y subscript allowed)", pos)),
-                        ExprType::Immediate(v) => {
-                            gstate.write_asm(&format!("DEC {}+{}", variable, v), cycles)?;
-                            gstate.flags = FlagsState::Absolute(variable, v as u16);
-                            Ok(ExprType::Absolute(variable, v as u16))
-                        },
-                        _ => return Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
-                    }
+    match expr_type {
+        ExprType::X => {
+            if plusplus {
+                gstate.write_asm("INX", 2)?;
+            } else {
+                gstate.write_asm("DEX", 2)?;
+            }
+            gstate.flags = FlagsState::X;
+            Ok(ExprType::X)
+        },
+        ExprType::Y => {
+            if plusplus {
+                gstate.write_asm("INY", 2)?;
+            } else {
+                gstate.write_asm("DEY", 2)?;
+            }
+            gstate.flags = FlagsState::Y;
+            Ok(ExprType::Y)
+        },
+        ExprType::Absolute(variable, offset) => {
+            let v = gstate.compiler_state.get_variable(variable);
+            let cycles = if v.memory == VariableMemory::Zeropage { 5 } else { 6 };
+            if *offset > 0 {
+                if plusplus {
+                    gstate.write_asm(&format!("INC {}+{}", variable, offset), cycles)?;
+                } else {
+                    gstate.write_asm(&format!("DEC {}+{}", variable, offset), cycles)?;
+                }
+            } else {
+                if plusplus {
+                    gstate.write_asm(&format!("INC {}", variable), cycles)?;
+                } else {
+                    gstate.write_asm(&format!("DEC {}", variable), cycles)?;
                 }
             }
+            gstate.flags = FlagsState::Absolute(variable, *offset);
+            Ok(ExprType::Absolute(variable, *offset))
         },
-        _ => Err(syntax_error(gstate.compiler_state, "Bad left value used with ++ operator", pos)),
-    }
-}
-
-fn generate_plusplus<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
-{
-    match expr {
-        Expr::Var((var, sub)) => {
-            match *var {
-                "X" => {
-                    gstate.write_asm("INX", 2)?;
-                    gstate.flags = FlagsState::X;
-                    Ok(ExprType::X)
-                },
-                "Y" => {
-                    gstate.write_asm("INY", 2)?;
-                    gstate.flags = FlagsState::Y;
-                    Ok(ExprType::Y)
-                },
-                variable => {
-                    let v = gstate.compiler_state.get_variable(variable);
-                    let cycles = if v.memory == VariableMemory::Zeropage { 5 } else { 6 };
-                    let sub_output = generate_expr(sub, gstate, pos)?;
-                    match sub_output {
-                        ExprType::Nothing => {
-                            gstate.write_asm(&format!("INC {}", variable), cycles)?;
-                            gstate.flags = FlagsState::Absolute(variable, 0);
-                            Ok(ExprType::Absolute(variable, 0))
-                        },
-                        ExprType::X => {
-                            gstate.write_asm(&format!("INC {},X", variable), cycles + 1)?;
-                            gstate.flags = FlagsState::AbsoluteX(variable);
-                            Ok(ExprType::AbsoluteX(variable))
-                        },
-                        ExprType::Y => Err(syntax_error(gstate.compiler_state, "Bad left value used with ++ operator (no Y subscript allowed)", pos)),
-                        ExprType::Immediate(v) => {
-                            gstate.write_asm(&format!("INC {}+{}", variable, v), cycles)?;
-                            gstate.flags = FlagsState::Absolute(variable, v as u16);
-                            Ok(ExprType::Absolute(variable, v as u16))
-                        },
-                        _ => return Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
-                    }
-                }
+        ExprType::AbsoluteX(variable) => {
+            let v = gstate.compiler_state.get_variable(variable);
+            let cycles = if v.memory == VariableMemory::Zeropage { 6 } else { 7 };
+            if plusplus {
+                gstate.write_asm(&format!("INC {}", variable), cycles)?;
+            } else {
+                gstate.write_asm(&format!("DEC {}", variable), cycles)?;
+            }
+            gstate.flags = FlagsState::AbsoluteX(variable);
+            Ok(ExprType::AbsoluteX(variable))
+        },
+        _ => {
+            if plusplus {
+                Err(syntax_error(gstate.compiler_state, "Bad left value used with ++ operator", pos))
+            } else {
+                Err(syntax_error(gstate.compiler_state, "Bad left value used with -- operator", pos))
             }
         },
-        _ => Err(syntax_error(gstate.compiler_state, "Bad left value used with ++ operator", pos)),
     }
 }
 
@@ -627,8 +607,26 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                 },
             }
         }
-        Expr::MinusMinus(v) => generate_minusminus(v, gstate, pos),
-        Expr::PlusPlus(v) => generate_plusplus(v, gstate, pos),
+        Expr::MinusMinus(expr, false) => {
+            let expr_type = generate_expr(expr, gstate, pos)?;
+            generate_plusplus(&expr_type, gstate, pos, false)?;
+            Ok(expr_type)
+        },
+        Expr::PlusPlus(expr, false) => {
+            let expr_type = generate_expr(expr, gstate, pos)?;
+            generate_plusplus(&expr_type, gstate, pos, true)?;
+            Ok(expr_type)
+        },
+        Expr::MinusMinus(expr, true) => {
+            let expr_type = generate_expr(expr, gstate, pos)?;
+            gstate.deferred_plusplus.push((expr_type.clone(), pos, false));
+            Ok(expr_type)
+        },
+        Expr::PlusPlus(expr, true) => {
+            let expr_type = generate_expr(expr, gstate, pos)?;
+            gstate.deferred_plusplus.push((expr_type.clone(), pos, true));
+            Ok(expr_type)
+        },
         Expr::Neg(v) => generate_neg(v, gstate, pos),
         Expr::Deref(v) => generate_deref(v, gstate, pos),
         Expr::Nothing => Ok(ExprType::Nothing),
@@ -921,6 +919,7 @@ fn generate_for_loop<'a>(init: &Expr<'a>, condition: &Expr<'a>, update: &Expr<'a
     generate_statement(body, gstate)?;
     gstate.write_label(&forupdate_label)?;
     generate_expr(update, gstate, pos)?;
+    gstate.purge_deferred_plusplus()?;
     generate_condition(condition, gstate, pos, false, &for_label)?;
     gstate.write_label(&forend_label)?;
     gstate.loops.pop();
@@ -1074,6 +1073,8 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
         }
     }
 
+    gstate.purge_deferred_plusplus()?;
+    
     gstate.acc_in_use = false;
     // Generate different kind of statements
     match &code.statement {
@@ -1106,6 +1107,8 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
         Statement::Asm(s) => { generate_asm_statement(s, gstate)?; }
         Statement::Strobe(s) => { generate_strobe_statement(s, gstate, code.pos)?; }
     }
+    
+    gstate.purge_deferred_plusplus()?;
     Ok(())
 }
 
@@ -1123,7 +1126,8 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         loops: Vec::new(),
         flags: FlagsState::Unknown,
         acc_in_use: false,
-        insert_code
+        insert_code,
+        deferred_plusplus: Vec::new()
     };
 
     gstate.write("\tPROCESSOR 6502\n\n")?;

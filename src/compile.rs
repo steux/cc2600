@@ -70,8 +70,8 @@ pub enum Expr<'a> {
         rhs: Box<Expr<'a>>,
     },
     Neg(Box<Expr<'a>>),
-    MinusMinus(Box<Expr<'a>>),
-    PlusPlus(Box<Expr<'a>>),
+    MinusMinus(Box<Expr<'a>>, bool),
+    PlusPlus(Box<Expr<'a>>, bool),
     Deref(Box<Expr<'a>>),
 }
 
@@ -236,13 +236,13 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
         .map_prefix(|op, rhs| match op.as_rule() {
             Rule::neg => Ok(Expr::Neg(Box::new(rhs?))),
             Rule::deref => Ok(Expr::Deref(Box::new(rhs?))),
-            Rule::mmp => Ok(Expr::MinusMinus(Box::new(rhs?))),
-            Rule::ppp => Ok(Expr::PlusPlus(Box::new(rhs?))),
+            Rule::mmp => Ok(Expr::MinusMinus(Box::new(rhs?), false)),
+            Rule::ppp => Ok(Expr::PlusPlus(Box::new(rhs?), false)),
             _ => unreachable!(),
         })
         .map_postfix(|lhs, op| match op.as_rule() {
-            Rule::mm => Ok(Expr::MinusMinus(Box::new(lhs?))),
-            Rule::pp => Ok(Expr::PlusPlus(Box::new(lhs?))),
+            Rule::mm => Ok(Expr::MinusMinus(Box::new(lhs?), true)),
+            Rule::pp => Ok(Expr::PlusPlus(Box::new(lhs?), true)),
             _ => unreachable!(),
         })
         .parse(pairs)
