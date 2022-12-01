@@ -287,7 +287,7 @@ pub fn process<I: BufRead, O: Write>(
                     _ => break
                 }
             } else {
-                let mut s = remaining.splitn(2, "/*");
+                let mut s = remaining.splitn(2, "//").next().unwrap().splitn(2, "/*");
                 uncommented_buf.push_str(s.next().unwrap());
                 if uncommented_buf.is_empty() { insert_it = false; }
                 match s.next() {

@@ -484,6 +484,27 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
     }
 }
 
+fn generate_function_call<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
+{
+    match expr {
+        Expr::Identifier((var, sub)) => {
+            match sub.as_ref() {
+                Expr::Nothing => {
+                    match gstate.compiler_state.functions.get(*var) {
+                        None => Err(syntax_error(gstate.compiler_state, "Unknown function identifier", pos)),
+                        Some(_) => {
+                            gstate.write_asm(&format!("JSR {}", *var), 6)?;
+                            Ok(())
+                        }
+                    }
+                },
+                _ => Err(syntax_error(gstate.compiler_state, "No subscript allowed here", pos))
+            }
+        },
+        _ => Err(syntax_error(gstate.compiler_state, "Function call on something else than a function", pos))
+    }
+}
+
 fn generate_plusplus<'a>(expr_type: &ExprType<'a>, gstate: &mut GeneratorState<'a>, pos: usize, plusplus: bool) -> Result<ExprType<'a>, Error>
 {
     match expr_type {
@@ -556,7 +577,7 @@ fn generate_neg<'a>(expr: &Expr<'a>, _gstate: &mut GeneratorState<'a>, _pos: usi
 fn generate_deref<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
 {
     match expr {
-        Expr::Var((var, sub)) => {
+        Expr::Identifier((var, sub)) => {
             let v = gstate.compiler_state.get_variable(var);
             if v.var_type == VariableType::CharPtr {
                 let sub_output = generate_expr(sub, gstate, pos)?;
@@ -591,22 +612,31 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                 Operation::Lte => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
             }
         },
-        Expr::Var((var, sub)) => {
+        Expr::Identifier((var, sub)) => {
             match *var {
                 "X" => Ok(ExprType::X),
                 "Y" => Ok(ExprType::Y),
-                variable => { 
-                    let sub_output = generate_expr(sub, gstate, pos)?;
-                    match sub_output {
-                        ExprType::Nothing => Ok(ExprType::Absolute(variable, 0)),
-                        ExprType::X => Ok(ExprType::AbsoluteX(variable)),
-                        ExprType::Y => Ok(ExprType::AbsoluteY(variable)),
-                        ExprType::Immediate(v) => Ok(ExprType::Absolute(variable, v as u16)),
-                        _ => return Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
+                variable => {
+                    let v = gstate.compiler_state.get_variable(variable);
+                    if let VariableDefinition::Value(val) = &v.def {
+                        Ok(ExprType::Immediate(*val))
+                    } else {
+                        let sub_output = generate_expr(sub, gstate, pos)?;
+                        match sub_output {
+                            ExprType::Nothing => Ok(ExprType::Absolute(variable, 0)),
+                            ExprType::X => Ok(ExprType::AbsoluteX(variable)),
+                            ExprType::Y => Ok(ExprType::AbsoluteY(variable)),
+                            ExprType::Immediate(v) => Ok(ExprType::Absolute(variable, v as u16)),
+                            _ => Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
+                        }
                     }
                 },
             }
-        }
+        },
+        Expr::FunctionCall(expr) => {
+            generate_function_call(expr, gstate, pos)?;
+            Ok(ExprType::Nothing)
+        },
         Expr::MinusMinus(expr, false) => {
             let expr_type = generate_expr(expr, gstate, pos)?;
             generate_plusplus(&expr_type, gstate, pos, false)?;
@@ -1040,7 +1070,7 @@ fn generate_asm_statement<'a>(s: &'a str, gstate: &mut GeneratorState<'a>) -> Re
 fn generate_strobe_statement<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
 {
     match expr {
-        Expr::Var((name, _)) => {
+        Expr::Identifier((name, _)) => {
             let v = gstate.compiler_state.get_variable(name);
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
             match v.var_type {
@@ -1133,9 +1163,9 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
     gstate.write("\tPROCESSOR 6502\n\n")?;
     
     for v in compiler_state.sorted_variables().iter() {
-        if v.1.var_const || v.1.memory == VariableMemory::ROM {
+        if v.1.var_const  {
             if let VariableDefinition::Value(val) = &v.1.def  {
-                gstate.write(&format!("{:23}\tEQU ${:x}\n", v.0, val))?; 
+                gstate.write(&format!("{:23}\tEQU ${:x}\n", v.0, val))?;
             }
         }
     }
@@ -1146,7 +1176,12 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
     gstate.write("cctmp                  \tds 1\n")?; 
     for v in compiler_state.sorted_variables().iter() {
         if !v.1.var_const && v.1.memory == VariableMemory::Zeropage && v.1.def == VariableDefinition::None {
-            gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size))?; 
+            let s = match v.1.var_type {
+                VariableType::Char => 1,
+                VariableType::Short => 2,
+                VariableType::CharPtr => 2,
+            };
+            gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
         }
     }
 

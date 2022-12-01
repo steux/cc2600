@@ -63,7 +63,8 @@ pub enum Operation {
 pub enum Expr<'a> {
     Nothing,
     Integer(i32),
-    Var((&'a str, Box<Expr<'a>>)),
+    Identifier((&'a str, Box<Expr<'a>>)),
+    FunctionCall(Box<Expr<'a>>),
     BinOp {
         lhs: Box<Expr<'a>>,
         op: Operation,
@@ -120,7 +121,7 @@ pub struct Function<'a> {
 
 pub struct CompilerState<'a> {
     variables: HashMap<String, Variable>,
-    functions: HashMap<String, Function<'a>>,
+    pub functions: HashMap<String, Function<'a>>,
     pratt: PrattParser<Rule>,
     mapped_lines: &'a Vec::<(std::rc::Rc::<String>,u32,Option<(std::rc::Rc::<String>,u32)>)>,
     pub preprocessed_utf8: &'a str,
@@ -175,7 +176,7 @@ fn parse_int(p: Pair<Rule>) -> i32
     }
 }
 
-fn parse_var<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<(&'a str, Box<Expr<'a>>), Error>
+fn parse_identifier<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<(&'a str, Box<Expr<'a>>), Error>
 {
     let mut p = pairs.into_iter();
     let px = p.next().unwrap();
@@ -199,7 +200,14 @@ fn parse_var<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<(&
             // TODO: Check subscript is correct
             Ok((varname, subscript))
         },
-        None => Err(syntax_error(state, &format!("Unknown identifier {}", varname), px.as_span().start()))
+        None => {
+            match state.functions.get(varname) {
+                Some(_var) => {
+                    Ok((varname, subscript))
+                },
+                None => Err(syntax_error(state, &format!("Unknown identifier {}", varname), px.as_span().start()))
+            }
+        }
     }
 }
 
@@ -210,7 +218,7 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
             match primary.as_rule() {
                 Rule::int => Ok(Expr::Integer(parse_int(primary.into_inner().next().unwrap()))),
                 Rule::expr => Ok(parse_expr(state, primary.into_inner())?),
-                Rule::var => Ok(Expr::Var(parse_var(state, primary.into_inner())?)),
+                Rule::identifier => Ok(Expr::Identifier(parse_identifier(state, primary.into_inner())?)),
                 rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
             }
         })
@@ -243,6 +251,7 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
         .map_postfix(|lhs, op| match op.as_rule() {
             Rule::mm => Ok(Expr::MinusMinus(Box::new(lhs?), true)),
             Rule::pp => Ok(Expr::PlusPlus(Box::new(lhs?), true)),
+            Rule::call =>Ok(Expr::FunctionCall(Box::new(lhs?))),             
             _ => unreachable!(),
         })
         .parse(pairs)
@@ -272,7 +281,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                     }
                 }
             },
-            Rule::var_name_ex => {
+            Rule::id_name_ex => {
                 let mut name = "";
                 let mut size:usize = 1;
                 let mut def = VariableDefinition::None;
@@ -280,7 +289,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                     match p.as_rule() {
                         Rule::pointer => var_type = VariableType::CharPtr,
                         Rule::var_const => var_const = true,
-                        Rule::var_name => name = p.as_str(),
+                        Rule::id_name => name = p.as_str(),
                         Rule::int => size = p.as_str().parse::<usize>().unwrap(), 
                         Rule::var_def => {
                             let px = p.into_inner().next().unwrap();
@@ -453,7 +462,7 @@ fn compile_func_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) 
         pair = p.next().unwrap();
     }
     match pair.as_rule() {
-        Rule::var_name => {
+        Rule::id_name => {
             let name = pair.as_str();
             let pair = p.next().unwrap();
             match pair.as_rule() {
@@ -509,7 +518,7 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
         .op(Op::infix(Rule::eq, Assoc::Left) | Op::infix(Rule::neq, Assoc::Left) | Op::infix(Rule::gt, Assoc::Left) | Op::infix(Rule::gte, Assoc::Left) | Op::infix(Rule::lt, Assoc::Left) | Op::infix(Rule::lte, Assoc::Left))
         .op(Op::infix(Rule::add, Assoc::Left) | Op::infix(Rule::sub, Assoc::Left))
         .op(Op::prefix(Rule::neg) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp) | Op::prefix(Rule::deref))
-        .op(Op::postfix(Rule::mm) | Op::postfix(Rule::pp));
+        .op(Op::postfix(Rule::call) | Op::postfix(Rule::mm) | Op::postfix(Rule::pp));
     
     // Prepare the context
     let mut context = cpp::Context::new(&args.input);
