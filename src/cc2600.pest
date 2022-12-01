@@ -24,7 +24,8 @@ inline = { "inline" }
 
 block = { "{" ~ statement* ~ "}" }
 statement = {
-      do_while
+      block
+    | do_while
     | while_do
     | for_loop
     | if_statement
@@ -33,7 +34,6 @@ statement = {
     | continue_statement
     | return_statement
     | expr ~ ";"
-    | block
     | nothing ~ ";"
     | asm_statement
     | strobe_statement

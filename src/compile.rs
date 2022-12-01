@@ -366,8 +366,8 @@ fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Res
         },
         Rule::do_while => {
             let mut p = pair.into_inner();
-            let condition = parse_expr(state, p.next().unwrap().into_inner())?;
             let body = compile_statement(state, p.next().unwrap().into_inner().next().unwrap())?;
+            let condition = parse_expr(state, p.next().unwrap().into_inner())?;
             Ok(StatementLoc {
                 pos, statement: Statement::DoWhile {
                     body: Box::new(body), condition  
