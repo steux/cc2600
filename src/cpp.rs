@@ -75,6 +75,11 @@ impl Context {
         self.defs.insert(name.into(), value.into());
         self
     }
+    /// 
+    pub fn undefine<N: Into<String>>(&mut self, name: N) -> &mut Self {
+        self.defs.remove(&name.into());
+        self
+    }
     /// Gets a macro that may or may not be defined from a context.
     pub fn get_macro<N: Into<String>>(&self, name: N) -> Option<&String> {
         self.defs.get(&name.into())
@@ -356,7 +361,35 @@ pub fn process<I: BufRead, O: Write>(
                 } else {
                     state = State::Skip;
                 }
-            } else {
+            } else if substr.starts_with("#undef") {
+                if state == State::Active {
+                    let mut parts = substr.splitn(2, "//").next().unwrap().splitn(2, " ");
+                    parts.next().unwrap();
+                    let maybe_expr = parts.next().map(|s| s.trim()).and_then(|s| {
+                        if s.is_empty() {
+                            None
+                        } else {
+                            Some(s)
+                        }
+                    });
+                    let expr = match maybe_expr {
+                        Some(x) => x,
+                        _ => {
+                            return Err(Error::Syntax {
+                                filename: filename.clone(), included_in: included_in.clone(), line,
+                                msg: "Expected something after `#undef`".to_string() })
+                        }
+                    };
+
+                    if context.get_macro(expr).is_none() {
+                        return Err(Error::Syntax {
+                            filename: filename.clone(), included_in: included_in.clone(), line,
+                            msg: format!("Macro {} is not defined", expr)});
+                    }
+                    context.undefine(expr);
+                    regex = context.build_regex();
+                } 
+            } else { 
                 let substr;
                 let new_line;
                 {
@@ -435,6 +468,11 @@ pub fn process<I: BufRead, O: Write>(
                                 let mut p = expr.splitn(2, " ");
                                 let mcro = p.next().unwrap();
                                 let value = p.next().or_else(|| Some("")).unwrap();
+                                if context.get_macro(mcro).is_some() {
+                                    return Err(Error::Syntax {
+                                        filename: filename.clone(), included_in: included_in.clone(), line,
+                                        msg: format!("Macro {} already defined", mcro)});
+                                }
                                 context.define(mcro, value);
                                 regex = context.build_regex();
                             } },

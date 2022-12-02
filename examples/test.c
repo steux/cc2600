@@ -33,113 +33,81 @@ const unsigned char ORANGE = 0xfa;
 #define OVERSCAN 30
 #endif
 
-#define SPRITE_HEIGHT 16 
-#define WAIT for (Y = 5; Y != 0; Y--);
+char first_time;
+unsigned char i, j, k;
+unsigned char scroll_sequence;
+unsigned char scroll_counter;
+unsigned char lPFx[24];
+unsigned char rPFx[24];
+unsigned char lPFy[24];
+unsigned char rPFy[24];
 
-void draw_sprite()
+#define SPRITE_HEIGHT 0 
+
+#define WAIT asm("nop");asm("nop"); asm("nop"); asm("nop");asm("nop");asm("nop");asm("nop");asm("nop");asm("nop");asm("nop");
+
+#define START *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF1= rPFx[X]; *PF2 = rPFy[X];
+#define TAIL
+
+void draw_bird1()
 {
-        *COLUP0 = RED; 
-        *COLUP1 = WHITE; 
-        *GRP0 = 0x1C;
-        *HMBL = 0xD0; // +3 BALL
+#include "bird1.c"
+}
+
+void kernel1()
+{
+    X = 0; i = 0;
+    for (Y = 192 - 1 - SPRITE_HEIGHT; Y != 0; Y--) {
         strobe(WSYNC);
         strobe(HMOVE);
-      WAIT;
-        *GRP0 = 0x38;
-        *GRP1 = 0x04;
-        *ENABL = 2;
-        *HMBL = 0xF0; // + 1 BALL
+        START
+           if (Y == 32) draw_bird1();
+        TAIL
+    }
+}
+
+#undef START
+#undef TAIL
+#define START *PF0 = lPFx[X]; *PF1 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF1 = rPFy[X];
+#define TAIL 
+
+void draw_bird2()
+{
+#include "bird1.c"
+}
+
+void kernel2()
+{
+    X = 0; i = 0;
+    for (Y = 192 - 1 - SPRITE_HEIGHT; Y != 0; Y--) {
         strobe(WSYNC);
         strobe(HMOVE);
-      WAIT;
-        *GRP0 = 0x70;
-        *GRP1 = 0x0c;
-        *HMBL = 0x00;
+        START
+            if (Y == 32) draw_bird2();
+        TAIL
+    }
+}
+
+#undef START
+#undef TAIL
+#define START *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF1 = rPFy[X];
+#define TAIL 
+
+void draw_bird3()
+{
+#include "bird1.c"
+}
+
+void kernel3()
+{
+    X = 0; i = 0;
+    for (Y = 192 - 1 - SPRITE_HEIGHT; Y != 0; Y--) {
         strobe(WSYNC);
         strobe(HMOVE);
-      WAIT;
-        *GRP1 = 0x0e;
-        *HMBL = 0xF0; // +1 BALL
-        strobe(WSYNC);
-        strobe(HMOVE);
-      WAIT;
-        *GRP1 = 0x0a;
-        *HMBL = 0x00;
-        strobe(WSYNC);
-        strobe(HMOVE);
-      WAIT;
-        *GRP0 = 0x10;
-        *CTRLPF = 0x30;
-        *HMBL = 0x40; // -4 BALL
-        strobe(WSYNC);
-        strobe(HMOVE);
-      WAIT;
-        *GRP0 = 0xe0;
-        *COLUP0 = YELLOW;
-        *GRP1 = 0x0b; 
-        *HMBL = 0xF0; // +1 BALL
-        strobe(WSYNC);
-        strobe(HMOVE);
-      WAIT;
-        *HMBL = 0x00;
-        *GRP1 = 0x0f;
-        strobe(WSYNC);
-        strobe(HMOVE);
-      WAIT;
-        *GRP0 = 0xF0;
-        *GRP1 = 0x07;
-        strobe(WSYNC);
-        strobe(HMOVE);
-      WAIT;
-        *COLUP1 = RED;
-        *GRP1 = 0x04;
-        *HMBL = 0xe0; // +2 BALL
-        strobe(WSYNC);
-        strobe(HMOVE);
-      WAIT;
-        *GRP0 = 0x70;
-        *GRP1 = 0x1f;
-        *COLUP1 = ORANGE;
-        *HMP1 = 0xD0; // P1 : + 3
-        *HMBL = 0xf0; // + 1 BALL
-        strobe(WSYNC);
-        strobe(HMOVE);
-      WAIT;
-        *HMP1 = 0x00;
-        *HMBL = 0x10; // -1 BALL
-        *GRP0 = 0x78;
-        *GRP1 = 0x10;
-        *COLUP0 = RED;
-        strobe(WSYNC);
-        strobe(HMOVE);
-      WAIT;
-        *HMBL = 0x00;
-        *GRP0 = 0x7c;
-        *GRP1 = 0x0e;
-        strobe(WSYNC);
-        strobe(HMOVE);
-      WAIT;
-        *HMBL = 0x10; // -1 BALL
-        *GRP1 = 0;
-        *GRP0 = 0x3e;
-        strobe(WSYNC);
-        strobe(HMOVE);
-      WAIT;
-        *HMBL = 0x30; // -3 BALL
-        *ENABL = 0;
-        *GRP0 = 0x3f;
-        *HMP1 = 0x30; // P1: - 3
-        strobe(WSYNC);
-        strobe(HMOVE);
-      WAIT;
-        *HMBL = 0;
-        *GRP0 = 0x1e;
-        *HMP1 = 0;
-        *CTRLPF = 0x20; // Ball back to 4 pixels
-        strobe(WSYNC);
-        strobe(HMOVE);
-      WAIT;
-        *GRP0 = 0;
+        START
+            if (Y == 32) draw_bird2();
+        TAIL
+    }
 }
 
 void init_sprites_pos()
@@ -172,7 +140,97 @@ void init_sprites_pos()
     strobe(HMOVE);
 }
 
-char first_time;
+void load_scroll_sequence1()
+{
+    Y = scroll_sequence;
+    j = s0_PF1[Y];
+    k = s0_PF2[Y]; 
+    for (X = 0; X != 24; X++) {
+        rPFx[X] = j;
+        rPFy[X] = k;
+    } 
+    Y = scroll_sequence + 4;
+    if (Y > 23) Y = Y - 24;
+    j = s0_PF1[Y];
+    k = s0_PF2[Y]; 
+    for (X = 0; X != 24; X++) {
+        lPFx[X] = j;
+        lPFy[X] = k;
+    }
+    *PF0 = 0; 
+}
+
+void load_scroll_sequence2()
+{
+    Y = scroll_sequence;
+    j = s0_PF0[Y];
+    k = s0_PF1[Y]; 
+    for (X = 0; X != 24; X++) {
+        rPFx[X] = j;
+        rPFy[X] = k;
+    } 
+    Y = scroll_sequence + 4;
+    if (Y > 23) Y = Y - 24;
+    j = s0_PF0[Y];
+    k = s0_PF1[Y]; 
+    for (X = 0; X != 24; X++) {
+        lPFx[X] = j;
+        lPFy[X] = k;
+    } 
+    *PF2 = 0;
+}
+
+void load_scroll_sequence3()
+{
+    Y = scroll_sequence;
+    j = s0_PF0[Y];
+    k = s0_PF1[Y]; 
+    for (X = 0; X != 24; X++) {
+        rPFx[X] = j;
+        rPFy[X] = k;
+    } 
+    Y = scroll_sequence + 4;
+    if (Y > 23) Y = Y - 24;
+    j = s0_PF1[Y];
+    k = s0_PF2[Y]; 
+    for (X = 0; X != 24; X++) {
+        lPFx[X] = j;
+        lPFy[X] = k;
+    } 
+    *PF2 = 0;
+}
+
+void load_scroll_sequence()
+{
+    if (scroll_sequence < 12) {
+        load_scroll_sequence1();
+    } else if (scroll_sequence < 20) {
+        load_scroll_sequence2();
+    } else {
+        load_scroll_sequence3();
+    }
+}
+    
+void init()
+{
+    for (X = BLANK - 8; X != 0; X--) strobe(WSYNC);
+    init_sprites_pos();
+    scroll_sequence = 0;
+    scroll_counter = 0;
+    first_time = 0;
+    j = 0;
+}
+
+void game_logic()
+{
+    load_scroll_sequence();
+    scroll_counter++;
+    if (scroll_counter == 20) {
+        scroll_counter = 0;
+        scroll_sequence++;
+        if (scroll_sequence == 24) scroll_sequence = 0;
+    }
+}
 
 void main()
 {
@@ -187,17 +245,16 @@ void main()
     *VSYNC = 0; // Turn VSYNC Off
 
     if (first_time) {
-        for (X = BLANK - 8; X != 0; X--) strobe(WSYNC);
-        init_sprites_pos();
-        first_time = 0;
+        init();
     } else {
 #ifdef PAL
         *TIM64T = 53; // ((48-4) * 76) / 64
 #else
         *TIM64T = 44;
 #endif
+        // The game logic
+        game_logic();
         while (*INTIM);
-        //for (X = BLANK - 4; X != 0; X--) strobe(WSYNC);
     }
     
     // Renable output (disable VBLANK)
@@ -205,12 +262,11 @@ void main()
     strobe(HMOVE);
     *VBLANK = 0;
 
-    for (X = KERNAL - 1 - SPRITE_HEIGHT; X != 0; X--) {
-      strobe(WSYNC);
-      strobe(HMOVE);
-      WAIT;
-      if (X == 32) draw_sprite(); 
-    }
+    if (scroll_sequence < 12) {
+        kernel1();
+    } else if (scroll_sequence < 20) {
+        kernel2();
+    } else kernel3();
 
     strobe(WSYNC);
     *VBLANK = 2; // Enable VBLANK again
