@@ -1,6 +1,13 @@
+#ifdef __ATARI2600__
 #include "vcs.h"
-
 unsigned char X, Y;
+
+const unsigned char *const s0_PF0[24]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x80,0xc0,0xe0,0xf0,0xf0,0x70,0x30,0x10};
+const unsigned char *const s0_PF1[24]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x03,0x07,0x0f,0x1f,0x3e,0x7c,0xf8,0xf0,0xe0,0xc0,0x80,0x00,0x00,0x00,0x00};
+const unsigned char *const s0_PF2[24]={0x80,0xc0,0xe0,0xf0,0xf8,0x7c,0x3e,0x1f,0x0f,0x07,0x03,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+const unsigned char *const s1_PF0[24]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x80,0xc0,0xe0,0x70,0x30,0x10,0x00};
+const unsigned char *const s1_PF1[24]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x03,0x07,0x0e,0x1c,0x38,0x70,0xe0,0xc0,0x80,0x00,0x00,0x00,0x00,0x00};
+const unsigned char *const s1_PF2[24]={0x00,0x80,0xc0,0xe0,0x70,0x38,0x1c,0x0e,0x07,0x03,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
 #ifdef PAL
 const unsigned char RED = 0x64;
@@ -180,26 +187,76 @@ void main()
     *VSYNC = 0; // Turn VSYNC Off
 
     if (first_time) {
-        for (X = BLANK - 7; X != 0; X--) strobe(WSYNC);
+        for (X = BLANK - 8; X != 0; X--) strobe(WSYNC);
         init_sprites_pos();
         first_time = 0;
     } else {
-        for (X = BLANK - 3; X != 0; X--) strobe(WSYNC);
+#ifdef PAL
+        *TIM64T = 53; // ((48-4) * 76) / 64
+#else
+        *TIM64T = 44;
+#endif
+        while (*INTIM);
+        //for (X = BLANK - 4; X != 0; X--) strobe(WSYNC);
     }
     
     // Renable output (disable VBLANK)
+    strobe(WSYNC);
+    strobe(HMOVE);
     *VBLANK = 0;
 
-    for (X = KERNAL - SPRITE_HEIGHT; X != 0; X--) {
+    for (X = KERNAL - 1 - SPRITE_HEIGHT; X != 0; X--) {
       strobe(WSYNC);
       strobe(HMOVE);
       WAIT;
       if (X == 32) draw_sprite(); 
     }
 
+    strobe(WSYNC);
     *VBLANK = 2; // Enable VBLANK again
     // Now we have 30 lines of VBLANK
     //strobe(HMCLR);
     for (X = OVERSCAN; X != 0; X--) strobe(WSYNC);
   } while(1);
 }
+#else
+
+#include <stdio.h>
+
+unsigned char reverse(unsigned char input)
+{
+    unsigned char output = 0;
+    if (input & 1) output |= 128;
+    if (input & 2) output |= 64;
+    if (input & 4) output |= 32;
+    if (input & 8) output |= 16;
+    if (input & 16) output |= 8;
+    if (input & 32) output |= 4;
+    if (input & 64) output |= 2;
+    if (input & 128) output |= 1;
+    return output;
+}
+
+void main()
+{
+    int i, j, c, d;
+#define WIDTH 24
+    unsigned char PF[3][WIDTH];
+    for (j = 0; j < 2; j++) {
+        unsigned int mask = (j)?0x0e:0x1f;
+        for (i = 0; i < WIDTH; i++) {
+            unsigned int val = (mask << i) >> 4;
+            PF[0][i] = reverse((val >> 16) & 0x0f);
+            PF[1][i] = (val >> 8) & 0xff;
+            PF[2][i] = reverse(val & 0xff);
+        }
+        for (d = 0; d < 3; d++) {
+            printf("const unsigned char *const s%d_PF%d[%d]={", j, d, WIDTH);
+            for (c = 0; c < WIDTH - 1; c++) {
+                printf("0x%02x,", PF[d][c]);
+            }
+            printf("0x%02x};\n", PF[d][c]);
+        }
+    }
+}
+#endif

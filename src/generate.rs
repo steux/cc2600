@@ -1268,7 +1268,31 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         generate_statement(&f.1.code, &mut gstate)?;
         gstate.write_asm("RTS", 6)?;
     }
-   
+  
+    // Generate ROM tables
+    gstate.write("\n; Tables in ROM\n")?;
+    gstate.write("\talign $100\n\n")?;
+    for v in compiler_state.sorted_variables().iter() {
+        if v.1.memory == VariableMemory::ROM {
+            match &v.1.def {
+                VariableDefinition::Array(arr) => {
+                    gstate.write(v.0)?;
+                    let mut counter = 0;
+                    for i in arr {
+                        if counter == 0 || counter == 16 {
+                            gstate.write("\n\thex ")?;
+                        }
+                        counter += 1;
+                        if counter == 16 { counter = 0; }
+                        gstate.write(&format!("{:02x}", i))?;
+                    } 
+                    gstate.write("\n")?;
+                },
+                _ => ()
+            };
+        }
+    }
+
     // Generate startup code
     gstate.write("
 Powerup
