@@ -42,10 +42,9 @@ unsigned char rPFx[24];
 unsigned char lPFy[24];
 unsigned char rPFy[24];
 
-#define SPRITE_HEIGHT 0 
+#define SPRITE_HEIGHT 17 
 
-#define WAIT asm("nop");asm("nop"); asm("nop"); asm("nop");asm("nop");asm("nop");asm("nop");asm("nop");asm("nop");asm("nop");
-
+#define WAIT for (i = 1; i != 0; i--); asm("nop") 
 #define START *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF1= rPFx[X]; *PF2 = rPFy[X];
 #define TAIL
 
@@ -57,7 +56,7 @@ void draw_bird1()
 void kernel1()
 {
     X = 0; i = 0;
-    for (Y = 192 - 1 - SPRITE_HEIGHT; Y != 0; Y--) {
+    for (Y = KERNAL - 1 - SPRITE_HEIGHT; Y != 0; Y--) {
         strobe(WSYNC);
         strobe(HMOVE);
         START
@@ -79,7 +78,7 @@ void draw_bird2()
 void kernel2()
 {
     X = 0; i = 0;
-    for (Y = 192 - 1 - SPRITE_HEIGHT; Y != 0; Y--) {
+    for (Y = KERNAL - 1 - SPRITE_HEIGHT; Y != 0; Y--) {
         strobe(WSYNC);
         strobe(HMOVE);
         START
@@ -90,7 +89,7 @@ void kernel2()
 
 #undef START
 #undef TAIL
-#define START *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF1 = rPFy[X];
+#define START *PF0 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF2 = rPFy[X];
 #define TAIL 
 
 void draw_bird3()
@@ -101,11 +100,11 @@ void draw_bird3()
 void kernel3()
 {
     X = 0; i = 0;
-    for (Y = 192 - 1 - SPRITE_HEIGHT; Y != 0; Y--) {
+    for (Y = KERNAL - 1 - SPRITE_HEIGHT; Y != 0; Y--) {
         strobe(WSYNC);
         strobe(HMOVE);
         START
-            if (Y == 32) draw_bird2();
+            if (Y == 32) draw_bird3();
         TAIL
     }
 }
@@ -119,6 +118,7 @@ void init_sprites_pos()
     *GRP0 = 0;
     *GRP0 = 0;
     *GRP0 = 0;
+    *GRP0 = 0;
     strobe(RESP0);
     strobe(WSYNC);
 
@@ -127,6 +127,7 @@ void init_sprites_pos()
     *GRP1 = 0;
     *GRP1 = 0;
     *GRP1 = 0;
+    *GRP0 = 0;
     strobe(RESP1);
     strobe(WSYNC);
 
@@ -135,6 +136,7 @@ void init_sprites_pos()
     *GRP1 = 0;
     *GRP1 = 0;
     *CTRLPF = 0x20;
+    *GRP0 = 0;
     strobe(RESBL);
     strobe(WSYNC);
     strobe(HMOVE);
@@ -150,14 +152,13 @@ void load_scroll_sequence1()
         rPFy[X] = k;
     } 
     Y = scroll_sequence + 4;
-    if (Y > 23) Y = Y - 24;
+    if (Y >= 24) Y = Y - 24;
     j = s0_PF1[Y];
     k = s0_PF2[Y]; 
     for (X = 0; X != 24; X++) {
         lPFx[X] = j;
         lPFy[X] = k;
     }
-    *PF0 = 0; 
 }
 
 void load_scroll_sequence2()
@@ -170,34 +171,32 @@ void load_scroll_sequence2()
         rPFy[X] = k;
     } 
     Y = scroll_sequence + 4;
-    if (Y > 23) Y = Y - 24;
+    if (Y >= 24) Y = Y - 24;
     j = s0_PF0[Y];
     k = s0_PF1[Y]; 
     for (X = 0; X != 24; X++) {
         lPFx[X] = j;
         lPFy[X] = k;
     } 
-    *PF2 = 0;
 }
 
 void load_scroll_sequence3()
 {
     Y = scroll_sequence;
     j = s0_PF0[Y];
-    k = s0_PF1[Y]; 
+    k = s0_PF2[Y]; 
     for (X = 0; X != 24; X++) {
         rPFx[X] = j;
         rPFy[X] = k;
     } 
     Y = scroll_sequence + 4;
-    if (Y > 23) Y = Y - 24;
-    j = s0_PF1[Y];
+    if (Y >= 24) Y = Y - 24;
+    j = s0_PF0[Y];
     k = s0_PF2[Y]; 
     for (X = 0; X != 24; X++) {
         lPFx[X] = j;
         lPFy[X] = k;
     } 
-    *PF2 = 0;
 }
 
 void load_scroll_sequence()
@@ -223,13 +222,13 @@ void init()
 
 void game_logic()
 {
-    load_scroll_sequence();
-    scroll_counter++;
-    if (scroll_counter == 20) {
+    if (scroll_counter == 5) {
         scroll_counter = 0;
         scroll_sequence++;
         if (scroll_sequence == 24) scroll_sequence = 0;
     }
+    load_scroll_sequence();
+    scroll_counter++;
 }
 
 void main()
@@ -259,8 +258,11 @@ void main()
     
     // Renable output (disable VBLANK)
     strobe(WSYNC);
-    strobe(HMOVE);
+    //strobe(HMOVE);
     *VBLANK = 0;
+    *PF0 = 0;
+    *PF1 = 0;
+    *PF2 = 0;
 
     if (scroll_sequence < 12) {
         kernel1();
