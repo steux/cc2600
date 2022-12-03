@@ -5,8 +5,6 @@ use std::io::Write;
 
 use log::debug;
 
-// TODO: implement holdback on write (in order to remove PLA/PHA and LDA/STA pairs) 
-
 struct GeneratorState<'a> {
     compiler_state: &'a CompilerState<'a>,
     last_included_line_number: usize,
@@ -330,9 +328,9 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                     }
                 },
                 _ => {
-                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                     match right {
                         ExprType::Absolute(variable, offset) => {
+                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             let v = gstate.compiler_state.get_variable(variable);
                             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                             if offset > 0 {
@@ -343,18 +341,22 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             gstate.flags = FlagsState::Absolute(variable, offset);
                         },
                         ExprType::AbsoluteX(variable) => {
+                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&format!("LDA {},X", variable), 4)?;
                             gstate.flags = FlagsState::AbsoluteX(variable);
                         },
                         ExprType::AbsoluteY(variable) => {
+                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&format!("LDA {},Y", variable), 4)?;
                             gstate.flags = FlagsState::AbsoluteY(variable);
                         },
                         ExprType::Immediate(v) => {
+                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm(&format!("LDA #{}", v), 2)?;
                             gstate.flags = if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero };
                         },
                         ExprType::Tmp(_) => {
+                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             gstate.write_asm("LDA cctmp", 3)?;
                             gstate.flags = FlagsState::Unknown;
                         },

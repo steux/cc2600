@@ -17,9 +17,10 @@ const unsigned char BLACK = 0x00;
 const unsigned char WHITE = 0x0e;
 const unsigned char YELLOW = 0x2e;
 const unsigned char ORANGE = 0x4a;
+const unsigned char GREY = 0x04;
 #define BLANK 48
-#define KERNAL 228
-#define OVERSCAN 36
+#define KERNAL 192 
+#define OVERSCAN 72 //Instead of 36
 #else
 const unsigned char RED = 0x36;
 const unsigned char BLUE = 0x8e;
@@ -28,6 +29,7 @@ const unsigned char BLACK = 0x00;
 const unsigned char WHITE = 0x0e;
 const unsigned char YELLOW = 0x1e;
 const unsigned char ORANGE = 0xfa;
+const unsigned char GREY = 0x04;
 #define BLANK 40
 #define KERNAL 192
 #define OVERSCAN 30
@@ -41,10 +43,12 @@ unsigned char lPFx[24];
 unsigned char rPFx[24];
 unsigned char lPFy[24];
 unsigned char rPFy[24];
+unsigned char left_window, right_window;
 
 #define SPRITE_HEIGHT 17 
 
-#define WAIT for (i = 1; i != 0; i--); asm("nop") 
+//#define WAIT for (i = 1; i != 0; i--); asm("nop") 
+#define WAIT i++; if (i == 8) { i = 0; X++; } else { X++; X--; }
 #define START *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF1= rPFx[X]; *PF2 = rPFy[X];
 #define TAIL
 
@@ -132,7 +136,7 @@ void init_sprites_pos()
     strobe(WSYNC);
 
     *COLUBK = BLUE;
-    *COLUPF = BLACK;
+    *COLUPF = GREY;
     *GRP1 = 0;
     *GRP1 = 0;
     *CTRLPF = 0x20;
@@ -145,17 +149,50 @@ void init_sprites_pos()
 void load_scroll_sequence1()
 {
     Y = scroll_sequence;
-    j = s0_PF1[Y];
-    k = s0_PF2[Y]; 
-    for (X = 0; X != 24; X++) {
+    j = s1_PF1[Y];
+    k = s1_PF2[Y]; 
+    for (X = 0; X != right_window; X++) {
         rPFx[X] = j;
         rPFy[X] = k;
-    } 
+    }
+    rPFx[X] = s0_PF1[Y];
+    rPFy[X] = s0_PF2[Y];
+    X++;
+    for (; X != right_window + 6; X++) {
+        rPFx[X] = 0;
+        rPFy[X] = 0;
+    }
+    rPFx[X] = s0_PF1[Y];
+    rPFy[X] = s0_PF2[Y];
+    X++;
+    j = s1_PF1[Y];
+    k = s1_PF2[Y]; 
+    for (; X != 24; X++) {
+        rPFx[X] = j;
+        rPFy[X] = k;
+    }
+    
     Y = scroll_sequence + 4;
     if (Y >= 24) Y = Y - 24;
-    j = s0_PF1[Y];
-    k = s0_PF2[Y]; 
-    for (X = 0; X != 24; X++) {
+    j = s1_PF1[Y];
+    k = s1_PF2[Y]; 
+    for (X = 0; X != left_window; X++) {
+        lPFx[X] = j;
+        lPFy[X] = k;
+    }
+    lPFx[X] = s0_PF1[Y];
+    lPFy[X] = s0_PF2[Y];
+    X++;
+    for (; X != left_window + 6; X++) {
+        lPFx[X] = 0;
+        lPFy[X] = 0;
+    }
+    lPFx[X] = s0_PF1[Y];
+    lPFy[X] = s0_PF2[Y];
+    X++;
+    j = s1_PF1[Y];
+    k = s1_PF2[Y]; 
+    for (; X != 24; X++) {
         lPFx[X] = j;
         lPFy[X] = k;
     }
@@ -164,39 +201,105 @@ void load_scroll_sequence1()
 void load_scroll_sequence2()
 {
     Y = scroll_sequence;
-    j = s0_PF0[Y];
-    k = s0_PF1[Y]; 
-    for (X = 0; X != 24; X++) {
+    j = s1_PF0[Y];
+    k = s1_PF1[Y]; 
+    for (X = 0; X != right_window; X++) {
         rPFx[X] = j;
         rPFy[X] = k;
-    } 
+    }
+    rPFx[X] = s0_PF0[Y];
+    rPFy[X] = s0_PF1[Y];
+    X++;
+    for (; X != right_window + 6; X++) {
+        rPFx[X] = 0;
+        rPFy[X] = 0;
+    }
+    rPFx[X] = s0_PF0[Y];
+    rPFy[X] = s0_PF1[Y];
+    X++;
+    j = s1_PF0[Y];
+    k = s1_PF1[Y]; 
+    for (; X != 24; X++) {
+        rPFx[X] = j;
+        rPFy[X] = k;
+    }
+    
     Y = scroll_sequence + 4;
     if (Y >= 24) Y = Y - 24;
-    j = s0_PF0[Y];
-    k = s0_PF1[Y]; 
-    for (X = 0; X != 24; X++) {
+    j = s1_PF0[Y];
+    k = s1_PF1[Y]; 
+    for (X = 0; X != left_window; X++) {
         lPFx[X] = j;
         lPFy[X] = k;
-    } 
+    }
+    lPFx[X] = s0_PF0[Y];
+    lPFy[X] = s0_PF1[Y];
+    X++;
+    for (; X != left_window + 6; X++) {
+        lPFx[X] = 0;
+        lPFy[X] = 0;
+    }
+    lPFx[X] = s0_PF0[Y];
+    lPFy[X] = s0_PF1[Y];
+    X++;
+    j = s1_PF0[Y];
+    k = s1_PF1[Y]; 
+    for (; X != 24; X++) {
+        lPFx[X] = j;
+        lPFy[X] = k;
+    }
 }
 
 void load_scroll_sequence3()
 {
     Y = scroll_sequence;
-    j = s0_PF0[Y];
-    k = s0_PF2[Y]; 
-    for (X = 0; X != 24; X++) {
+    j = s1_PF0[Y];
+    k = s1_PF2[Y]; 
+    for (X = 0; X != right_window; X++) {
         rPFx[X] = j;
         rPFy[X] = k;
-    } 
+    }
+    rPFx[X] = s0_PF0[Y];
+    rPFy[X] = s0_PF2[Y];
+    X++;
+    for (; X != right_window + 6; X++) {
+        rPFx[X] = 0;
+        rPFy[X] = 0;
+    }
+    rPFx[X] = s0_PF0[Y];
+    rPFy[X] = s0_PF2[Y];
+    X++;
+    j = s1_PF0[Y];
+    k = s1_PF2[Y]; 
+    for (; X != 24; X++) {
+        rPFx[X] = j;
+        rPFy[X] = k;
+    }
+    
     Y = scroll_sequence + 4;
     if (Y >= 24) Y = Y - 24;
-    j = s0_PF0[Y];
-    k = s0_PF2[Y]; 
-    for (X = 0; X != 24; X++) {
+    j = s1_PF0[Y];
+    k = s1_PF2[Y]; 
+    for (X = 0; X != left_window; X++) {
         lPFx[X] = j;
         lPFy[X] = k;
-    } 
+    }
+    lPFx[X] = s0_PF0[Y];
+    lPFy[X] = s0_PF2[Y];
+    X++;
+    for (; X != left_window + 6; X++) {
+        lPFx[X] = 0;
+        lPFy[X] = 0;
+    }
+    lPFx[X] = s0_PF0[Y];
+    lPFy[X] = s0_PF2[Y];
+    X++;
+    j = s1_PF0[Y];
+    k = s1_PF2[Y]; 
+    for (; X != 24; X++) {
+        lPFx[X] = j;
+        lPFy[X] = k;
+    }
 }
 
 void load_scroll_sequence()
@@ -218,6 +321,8 @@ void init()
     scroll_counter = 0;
     first_time = 0;
     j = 0;
+    left_window = 6;
+    right_window = 10;
 }
 
 void game_logic()
@@ -225,7 +330,12 @@ void game_logic()
     if (scroll_counter == 5) {
         scroll_counter = 0;
         scroll_sequence++;
-        if (scroll_sequence == 24) scroll_sequence = 0;
+        if (scroll_sequence == 20) left_window = right_window;
+        if (scroll_sequence == 24) {
+            right_window = right_window + 1;
+            if (right_window == 16) right_window = 0;
+            scroll_sequence = 0;
+        }
     }
     load_scroll_sequence();
     scroll_counter++;

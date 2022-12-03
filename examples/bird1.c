@@ -59,13 +59,15 @@ strobe(WSYNC);
 strobe(HMOVE);
 START
 *GRP0 = 0xF0;
-*GRP1 = 0x07;
+*GRP1 = 0x38;
+*HMP1 = 0xD0; // P1 : + 3
 TAIL
 strobe(WSYNC);
 strobe(HMOVE);
 START
 *COLUP1 = RED;
-*GRP1 = 0x04;
+*HMP1 = 0x00;
+*GRP1 = 0x20;
 *HMBL = 0xe0; // +2 BALL
 TAIL
 strobe(WSYNC);
@@ -73,18 +75,16 @@ strobe(HMOVE);
 START
 *GRP0 = 0x70;
 *GRP1 = 0x1f;
-//*COLUP1 = ORANGE;
-*HMP1 = 0xD0; // P1 : + 3
+*COLUP1 = ORANGE;
 *HMBL = 0xf0; // + 1 BALL
 TAIL
 strobe(WSYNC);
 strobe(HMOVE);
 START
-*HMP1 = 0x00;
 *HMBL = 0x10; // -1 BALL
 *GRP0 = 0x78;
 *GRP1 = 0x10;
-//*COLUP0 = RED;
+*COLUP0 = RED;
 TAIL
 strobe(WSYNC);
 strobe(HMOVE);
