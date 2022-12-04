@@ -53,6 +53,8 @@ pub enum Operation {
     And,
     Or,
     Xor,
+    Brs,
+    Bls,
     Assign,
     Eq,
     Neq,
@@ -232,6 +234,8 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
                 Rule::and => Operation::And,
                 Rule::or => Operation::Or,
                 Rule::xor => Operation::Xor,
+                Rule::brs => Operation::Brs,
+                Rule::bls => Operation::Bls,
                 Rule::eq => Operation::Eq,
                 Rule::neq => Operation::Neq,
                 Rule::assign => Operation::Assign,
@@ -520,8 +524,13 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
         PrattParser::new()
         .op(Op::infix(Rule::comma, Assoc::Left))
         .op(Op::infix(Rule::assign, Assoc::Right))
-        .op(Op::infix(Rule::and, Assoc::Left) | Op::infix(Rule::or, Assoc::Left) | Op::infix(Rule::xor, Assoc::Left))
+        .op(Op::infix(Rule::lor, Assoc::Left))
+        .op(Op::infix(Rule::land, Assoc::Left))
+        .op(Op::infix(Rule::or, Assoc::Left))
+        .op(Op::infix(Rule::xor, Assoc::Left))
+        .op(Op::infix(Rule::and, Assoc::Left))
         .op(Op::infix(Rule::eq, Assoc::Left) | Op::infix(Rule::neq, Assoc::Left) | Op::infix(Rule::gt, Assoc::Left) | Op::infix(Rule::gte, Assoc::Left) | Op::infix(Rule::lt, Assoc::Left) | Op::infix(Rule::lte, Assoc::Left))
+        .op(Op::infix(Rule::brs, Assoc::Left) | Op::infix(Rule::bls, Assoc::Left))
         .op(Op::infix(Rule::add, Assoc::Left) | Op::infix(Rule::sub, Assoc::Left))
         .op(Op::prefix(Rule::neg) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp) | Op::prefix(Rule::deref))
         .op(Op::postfix(Rule::call) | Op::postfix(Rule::mm) | Op::postfix(Rule::pp));

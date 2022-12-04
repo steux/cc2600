@@ -48,9 +48,8 @@ unsigned char ybird;
 
 #define SPRITE_HEIGHT 17 
 
-// 16 cycles
-#define WAIT asm("PHA"); asm("PLA"); asm("PHA"); asm("PLA"); asm("nop");
-#define BEFORE i--; 
+#define WAIT asm("PHA"); asm("PLA");
+#define BEFORE X = Y >> 3  
 #define START BEFORE; *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF1= rPFx[X]; *PF2 = rPFy[X];
 
 void draw_bird1()
@@ -60,7 +59,7 @@ void draw_bird1()
 
 void kernel1()
 {
-    X = 0; i = 8; 
+    X = 0; i = 0;
     for (Y = KERNAL - 2 - SPRITE_HEIGHT; Y != ybird; Y--) {
         strobe(WSYNC);
         strobe(HMOVE);
@@ -88,7 +87,7 @@ void draw_bird2()
 
 void kernel2()
 {
-    X = 0; i = 8;
+    X = 0; i = 0; 
     for (Y = KERNAL - 2 - SPRITE_HEIGHT; Y != ybird; Y--) {
         strobe(WSYNC);
         strobe(HMOVE);
@@ -116,7 +115,7 @@ void draw_bird3()
 
 void kernel3()
 {
-    X = 0; i = 8;
+    X = 0; i = 0;
     for (Y = KERNAL - 2 - SPRITE_HEIGHT; Y != ybird; Y--) {
         strobe(WSYNC);
         strobe(HMOVE);

@@ -437,6 +437,11 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
         ExprType::Y => {
             gstate.write_asm("TYA", 2)?;
         },
+        ExprType::A(_) => {
+        },
+        ExprType::Tmp(_) => {
+            gstate.write_asm("LDA cctmp", 3)?;
+        },
         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
     }
     gstate.acc_in_use = true;
@@ -487,6 +492,81 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
             gstate.write_asm(&format!("{} {},Y", operation, varname), 4)?;
         },
         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
+    };
+    gstate.flags = FlagsState::Unknown;
+    if acc_in_use {
+        gstate.write_asm("STA cctmp", 3)?;
+        gstate.write_asm("PLA", 3)?;
+        Ok(ExprType::Tmp(signed))
+    } else {
+        Ok(ExprType::A(signed))
+    }
+}
+
+fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+{
+    let acc_in_use = gstate.acc_in_use;
+    if acc_in_use { gstate.write_asm("PHA", 3)?; }
+    let left = generate_expr(lhs, gstate, pos)?;
+    let right = generate_expr(rhs, gstate, pos)?;
+    let signed;
+    match left {
+        ExprType::Absolute(varname, offset) => {
+            let v = gstate.compiler_state.get_variable(varname);
+            signed = v.signed; 
+            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
+            if offset > 0 {
+                gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
+            } else {
+                gstate.write_asm(&format!("LDA {}", varname), cycles)?;
+            }
+        },
+        ExprType::AbsoluteX(varname) => {
+            let v = gstate.compiler_state.get_variable(varname);
+            signed = v.signed; 
+            gstate.write_asm(&format!("LDA {},X", varname), 4)?;
+        },
+        ExprType::AbsoluteY(varname) => {
+            let v = gstate.compiler_state.get_variable(varname);
+            signed = v.signed; 
+            gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
+        },
+        ExprType::X => {
+            signed = false;
+            gstate.write_asm("TXA", 2)?;
+        },
+        ExprType::Y => {
+            signed = false;
+            gstate.write_asm("TYA", 2)?;
+        },
+        ExprType::A(s) => { signed = s; },
+        ExprType::Tmp(s) => {
+            signed = s;
+            gstate.write_asm("LDA cctmp", 3)?;
+        },
+        _ => return Err(syntax_error(gstate.compiler_state, "Bad left value for shift operation", pos))
+    }
+    gstate.acc_in_use = true;
+    let operation = match op {
+        Operation::Brs => {
+            "LSR"
+        },
+        Operation::Bls => {
+            "ASL"
+        },
+        _ => unreachable!(),
+    };
+    match right {
+        ExprType::Immediate(v) => {
+            if v >= 0 {
+                for _ in 0..v {
+                    gstate.write_asm(&format!("{}", operation), 2)?;
+                }
+            } else {
+                return Err(syntax_error(gstate.compiler_state, "Negative shift operation not allowed", pos));
+            } 
+        },
+        _ => return Err(syntax_error(gstate.compiler_state, "Incorrect reight value for shift operation (positive constants only)", pos))
     };
     gstate.flags = FlagsState::Unknown;
     if acc_in_use {
@@ -628,6 +708,8 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                 Operation::Gte => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
                 Operation::Lt => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
                 Operation::Lte => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
+                Operation::Brs => generate_shift(lhs, op, rhs, gstate, pos),
+                Operation::Bls => generate_shift(lhs, op, rhs, gstate, pos),
             }
         },
         Expr::Identifier((var, sub)) => {
