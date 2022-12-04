@@ -1,4 +1,3 @@
-TAIL
 strobe(WSYNC);
 strobe(HMOVE);
 START
@@ -120,4 +119,4 @@ strobe(WSYNC);
 strobe(HMOVE);
 START
 *GRP0 = 0;
-
+TAIL

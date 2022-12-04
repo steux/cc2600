@@ -44,12 +44,14 @@ unsigned char rPFx[24];
 unsigned char lPFy[24];
 unsigned char rPFy[24];
 unsigned char left_window, right_window;
+unsigned char ybird;
 
 #define SPRITE_HEIGHT 17 
 
-//#define WAIT for (i = 1; i != 0; i--); asm("nop") 
-#define WAIT i++; if (i == 8) { i = 0; X++; } else { X++; X--; }
-#define START *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF1= rPFx[X]; *PF2 = rPFy[X];
+#define WAIT asm("PHA"); asm("PLA"); asm("PHA"); asm("PLA");
+//#define WAIT if (i == 0) { X++; i = 8; } else { asm("PHA"); asm("PLA"); } 
+#define BEFORE i--; 
+#define START BEFORE; *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF1= rPFx[X]; *PF2 = rPFy[X];
 #define TAIL
 
 void draw_bird1()
@@ -59,19 +61,27 @@ void draw_bird1()
 
 void kernel1()
 {
-    X = 0; i = 0;
-    for (Y = KERNAL - 1 - SPRITE_HEIGHT; Y != 0; Y--) {
+    X = 0; i = 8; 
+    for (Y = KERNAL - 2 - SPRITE_HEIGHT; Y != ybird; Y--) {
         strobe(WSYNC);
         strobe(HMOVE);
         START
-           if (Y == 32) draw_bird1();
-        TAIL
     }
+    strobe(WSYNC);
+    strobe(HMOVE);
+    START
+    draw_bird1();
+    do {
+        strobe(WSYNC);
+        strobe(HMOVE);
+        START
+        Y--;
+    } while (Y != 0); 
 }
 
 #undef START
 #undef TAIL
-#define START *PF0 = lPFx[X]; *PF1 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF1 = rPFy[X];
+#define START BEFORE; *PF0 = lPFx[X]; *PF1 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF1 = rPFy[X];
 #define TAIL 
 
 void draw_bird2()
@@ -81,19 +91,27 @@ void draw_bird2()
 
 void kernel2()
 {
-    X = 0; i = 0;
-    for (Y = KERNAL - 1 - SPRITE_HEIGHT; Y != 0; Y--) {
+    X = 0; i = 8;
+    for (Y = KERNAL - 2 - SPRITE_HEIGHT; Y != ybird; Y--) {
         strobe(WSYNC);
         strobe(HMOVE);
         START
-            if (Y == 32) draw_bird2();
-        TAIL
     }
+    strobe(WSYNC);
+    strobe(HMOVE);
+    START
+    draw_bird2();
+    do {
+        strobe(WSYNC);
+        strobe(HMOVE);
+        START
+        Y--;
+    } while (Y != 0); 
 }
 
 #undef START
 #undef TAIL
-#define START *PF0 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF2 = rPFy[X];
+#define START BEFORE; *PF0 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF2 = rPFy[X];
 #define TAIL 
 
 void draw_bird3()
@@ -103,14 +121,22 @@ void draw_bird3()
 
 void kernel3()
 {
-    X = 0; i = 0;
-    for (Y = KERNAL - 1 - SPRITE_HEIGHT; Y != 0; Y--) {
+    X = 0; i = 8;
+    for (Y = KERNAL - 2 - SPRITE_HEIGHT; Y != ybird; Y--) {
         strobe(WSYNC);
         strobe(HMOVE);
         START
-            if (Y == 32) draw_bird3();
-        TAIL
     }
+    strobe(WSYNC);
+    strobe(HMOVE);
+    START
+    draw_bird3();
+    do {
+        strobe(WSYNC);
+        strobe(HMOVE);
+        START
+        Y--;
+    } while (Y != 0); 
 }
 
 void init_sprites_pos()
@@ -323,6 +349,7 @@ void init()
     j = 0;
     left_window = 6;
     right_window = 10;
+    ybird = 100;
 }
 
 void game_logic()
@@ -337,6 +364,8 @@ void game_logic()
             scroll_sequence = 0;
         }
     }
+    ybird++;
+    if (ybird == 150) ybird = 50;
     load_scroll_sequence();
     scroll_counter++;
 }
