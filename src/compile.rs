@@ -50,6 +50,9 @@ pub struct Variable {
 pub enum Operation {
     Add,
     Sub,
+    And,
+    Or,
+    Xor,
     Assign,
     Eq,
     Neq,
@@ -226,6 +229,9 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
             let op = match op.as_rule() {
                 Rule::add => Operation::Add,
                 Rule::sub => Operation::Sub,
+                Rule::and => Operation::And,
+                Rule::or => Operation::Or,
+                Rule::xor => Operation::Xor,
                 Rule::eq => Operation::Eq,
                 Rule::neq => Operation::Neq,
                 Rule::assign => Operation::Assign,

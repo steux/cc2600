@@ -407,6 +407,9 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
                     match op {
                         Operation::Add => return Ok(ExprType::Immediate(l + r)),
                         Operation::Sub => return Ok(ExprType::Immediate(l - r)),
+                        Operation::And => return Ok(ExprType::Immediate(l & r)),
+                        Operation::Or => return Ok(ExprType::Immediate(l | r)),
+                        Operation::Xor => return Ok(ExprType::Immediate(l ^ r)),
                         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
                     } 
                 },
@@ -445,6 +448,15 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
         Operation::Sub => {
             gstate.write_asm("SEC", 2)?;
             "SBC"
+        },
+        Operation::And => {
+            "AND"
+        },
+        Operation::Or => {
+            "ORA"
+        },
+        Operation::Xor => {
+            "EOR"
         },
         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
     };
@@ -609,7 +621,7 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
         Expr::BinOp {lhs, op, rhs} => {
             match op {
                 Operation::Assign => generate_assign(lhs, rhs, gstate, pos),
-                Operation::Add | Operation::Sub => generate_arithm(lhs, op, rhs, gstate, pos),
+                Operation::Add | Operation::Sub | Operation::And | Operation::Or | Operation::Xor => generate_arithm(lhs, op, rhs, gstate, pos),
                 Operation::Eq => Err(Error::Unimplemented { feature: "Equal not implemented" }),
                 Operation::Neq => Err(Error::Unimplemented { feature: "Not equal not implemented" }),
                 Operation::Gt => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
