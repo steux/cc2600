@@ -60,7 +60,13 @@ void draw_bird1()
 void kernel1()
 {
     X = 0;
-    Y = KERNAL - 2 - SPRITE_HEIGHT; 
+    Y = KERNAL; 
+    
+    // Renable output (disable VBLANK)
+    strobe(WSYNC);
+    strobe(HMOVE);
+    *VBLANK = 0;
+
     do {
         strobe(WSYNC);
         strobe(HMOVE);
@@ -88,7 +94,13 @@ void draw_bird2()
 void kernel2()
 {
     X = 0; 
-    Y = KERNAL - 2 - SPRITE_HEIGHT; 
+    Y = KERNAL; 
+    
+    // Renable output (disable VBLANK)
+    strobe(WSYNC);
+    strobe(HMOVE);
+    *VBLANK = 0;
+
     do {
         strobe(WSYNC);
         strobe(HMOVE);
@@ -116,7 +128,13 @@ void draw_bird3()
 void kernel3()
 {
     X = 0;
-    Y = KERNAL - 2 - SPRITE_HEIGHT; 
+    Y = KERNAL; 
+    
+    // Renable output (disable VBLANK)
+    strobe(WSYNC);
+    strobe(HMOVE);
+    *VBLANK = 0;
+
     do {
         strobe(WSYNC);
         strobe(HMOVE);
@@ -357,23 +375,18 @@ void main()
         init();
     } else {
 #ifdef PAL
-        *TIM64T = 53; // ((48-4) * 76) / 64
+        *TIM64T = 52; // ((48-4) * 76) / 64
 #else
-        *TIM64T = 44;
+        *TIM64T = 42;
 #endif
         // The game logic
         game_logic();
+        *PF0 = 0;
+        *PF1 = 0;
+        *PF2 = 0;
         while (*INTIM);
     }
     
-    // Renable output (disable VBLANK)
-    strobe(WSYNC);
-    //strobe(HMOVE);
-    *VBLANK = 0;
-    *PF0 = 0;
-    *PF1 = 0;
-    *PF2 = 0;
-
     if (scroll_sequence < 12) {
         kernel1();
     } else if (scroll_sequence < 20) {
