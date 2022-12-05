@@ -48,7 +48,7 @@ unsigned char ybird;
 
 #define SPRITE_HEIGHT 17 
 
-#define WAIT asm("PHA"); asm("PLA");
+#define WAIT Y--; asm("PHA"); asm("PLA");
 #define BEFORE X = Y >> 3  
 #define START BEFORE; *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF1= rPFx[X]; *PF2 = rPFy[X];
 
@@ -59,12 +59,13 @@ void draw_bird1()
 
 void kernel1()
 {
-    X = 0; i = 0;
-    for (Y = KERNAL - 2 - SPRITE_HEIGHT; Y != ybird; Y--) {
+    X = 0;
+    Y = KERNAL - 2 - SPRITE_HEIGHT; 
+    do {
         strobe(WSYNC);
         strobe(HMOVE);
         START
-    }
+    } while (Y != ybird);
     strobe(WSYNC);
     strobe(HMOVE);
     START
@@ -73,7 +74,6 @@ void kernel1()
         strobe(WSYNC);
         strobe(HMOVE);
         START
-        Y--;
     } while (Y != 0); 
 }
 
@@ -87,12 +87,13 @@ void draw_bird2()
 
 void kernel2()
 {
-    X = 0; i = 0; 
-    for (Y = KERNAL - 2 - SPRITE_HEIGHT; Y != ybird; Y--) {
+    X = 0; 
+    Y = KERNAL - 2 - SPRITE_HEIGHT; 
+    do {
         strobe(WSYNC);
         strobe(HMOVE);
         START
-    }
+    } while (Y != ybird);
     strobe(WSYNC);
     strobe(HMOVE);
     START
@@ -101,7 +102,6 @@ void kernel2()
         strobe(WSYNC);
         strobe(HMOVE);
         START
-        Y--;
     } while (Y != 0); 
 }
 
@@ -115,12 +115,13 @@ void draw_bird3()
 
 void kernel3()
 {
-    X = 0; i = 0;
-    for (Y = KERNAL - 2 - SPRITE_HEIGHT; Y != ybird; Y--) {
+    X = 0;
+    Y = KERNAL - 2 - SPRITE_HEIGHT; 
+    do {
         strobe(WSYNC);
         strobe(HMOVE);
         START
-    }
+    } while (Y != ybird);
     strobe(WSYNC);
     strobe(HMOVE);
     START
@@ -129,7 +130,6 @@ void kernel3()
         strobe(WSYNC);
         strobe(HMOVE);
         START
-        Y--;
     } while (Y != 0); 
 }
 
