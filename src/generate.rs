@@ -367,10 +367,14 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                         ExprType::Absolute(variable, offset) => {
                             let v = gstate.compiler_state.get_variable(variable);
                             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            if offset > 0 {
-                                gstate.write_asm(&format!("STA {}+{}", variable, offset), cycles)?;
+                            let off = if high_byte { offset + 1 } else { offset };
+                            if off > 0 {
+                                gstate.write_asm(&format!("STA {}+{}", variable, off), cycles)?;
                             } else {
                                 gstate.write_asm(&format!("STA {}", variable), cycles)?;
+                            }
+                            if v.var_type == VariableType::Short && !high_byte {
+                                generate_assign(lhs, rhs, gstate, pos, true)?;
                             }
                         },
                         ExprType::AbsoluteX(variable) => {
@@ -428,7 +432,7 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
             let off = if high_byte { offset + 1 } else { offset };
             if off > 0 {
-                gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
+                gstate.write_asm(&format!("LDA {}+{}", varname, off), cycles)?;
             } else {
                 gstate.write_asm(&format!("LDA {}", varname), cycles)?;
             }
@@ -489,7 +493,7 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
             let off = if high_byte { offset + 1 } else { offset };
             if off > 0 {
-                gstate.write_asm(&format!("{} {}+{}", operation, varname, offset), cycles)?;
+                gstate.write_asm(&format!("{} {}+{}", operation, varname, off), cycles)?;
             } else {
                 gstate.write_asm(&format!("{} {}", operation, varname), cycles)?;
             }
