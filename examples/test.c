@@ -11,16 +11,18 @@ const unsigned char *const s1_PF2[24]={0x00,0x80,0xc0,0xe0,0x70,0x38,0x1c,0x0e,0
 
 #ifdef PAL
 const unsigned char RED = 0x64;
-const unsigned char BLUE = 0xB4;
+const unsigned char BLUE = 0xB2;
 const unsigned char LBLUE = 0xBA;
 const unsigned char BLACK = 0x00;
 const unsigned char WHITE = 0x0e;
-const unsigned char YELLOW = 0x2e;
-const unsigned char ORANGE = 0x4a;
+const unsigned char YELLOW = 0x2c;
+const unsigned char ORANGE = 0x4c;
 const unsigned char GREY = 0x04;
+const unsigned char GREEN = 0x58;
 #define BLANK 48
 #define KERNAL 192 
-#define OVERSCAN 72 //Instead of 36
+#define PALBOTTOM 36
+#define OVERSCAN 36
 #else
 const unsigned char RED = 0x36;
 const unsigned char BLUE = 0x8e;
@@ -30,6 +32,7 @@ const unsigned char WHITE = 0x0e;
 const unsigned char YELLOW = 0x1e;
 const unsigned char ORANGE = 0xfa;
 const unsigned char GREY = 0x04;
+const unsigned char GREEN = 0xC6;
 #define BLANK 40
 #define KERNAL 192
 #define OVERSCAN 30
@@ -60,12 +63,13 @@ void draw_bird1()
 void kernel1()
 {
     X = 0;
-    Y = KERNAL; 
+    Y = KERNAL - 1; 
     
     // Renable output (disable VBLANK)
     strobe(WSYNC);
     strobe(HMOVE);
-    *VBLANK = 0;
+    *VBLANK = X;
+    START; 
 
     do {
         strobe(WSYNC);
@@ -94,12 +98,13 @@ void draw_bird2()
 void kernel2()
 {
     X = 0; 
-    Y = KERNAL; 
+    Y = KERNAL - 1; 
     
     // Renable output (disable VBLANK)
     strobe(WSYNC);
     strobe(HMOVE);
-    *VBLANK = 0;
+    *VBLANK = X;
+    START; 
 
     do {
         strobe(WSYNC);
@@ -128,12 +133,13 @@ void draw_bird3()
 void kernel3()
 {
     X = 0;
-    Y = KERNAL; 
+    Y = KERNAL - 1; 
     
     // Renable output (disable VBLANK)
     strobe(WSYNC);
     strobe(HMOVE);
-    *VBLANK = 0;
+    *VBLANK = X;
+    START; 
 
     do {
         strobe(WSYNC);
@@ -174,7 +180,7 @@ void init_sprites_pos()
     strobe(WSYNC);
 
     *COLUBK = BLUE;
-    *COLUPF = GREY;
+    *COLUPF = BLACK;
     *GRP1 = 0;
     *GRP1 = 0;
     *CTRLPF = 0x20;
@@ -359,6 +365,26 @@ void game_logic()
     scroll_counter++;
 }
 
+void bottom()
+{
+    strobe(WSYNC);
+    *COLUBK = GREEN;
+    *PF0 = 0;
+    *PF1 = 0;
+    *PF2 = 0;
+    strobe(WSYNC);
+    strobe(WSYNC);
+
+#ifdef PAL
+    for (X = PALBOTTOM; X != 0; X--) strobe(WSYNC);
+#endif
+
+    *VBLANK = 2; // Enable VBLANK again
+                 // Now we have 30 lines of VBLANK
+                 //strobe(HMCLR);
+    for (X = OVERSCAN; X != 0; X--) strobe(WSYNC);
+}
+
 void main()
 {
   first_time = 1;
@@ -381,9 +407,7 @@ void main()
 #endif
         // The game logic
         game_logic();
-        *PF0 = 0;
-        *PF1 = 0;
-        *PF2 = 0;
+        *COLUBK = BLUE;
         while (*INTIM);
     }
     
@@ -393,11 +417,7 @@ void main()
         kernel2();
     } else kernel3();
 
-    strobe(WSYNC);
-    *VBLANK = 2; // Enable VBLANK again
-    // Now we have 30 lines of VBLANK
-    //strobe(HMCLR);
-    for (X = OVERSCAN; X != 0; X--) strobe(WSYNC);
+    bottom();
   } while(1);
 }
 #else

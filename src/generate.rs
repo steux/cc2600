@@ -101,12 +101,12 @@ fn generate_included_source_code_line<'a>(loc: usize, gstate: &'a mut GeneratorS
     None
 }
 
-fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
 {
-    let left = generate_expr(lhs, gstate, pos)?;
+    let left = generate_expr(lhs, gstate, pos, high_byte)?;
     match left {
         ExprType::X => {
-            match generate_expr(rhs, gstate, pos)? {
+            match generate_expr(rhs, gstate, pos, high_byte)? {
                 ExprType::Immediate(v) => {
                     gstate.write_asm(&format!("LDX #{}", v), 2)?;
                     gstate.flags = if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero };
@@ -169,7 +169,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
             }
         },
         ExprType::Y => {
-            match generate_expr(rhs, gstate, pos)? {
+            match generate_expr(rhs, gstate, pos, high_byte)? {
                 ExprType::Immediate(v) => {
                     gstate.write_asm(&format!("LDY #{}", v), 2)?;
                     gstate.flags = if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero };
@@ -233,7 +233,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
             }
         },
         _ => {
-            let right = generate_expr(rhs, gstate, pos)?; 
+            let right = generate_expr(rhs, gstate, pos, high_byte)?; 
             match right {
                 ExprType::X => {
                     match left {
@@ -394,12 +394,13 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
     }
 }
 
-fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
 {
     let acc_in_use = gstate.acc_in_use;
     if acc_in_use { gstate.write_asm("PHA", 3)?; }
-    let left = generate_expr(lhs, gstate, pos)?;
-    let right = generate_expr(rhs, gstate, pos)?;
+    
+    let left = generate_expr(lhs, gstate, pos, high_byte)?;
+    let right = generate_expr(rhs, gstate, pos, high_byte)?;
     match left {
         ExprType::Immediate(l) => {
             match right {
@@ -413,13 +414,20 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
                         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
                     } 
                 },
-                _ => gstate.write_asm(&format!("LDA #{}", l), 2)?,
+                _ => {
+                    if high_byte {
+                        gstate.write_asm(&format!("LDA #{}", (l >> 8) & 0xff), 2)?
+                    } else {
+                        gstate.write_asm(&format!("LDA #{}", l & 0xff), 2)?
+                    }
+                }
             };
         },
         ExprType::Absolute(varname, offset) => {
             let v = gstate.compiler_state.get_variable(varname);
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-            if offset > 0 {
+            let off = if high_byte { offset + 1 } else { offset };
+            if off > 0 {
                 gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
             } else {
                 gstate.write_asm(&format!("LDA {}", varname), cycles)?;
@@ -447,11 +455,15 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
     gstate.acc_in_use = true;
     let operation = match op {
         Operation::Add => {
-            gstate.write_asm("CLC", 2)?;
+            if !high_byte {
+                gstate.write_asm("CLC", 2)?;
+            }
             "ADC"
         },
         Operation::Sub => {
-            gstate.write_asm("SEC", 2)?;
+            if !high_byte {
+                gstate.write_asm("SEC", 2)?;
+            }
             "SBC"
         },
         Operation::And => {
@@ -475,7 +487,8 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
             let v = gstate.compiler_state.get_variable(varname);
             signed = v.signed; 
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-            if offset > 0 {
+            let off = if high_byte { offset + 1 } else { offset };
+            if off > 0 {
                 gstate.write_asm(&format!("{} {}+{}", operation, varname, offset), cycles)?;
             } else {
                 gstate.write_asm(&format!("{} {}", operation, varname), cycles)?;
@@ -507,8 +520,8 @@ fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &m
 {
     let acc_in_use = gstate.acc_in_use;
     if acc_in_use { gstate.write_asm("PHA", 3)?; }
-    let left = generate_expr(lhs, gstate, pos)?;
-    let right = generate_expr(rhs, gstate, pos)?;
+    let left = generate_expr(lhs, gstate, pos, false)?;
+    let right = generate_expr(rhs, gstate, pos, false)?;
     let signed;
     match left {
         ExprType::Absolute(varname, offset) => {
@@ -678,7 +691,7 @@ fn generate_deref<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usi
         Expr::Identifier((var, sub)) => {
             let v = gstate.compiler_state.get_variable(var);
             if v.var_type == VariableType::CharPtr {
-                let sub_output = generate_expr(sub, gstate, pos)?;
+                let sub_output = generate_expr(sub, gstate, pos, false)?;
                 match sub_output {
                     ExprType::Nothing => {
                         Ok(ExprType::Absolute(var, 0))
@@ -693,15 +706,15 @@ fn generate_deref<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usi
     }
 }
 
-fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
 {
     debug!("Expression: {:?}", expr);
     match expr {
         Expr::Integer(i) => Ok(ExprType::Immediate(*i)),
         Expr::BinOp {lhs, op, rhs} => {
             match op {
-                Operation::Assign => generate_assign(lhs, rhs, gstate, pos),
-                Operation::Add | Operation::Sub | Operation::And | Operation::Or | Operation::Xor => generate_arithm(lhs, op, rhs, gstate, pos),
+                Operation::Assign => generate_assign(lhs, rhs, gstate, pos, high_byte),
+                Operation::Add | Operation::Sub | Operation::And | Operation::Or | Operation::Xor => generate_arithm(lhs, op, rhs, gstate, pos, high_byte),
                 Operation::Eq => Err(Error::Unimplemented { feature: "Equal not implemented" }),
                 Operation::Neq => Err(Error::Unimplemented { feature: "Not equal not implemented" }),
                 Operation::Gt => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
@@ -721,7 +734,7 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                     if let VariableDefinition::Value(val) = &v.def {
                         Ok(ExprType::Immediate(*val))
                     } else {
-                        let sub_output = generate_expr(sub, gstate, pos)?;
+                        let sub_output = generate_expr(sub, gstate, pos, false)?;
                         match sub_output {
                             ExprType::Nothing => Ok(ExprType::Absolute(variable, 0)),
                             ExprType::X => Ok(ExprType::AbsoluteX(variable)),
@@ -738,22 +751,22 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
             Ok(ExprType::Nothing)
         },
         Expr::MinusMinus(expr, false) => {
-            let expr_type = generate_expr(expr, gstate, pos)?;
+            let expr_type = generate_expr(expr, gstate, pos, high_byte)?;
             generate_plusplus(&expr_type, gstate, pos, false)?;
             Ok(expr_type)
         },
         Expr::PlusPlus(expr, false) => {
-            let expr_type = generate_expr(expr, gstate, pos)?;
+            let expr_type = generate_expr(expr, gstate, pos, high_byte)?;
             generate_plusplus(&expr_type, gstate, pos, true)?;
             Ok(expr_type)
         },
         Expr::MinusMinus(expr, true) => {
-            let expr_type = generate_expr(expr, gstate, pos)?;
+            let expr_type = generate_expr(expr, gstate, pos, high_byte)?;
             gstate.deferred_plusplus.push((expr_type.clone(), pos, false));
             Ok(expr_type)
         },
         Expr::PlusPlus(expr, true) => {
-            let expr_type = generate_expr(expr, gstate, pos)?;
+            let expr_type = generate_expr(expr, gstate, pos, high_byte)?;
             gstate.deferred_plusplus.push((expr_type.clone(), pos, true));
             Ok(expr_type)
         },
@@ -780,8 +793,8 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
     debug!("Condition: {:?}", condition);
     match condition {
         Expr::BinOp {lhs, op, rhs} => {
-            let l = generate_expr(lhs, gstate, pos)?;
-            let r = generate_expr(rhs, gstate, pos)?;
+            let l = generate_expr(lhs, gstate, pos, false)?;
+            let r = generate_expr(rhs, gstate, pos, false)?;
             let left;
             let right;
 
@@ -1023,7 +1036,7 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
         },
         _ => {
             let cmp;
-            let expr = generate_expr(condition, gstate, pos)?;
+            let expr = generate_expr(condition, gstate, pos, false)?;
             if flags_ok(&gstate.flags, &expr) {
                 if negate {
                     gstate.write_asm(&format!("BEQ {}", label), 2)?;
@@ -1110,13 +1123,13 @@ fn generate_for_loop<'a>(init: &Expr<'a>, condition: &Expr<'a>, update: &Expr<'a
     let for_label = format!(".for{}", gstate.local_label_counter_for);
     let forupdate_label = format!(".forupdate{}", gstate.local_label_counter_for);
     let forend_label = format!(".forend{}", gstate.local_label_counter_for);
-    generate_expr(init, gstate, pos)?;
+    generate_expr(init, gstate, pos, false)?;
     gstate.loops.push((forupdate_label.clone(), forend_label.clone()));
     generate_condition(condition, gstate, pos, true, &forend_label)?;
     gstate.write_label(&for_label)?;
     generate_statement(body, gstate)?;
     gstate.write_label(&forupdate_label)?;
-    generate_expr(update, gstate, pos)?;
+    generate_expr(update, gstate, pos, false)?;
     gstate.purge_deferred_plusplus()?;
     generate_condition(condition, gstate, pos, false, &for_label)?;
     gstate.write_label(&forend_label)?;
@@ -1282,7 +1295,7 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
             }
         },
         Statement::Expression(expr) => { 
-            generate_expr(&expr, gstate, code.pos)?;
+            generate_expr(&expr, gstate, code.pos, false)?;
         },
         Statement::For { init, condition, update, body } => { 
             generate_for_loop(init, condition, update, body.as_ref(), gstate, code.pos)?; 
