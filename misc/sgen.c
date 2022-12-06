@@ -24,6 +24,8 @@ int find_hmove(int dx)
     return -1;
 }
 
+#define DEFAULT_BSIZE 4
+
 int main()
 {
     char line[256];
@@ -33,10 +35,11 @@ int main()
     signed char xp0 = 0, dxp0 = 0;
     unsigned char colup1 = 0, grp1 = 0;
     signed char xp1 = 0 , dxp1 = 0;
-    unsigned char bsize = 0;
+    unsigned char bsize = DEFAULT_BSIZE, benabled = 0;
     signed char xb = 0, dxb = 0;
     
     while (fgets(line, 256, stdin)) {
+        int lbm = -1, rbm = -1;
         int c0 = -1, c1 = -1, lb = -1, rb = -1, lc0 = -1, lc1 = -1, xc0 = 0, xc1 = 0;
         unsigned int c0x = 0, c1x = 0;
         int x, i;
@@ -48,7 +51,11 @@ int main()
             if (c == 'b') {
                 if (lb == -1) lb = x;
                 rb = x;
-            } else if (c == ' ' || c == '.' || c == '\n') continue; else {
+                rbm = -1;
+            } else if (c == ' ' || c == '.') {
+                if (lb == -1) lbm = x;
+                if (rbm == -1) rbm = x; // The ball must not cross lbm or rbm;
+            } else if (c == '\n') break; else {
                 const char *const color = find_color(c);
                 if (color) {
                     if (c == colup0 || c == c0) {
@@ -92,9 +99,11 @@ int main()
         }
         for (; xc0 != 8; xc0++) c0x <<= 1;
         for (; xc1 != 8; xc1++) c1x <<= 1;
+        if (rbm == -1) rbm = x;
 
 #ifdef DEBUG
         fprintf(stderr, "#%d: lc0=%d, c0x=%02x, lc1=%d, c1x=%02x\n", lnb, (int)lc0, (unsigned int)c0x, (int)lc1, (unsigned int)c1x);
+        fprintf(stderr, "#%d: lbm=%d, lb=%d, rb=%d, rbm=%d\n", lnb, (int)lbm, (int)lb, (int)rb, (int)rbm);
 #endif
 
         // Ok, now we have all the information we need
@@ -162,11 +171,70 @@ int main()
                 }
             }
         }
-        if (ndxp1 == 1 && dxp1 != 1) {
+        if (ndxp1 == 0 && dxp1 != 0) {
             fprintf(stdout, "*HMP1 = 0;\n");
         }
         dxp1 = ndxp1;
+
+        // Check the ball status
+        int ndxb = 0;
+        if (lb != -1) {
+            if (benabled == 0) {
+                fprintf(stdout, "*ENABL = 2;\n");
+                benabled = 1;
+            } 
+            int maxwidth = rbm - lbm - 1;
+            int minwidth = rb - lb + 1;
+
+            // The idea: Try to check if current bsize fits it
+            if (bsize < minwidth || bsize > maxwidth) {
+                // No, we have to switch bsize
+                int bits = 0;
+                if (minwidth > 4) bsize = 8;
+                else if (minwidth > 2) bsize = 4;
+                else if (minwidth > 1) bsize = 2;
+                else bsize = 1;
+                switch (bsize) {
+                    case 1: bits = 0x00; break;
+                    case 2: bits = 0x10; break;
+                    case 4: bits = 0x20; break;
+                    case 8: bits = 0x30; break;
+                }
+                fprintf(stdout, "*PFCTRL = 0x%02x;\n", bits);
+            }
+            // Check if there is a need to move the ball
+            if (xb > lb) {
+                // We need to move the ball to the left
+                char nxb = lb;
+                while (nxb + bsize > rbm) nxb--;
+                ndxb = nxb - xb;
+                xb = nxb;
+                fprintf(stdout, "*HMBL = 0x%02x;\n", find_hmove(ndxb));
+            } else if (xb + bsize <= rb) {
+                // We need to move the ball to the right
+                char nxb = rb - bsize + 1;
+                while (nxb <= lbm) nxb++;
+                ndxb = nxb - xb;
+                xb = nxb;
+                fprintf(stdout, "*HMBL = 0x%02x;\n", find_hmove(ndxb));
+            }
+        } else {
+            // No ball. Was it there ?
+            if (benabled) {
+                fprintf(stdout, "*ENABL = 0;\n");
+                benabled = 0;
+            }
+        }
+        if (ndxb == 0 && dxb != 0) {
+            fprintf(stdout, "*HMBL = 0;\n");
+        }
+        dxb = ndxb;
+     
+#ifdef DEBUG
+        fprintf(stderr, "#%d: xb=%d, bsize=%d, dxb=%d\n", lnb, (int)xb, (int)bsize, (int)dxb);
+#endif
         fprintf(stdout, "\n");
+
         lnb++;
     }
     
@@ -182,16 +250,37 @@ int main()
     }
     if (xp1 != 0) {
         dxp1 = -xp1;
-        fprintf(stdout, "*HMP1=0x%02x;\n", find_hmove(dxp1));
+        fprintf(stdout, "*HMP1 = 0x%02x;\n", find_hmove(dxp1));
     } else if (dxp1) {
-        dxp1 = 1;
+        dxp1 = 0;
         fprintf(stdout, "*HMP1 = 0\n");
     }
+    if (xb != 0) {
+        dxb = -xb;
+        fprintf(stdout, "*HMBL = 0x%02x;\n", find_hmove(dxb));
+    } else if (dxp1) {
+        dxb = 0;;
+        fprintf(stdout, "*HMBL = 0\n");
+    }
+    if (benabled) {
+        fprintf(stdout, "*ENABL = 0;\n");
+        benabled = 0;
+    }
     
-    fprintf(stdout, "strobe(WSYNC);\nstrobe(HMOVE);\nSTART\n");
+    fprintf(stdout, "\nstrobe(WSYNC);\nstrobe(HMOVE);\nSTART\n");
     if (dxp0) fprintf(stdout, "*HMP0 = 0\n");
     if (dxp1) fprintf(stdout, "*HMP1 = 0\n");
     if (dxb) fprintf(stdout, "*HMBL = 0\n");
+    if (bsize != DEFAULT_BSIZE) {
+        int bits = 0;
+        switch (bsize) {
+            case 1: bits = 0x00; break;
+            case 2: bits = 0x10; break;
+            case 4: bits = 0x20; break;
+            case 8: bits = 0x30; break;
+        }
+        fprintf(stdout, "*PFCTRL = 0x%02x;\n", bits);
+    }
     return 0;
 }
 
