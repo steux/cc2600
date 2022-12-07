@@ -53,20 +53,20 @@ unsigned char * const CXCLR       = 0x2C; //  ---- ----   Clear Collision Latche
  
 //-------------------------------------------------------------------------------
 
-unsigned char * const CXM0P       = 0x00; // xx00 0000       Read Collision  M0-P1   M0-P0
-unsigned char * const CXM1P       = 0x01; // xx00 0000                       M1-P0   M1-P1
-unsigned char * const CXP0FB      = 0x02; // xx00 0000                       P0-PF   P0-BL
-unsigned char * const CXP1FB      = 0x03; // xx00 0000                       P1-PF   P1-BL
-unsigned char * const CXM0FB      = 0x04; // xx00 0000                       M0-PF   M0-BL
-unsigned char * const CXM1FB      = 0x05; // xx00 0000                       M1-PF   M1-BL
-unsigned char * const CXBLPF      = 0x06; // x000 0000                       BL-PF   -----
-unsigned char * const CXPPMM      = 0x07; // xx00 0000                       P0-P1   M0-M1
-unsigned char * const INPT0       = 0x08; // x000 0000       Read Pot Port 0
-unsigned char * const INPT1       = 0x09; // x000 0000       Read Pot Port 1
-unsigned char * const INPT2       = 0x0A; // x000 0000       Read Pot Port 2
-unsigned char * const INPT3       = 0x0B; // x000 0000       Read Pot Port 3
-unsigned char * const INPT4       = 0x0C; // x000 0000       Read Input (Trigger) 0
-unsigned char * const INPT5       = 0x0D; // x000 0000       Read Input (Trigger) 1
+unsigned char * const CXM0P       = 0x30; // xx00 0000       Read Collision  M0-P1   M0-P0
+unsigned char * const CXM1P       = 0x31; // xx00 0000                       M1-P0   M1-P1
+unsigned char * const CXP0FB      = 0x32; // xx00 0000                       P0-PF   P0-BL
+unsigned char * const CXP1FB      = 0x33; // xx00 0000                       P1-PF   P1-BL
+unsigned char * const CXM0FB      = 0x34; // xx00 0000                       M0-PF   M0-BL
+unsigned char * const CXM1FB      = 0x35; // xx00 0000                       M1-PF   M1-BL
+unsigned char * const CXBLPF      = 0x36; // x000 0000                       BL-PF   -----
+unsigned char * const CXPPMM      = 0x37; // xx00 0000                       P0-P1   M0-M1
+unsigned char * const INPT0       = 0x38; // x000 0000       Read Pot Port 0
+unsigned char * const INPT1       = 0x39; // x000 0000       Read Pot Port 1
+unsigned char * const INPT2       = 0x3A; // x000 0000       Read Pot Port 2
+unsigned char * const INPT3       = 0x3B; // x000 0000       Read Pot Port 3
+unsigned char * const INPT4       = 0x3C; // x000 0000       Read Input (Trigger) 0
+unsigned char * const INPT5       = 0x3D; // x000 0000       Read Input (Trigger) 1
 
 //------------------------------------------------------------------------------
 //

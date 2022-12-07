@@ -47,7 +47,9 @@ unsigned char rPFx[24];
 unsigned char lPFy[24];
 unsigned char rPFy[24];
 unsigned char left_window, right_window;
-unsigned char ybird;
+unsigned short ybird;
+unsigned short yspeed;
+unsigned char button_pressed;
 
 #define SPRITE_HEIGHT 17 
 
@@ -75,7 +77,7 @@ void kernel1()
         strobe(WSYNC);
         strobe(HMOVE);
         START
-    } while (Y != ybird);
+    } while (Y != ybird >> 8);
     strobe(WSYNC);
     strobe(HMOVE);
     START
@@ -110,7 +112,7 @@ void kernel2()
         strobe(WSYNC);
         strobe(HMOVE);
         START
-    } while (Y != ybird);
+    } while (Y != ybird >> 8);
     strobe(WSYNC);
     strobe(HMOVE);
     START
@@ -145,7 +147,7 @@ void kernel3()
         strobe(WSYNC);
         strobe(HMOVE);
         START
-    } while (Y != ybird);
+    } while (Y != ybird >> 8);
     strobe(WSYNC);
     strobe(HMOVE);
     START
@@ -344,7 +346,9 @@ void init()
     j = 0;
     left_window = 6;
     right_window = 10;
-    ybird = 100;
+    ybird = 100 * 256;
+    yspeed = 0;
+    button_pressed = 0;
 }
 
 void game_logic()
@@ -359,8 +363,23 @@ void game_logic()
             scroll_sequence = 0;
         }
     }
-    ybird++;
-    if (ybird == 150) ybird = 50;
+    ybird = ybird + yspeed;
+    yspeed = yspeed - 10;
+    if (ybird >> 8 < SPRITE_HEIGHT + 8) {
+        ybird = 100 * 256;
+        yspeed = 0;
+    }
+    if (ybird >> 8 > 190) {
+        ybird = 100 * 256;
+        yspeed = 0;
+    }
+    if ((*INPT4 & 0x80) != 0) {
+        if (button_pressed == 0) {
+            button_pressed = 1;
+            yspeed = 400;
+        }
+    } else button_pressed = 0;
+
     load_scroll_sequence();
     scroll_counter++;
 }

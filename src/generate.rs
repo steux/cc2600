@@ -352,8 +352,12 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                         },
                         ExprType::Immediate(v) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                            gstate.write_asm(&format!("LDA #{}", v), 2)?;
-                            gstate.flags = if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero };
+                            let vx = match high_byte {
+                                false => v & 0xff,
+                                true => (v >> 8) & 0xff,
+                            };
+                            gstate.write_asm(&format!("LDA #{}", vx), 2)?;
+                            gstate.flags = if vx > 0 { FlagsState::Positive } else if vx < 0 { FlagsState::Negative } else { FlagsState::Zero };
                         },
                         ExprType::Tmp(_) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
@@ -400,8 +404,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
 
 fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
 {
-    let acc_in_use = gstate.acc_in_use;
-    if acc_in_use { gstate.write_asm("PHA", 3)?; }
+    let mut acc_in_use = gstate.acc_in_use;
     
     let left = generate_expr(lhs, gstate, pos, high_byte)?;
     let right = generate_expr(rhs, gstate, pos, high_byte)?;
@@ -415,10 +418,13 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
                         Operation::And => return Ok(ExprType::Immediate(l & r)),
                         Operation::Or => return Ok(ExprType::Immediate(l | r)),
                         Operation::Xor => return Ok(ExprType::Immediate(l ^ r)),
+                        Operation::Mul => return Ok(ExprType::Immediate(l * r)),
+                        Operation::Div => return Ok(ExprType::Immediate(l / r)),
                         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
                     } 
                 },
                 _ => {
+                    if acc_in_use { gstate.write_asm("PHA", 3)?; }
                     if high_byte {
                         gstate.write_asm(&format!("LDA #{}", (l >> 8) & 0xff), 2)?
                     } else {
@@ -428,6 +434,7 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
             };
         },
         ExprType::Absolute(varname, offset) => {
+            if acc_in_use { gstate.write_asm("PHA", 3)?; }
             let v = gstate.compiler_state.get_variable(varname);
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
             let off = if high_byte { offset + 1 } else { offset };
@@ -438,20 +445,26 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
             }
         },
         ExprType::AbsoluteX(varname) => {
+            if acc_in_use { gstate.write_asm("PHA", 3)?; }
             gstate.write_asm(&format!("LDA {},X", varname), 4)?;
         },
         ExprType::AbsoluteY(varname) => {
+            if acc_in_use { gstate.write_asm("PHA", 3)?; }
             gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
         },
         ExprType::X => {
+            if acc_in_use { gstate.write_asm("PHA", 3)?; }
             gstate.write_asm("TXA", 2)?;
         },
         ExprType::Y => {
+            if acc_in_use { gstate.write_asm("PHA", 3)?; }
             gstate.write_asm("TYA", 2)?;
         },
         ExprType::A(_) => {
+            acc_in_use = false;
         },
         ExprType::Tmp(_) => {
+            if acc_in_use { gstate.write_asm("PHA", 3)?; }
             gstate.write_asm("LDA cctmp", 3)?;
         },
         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
@@ -479,13 +492,19 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
         Operation::Xor => {
             "EOR"
         },
+        Operation::Mul => { return Err(syntax_error(gstate.compiler_state, "Operation not possible. 6502 doesn't implement a multiplier.", pos)) },
+        Operation::Div => { return Err(syntax_error(gstate.compiler_state, "Operation not possible. 6502 doesn't implement a divider.", pos)) },
         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
     };
     let signed;
     match right {
         ExprType::Immediate(v) => {
-            gstate.write_asm(&format!("{} #{}", operation, v), 2)?;
-            signed = if v > 127 { false } else { true };
+            let vx = match high_byte {
+                false => v & 0xff,
+                true => (v >> 8) & 0xff,
+            };
+            gstate.write_asm(&format!("{} #{}", operation, vx), 2)?;
+            signed = if v < 0 { true } else { false };
         },
         ExprType::Absolute(varname, offset) => {
             let v = gstate.compiler_state.get_variable(varname);
@@ -532,10 +551,34 @@ fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &m
             let v = gstate.compiler_state.get_variable(varname);
             signed = v.signed; 
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-            if offset > 0 {
-                gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
+            if v.var_type == VariableType::Short && *op == Operation::Brs {
+                // Special shift 8 case for extracting higher byte
+                match right {
+                    ExprType::Immediate(v) => {
+                        if v == 8 {
+                            gstate.write_asm(&format!("LDA {}+{}", varname, offset + 1), cycles)?;
+                            gstate.acc_in_use = true;
+                            if acc_in_use {
+                                gstate.write_asm("STA cctmp", 3)?;
+                                gstate.write_asm("PLA", 3)?;
+                                gstate.flags = FlagsState::Unknown;
+                                return Ok(ExprType::Tmp(signed));
+                            } else {
+                                gstate.flags = FlagsState::Absolute(varname, offset + 1);
+                                return Ok(ExprType::A(signed));
+                            }
+                        } else {
+                            return Err(syntax_error(gstate.compiler_state, "Incorrect right value for right shift operation on short (constant 8 only supported)", pos));
+                        } 
+                    },
+                    _ => return Err(syntax_error(gstate.compiler_state, "Incorrect right value for right shift operation on short (constant 8 only supported)", pos))
+                };
             } else {
-                gstate.write_asm(&format!("LDA {}", varname), cycles)?;
+                if offset > 0 {
+                    gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
+                } else {
+                    gstate.write_asm(&format!("LDA {}", varname), cycles)?;
+                }
             }
         },
         ExprType::AbsoluteX(varname) => {
@@ -575,7 +618,7 @@ fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &m
     };
     match right {
         ExprType::Immediate(v) => {
-            if v >= 0 {
+            if v >= 0 && v <= 8 {
                 for _ in 0..v {
                     gstate.write_asm(&format!("{}", operation), 2)?;
                 }
@@ -583,7 +626,7 @@ fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &m
                 return Err(syntax_error(gstate.compiler_state, "Negative shift operation not allowed", pos));
             } 
         },
-        _ => return Err(syntax_error(gstate.compiler_state, "Incorrect reight value for shift operation (positive constants only)", pos))
+        _ => return Err(syntax_error(gstate.compiler_state, "Incorrect right value for shift operation (positive constants only)", pos))
     };
     gstate.flags = FlagsState::Unknown;
     if acc_in_use {
@@ -718,7 +761,7 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
         Expr::BinOp {lhs, op, rhs} => {
             match op {
                 Operation::Assign => generate_assign(lhs, rhs, gstate, pos, high_byte),
-                Operation::Add | Operation::Sub | Operation::And | Operation::Or | Operation::Xor => generate_arithm(lhs, op, rhs, gstate, pos, high_byte),
+                Operation::Add | Operation::Sub | Operation::And | Operation::Or | Operation::Xor | Operation::Mul | Operation::Div  => generate_arithm(lhs, op, rhs, gstate, pos, high_byte),
                 Operation::Eq => Err(Error::Unimplemented { feature: "Equal not implemented" }),
                 Operation::Neq => Err(Error::Unimplemented { feature: "Not equal not implemented" }),
                 Operation::Gt => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
