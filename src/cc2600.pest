@@ -53,9 +53,10 @@ nothing = { "" }
 cases = { ("case" ~ int ~ ":" ~ statement*)* ~ ("default" ~ ":" ~ statement*) }
 
 expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
-    infix    =  _{ mul | div | add | sub | bls | brs | lte | lt | gte | gt | eq | neq |
-                   and | xor | or | land | lor | assign | comma |
-                   pass | mass | mulass | divass | blsass | brsass | andass | xorass | orass }
+    infix    =  _{ pass | mass | mulass | divass | blsass | brsass | andass | xorass | orass |
+                   mul | div | add | sub | bls | brs | lte | lt | gte | gt | eq | neq |
+                   and | xor | or | land | lor | assign | comma
+                   }
       mul    =   { "*" }  // Multiplication
       div    =   { "/" }  // Division
       add    =   { "+" }  // Addition
@@ -88,6 +89,8 @@ expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ pos
       ppp    =   { "++" } // Increment
       mmp    =   { "--" } // Decrement
       neg    =   { "-" }  // Negation
+      not    =   { "!" }  // Not
+      bnot   =   { "~" }  // Bitwise not
       addr   =   { "&" }  // Adress of
       deref  =   { "*" }  // Dereference
     postfix  =  _{ pp | mm | call }

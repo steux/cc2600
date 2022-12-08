@@ -353,7 +353,7 @@ void init()
 
 void game_logic()
 {
-    if (scroll_counter == 5) {
+    if (scroll_counter == 10) {
         scroll_counter = 0;
         scroll_sequence++;
         if (scroll_sequence == 20) left_window = right_window;
@@ -363,8 +363,7 @@ void game_logic()
             scroll_sequence = 0;
         }
     }
-    ybird = ybird + yspeed;
-    yspeed = yspeed - 10;
+    yspeed -= 10;
     if (ybird >> 8 < SPRITE_HEIGHT + 8) {
         ybird = 100 * 256;
         yspeed = 0;
@@ -376,9 +375,10 @@ void game_logic()
     if ((*INPT4 & 0x80) != 0) {
         if (button_pressed == 0) {
             button_pressed = 1;
-            yspeed = 400;
+            yspeed = 300;
         }
     } else button_pressed = 0;
+    ybird = ybird + yspeed;
 
     load_scroll_sequence();
     scroll_counter++;

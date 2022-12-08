@@ -101,15 +101,14 @@ fn generate_included_source_code_line<'a>(loc: usize, gstate: &'a mut GeneratorS
     None
 }
 
-fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
+fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut GeneratorState<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
 {
-    let left = generate_expr(lhs, gstate, pos, high_byte)?;
     match left {
         ExprType::X => {
-            match generate_expr(rhs, gstate, pos, high_byte)? {
+            match right {
                 ExprType::Immediate(v) => {
                     gstate.write_asm(&format!("LDX #{}", v), 2)?;
-                    gstate.flags = if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero };
+                    gstate.flags = if *v > 0 { FlagsState::Positive } else if *v < 0 { FlagsState::Negative } else { FlagsState::Zero };
                     Ok(ExprType::X) 
                 },
                 ExprType::Tmp(_) => {
@@ -119,7 +118,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                 },
                 ExprType::Absolute(name, offset) => {
                     let v = gstate.compiler_state.get_variable(name);
-                    if offset > 0 {
+                    if *offset > 0 {
                         gstate.write_asm(&format!("LDX {}+{}", name, offset), if v.memory == VariableMemory::Zeropage {3} else {4})?;
                     } else {
                         gstate.write_asm(&format!("LDX {}", name), if v.memory == VariableMemory::Zeropage {3} else {4})?;
@@ -169,10 +168,10 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
             }
         },
         ExprType::Y => {
-            match generate_expr(rhs, gstate, pos, high_byte)? {
+            match right {
                 ExprType::Immediate(v) => {
                     gstate.write_asm(&format!("LDY #{}", v), 2)?;
-                    gstate.flags = if v > 0 { FlagsState::Positive } else if v < 0 { FlagsState::Negative } else { FlagsState::Zero };
+                    gstate.flags = if *v > 0 { FlagsState::Positive } else if *v < 0 { FlagsState::Negative } else { FlagsState::Zero };
                     Ok(ExprType::Y) 
                 },
                 ExprType::Tmp(_) => {
@@ -182,7 +181,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                 },
                 ExprType::Absolute(name, offset) => {
                     let v = gstate.compiler_state.get_variable(name);
-                    if offset > 0 {
+                    if *offset > 0 {
                         gstate.write_asm(&format!("LDY {}+{}", name, offset), if v.memory == VariableMemory::Zeropage {3} else {4})?;
                     } else {
                         gstate.write_asm(&format!("LDY {}", name), if v.memory == VariableMemory::Zeropage {3} else {4})?;
@@ -233,14 +232,13 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
             }
         },
         _ => {
-            let right = generate_expr(rhs, gstate, pos, high_byte)?; 
             match right {
                 ExprType::X => {
                     match left {
                         ExprType::Absolute(variable, offset) => {
                             let v = gstate.compiler_state.get_variable(variable);
                             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            if offset > 0 {
+                            if *offset > 0 {
                                 gstate.write_asm(&format!("STX {}+{}", variable, offset), cycles)?;
                             } else {
                                 gstate.write_asm(&format!("STX {}", variable), cycles)?;
@@ -286,7 +284,7 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                         ExprType::Absolute(variable, offset) => {
                             let v = gstate.compiler_state.get_variable(variable);
                             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            if offset > 0 {
+                            if *offset > 0 {
                                 gstate.write_asm(&format!("STY {}+{}", variable, offset), cycles)?;
                             } else {
                                 gstate.write_asm(&format!("STY {}", variable), cycles)?;
@@ -333,12 +331,12 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             let v = gstate.compiler_state.get_variable(variable);
                             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            if offset > 0 {
+                            if *offset > 0 {
                                 gstate.write_asm(&format!("LDA {}+{}", variable, offset), cycles)?;
                             } else {
                                 gstate.write_asm(&format!("LDA {}", variable), cycles)?;
                             }
-                            gstate.flags = FlagsState::Absolute(variable, offset);
+                            gstate.flags = FlagsState::Absolute(variable, *offset);
                         },
                         ExprType::AbsoluteX(variable) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
@@ -371,14 +369,11 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                         ExprType::Absolute(variable, offset) => {
                             let v = gstate.compiler_state.get_variable(variable);
                             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            let off = if high_byte { offset + 1 } else { offset };
+                            let off = if high_byte { *offset + 1 } else { *offset };
                             if off > 0 {
                                 gstate.write_asm(&format!("STA {}+{}", variable, off), cycles)?;
                             } else {
                                 gstate.write_asm(&format!("STA {}", variable), cycles)?;
-                            }
-                            if v.var_type == VariableType::Short && !high_byte {
-                                generate_assign(lhs, rhs, gstate, pos, true)?;
                             }
                         },
                         ExprType::AbsoluteX(variable) => {
@@ -395,31 +390,29 @@ fn generate_assign<'a>(lhs: &Expr<'a>, rhs: &Expr<'a>, gstate: &mut GeneratorSta
                         gstate.write_asm("PLA", 3)?;
                         gstate.flags = FlagsState::Unknown;
                     }
-                    Ok(left)
+                    Ok(*left)
                 }
             }
         }
     }
 }
 
-fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
+fn generate_arithm<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>, gstate: &mut GeneratorState<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
 {
     let mut acc_in_use = gstate.acc_in_use;
     
-    let left = generate_expr(lhs, gstate, pos, high_byte)?;
-    let right = generate_expr(rhs, gstate, pos, high_byte)?;
     match left {
         ExprType::Immediate(l) => {
             match right {
                 ExprType::Immediate(r) => {
                     match op {
-                        Operation::Add => return Ok(ExprType::Immediate(l + r)),
-                        Operation::Sub => return Ok(ExprType::Immediate(l - r)),
-                        Operation::And => return Ok(ExprType::Immediate(l & r)),
-                        Operation::Or => return Ok(ExprType::Immediate(l | r)),
-                        Operation::Xor => return Ok(ExprType::Immediate(l ^ r)),
-                        Operation::Mul => return Ok(ExprType::Immediate(l * r)),
-                        Operation::Div => return Ok(ExprType::Immediate(l / r)),
+                        Operation::Add(_) => return Ok(ExprType::Immediate(l + r)),
+                        Operation::Sub(_) => return Ok(ExprType::Immediate(l - r)),
+                        Operation::And(_) => return Ok(ExprType::Immediate(l & r)),
+                        Operation::Or(_) => return Ok(ExprType::Immediate(l | r)),
+                        Operation::Xor(_) => return Ok(ExprType::Immediate(l ^ r)),
+                        Operation::Mul(_) => return Ok(ExprType::Immediate(l * r)),
+                        Operation::Div(_) => return Ok(ExprType::Immediate(l / r)),
                         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
                     } 
                 },
@@ -437,7 +430,7 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
             if acc_in_use { gstate.write_asm("PHA", 3)?; }
             let v = gstate.compiler_state.get_variable(varname);
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-            let off = if high_byte { offset + 1 } else { offset };
+            let off = if high_byte { *offset + 1 } else { *offset };
             if off > 0 {
                 gstate.write_asm(&format!("LDA {}+{}", varname, off), cycles)?;
             } else {
@@ -471,29 +464,29 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
     }
     gstate.acc_in_use = true;
     let operation = match op {
-        Operation::Add => {
+        Operation::Add(_) => {
             if !high_byte {
                 gstate.write_asm("CLC", 2)?;
             }
             "ADC"
         },
-        Operation::Sub => {
+        Operation::Sub(_) => {
             if !high_byte {
                 gstate.write_asm("SEC", 2)?;
             }
             "SBC"
         },
-        Operation::And => {
+        Operation::And(_) => {
             "AND"
         },
-        Operation::Or => {
+        Operation::Or(_) => {
             "ORA"
         },
-        Operation::Xor => {
+        Operation::Xor(_) => {
             "EOR"
         },
-        Operation::Mul => { return Err(syntax_error(gstate.compiler_state, "Operation not possible. 6502 doesn't implement a multiplier.", pos)) },
-        Operation::Div => { return Err(syntax_error(gstate.compiler_state, "Operation not possible. 6502 doesn't implement a divider.", pos)) },
+        Operation::Mul(_) => { return Err(syntax_error(gstate.compiler_state, "Operation not possible. 6502 doesn't implement a multiplier.", pos)) },
+        Operation::Div(_) => { return Err(syntax_error(gstate.compiler_state, "Operation not possible. 6502 doesn't implement a divider.", pos)) },
         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
     };
     let signed;
@@ -504,13 +497,13 @@ fn generate_arithm<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &
                 true => (v >> 8) & 0xff,
             };
             gstate.write_asm(&format!("{} #{}", operation, vx), 2)?;
-            signed = if v < 0 { true } else { false };
+            signed = if *v < 0 { true } else { false };
         },
         ExprType::Absolute(varname, offset) => {
             let v = gstate.compiler_state.get_variable(varname);
             signed = v.signed; 
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-            let off = if high_byte { offset + 1 } else { offset };
+            let off = if high_byte { *offset + 1 } else { *offset };
             if off > 0 {
                 gstate.write_asm(&format!("{} {}+{}", operation, varname, off), cycles)?;
             } else {
@@ -551,7 +544,7 @@ fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &m
             let v = gstate.compiler_state.get_variable(varname);
             signed = v.signed; 
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-            if v.var_type == VariableType::Short && *op == Operation::Brs {
+            if v.var_type == VariableType::Short && *op == Operation::Brs(false) {
                 // Special shift 8 case for extracting higher byte
                 match right {
                     ExprType::Immediate(v) => {
@@ -608,10 +601,10 @@ fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &m
     }
     gstate.acc_in_use = true;
     let operation = match op {
-        Operation::Brs => {
+        Operation::Brs(_) => {
             "LSR"
         },
-        Operation::Bls => {
+        Operation::Bls(_) => {
             "ASL"
         },
         _ => unreachable!(),
@@ -760,16 +753,61 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
         Expr::Integer(i) => Ok(ExprType::Immediate(*i)),
         Expr::BinOp {lhs, op, rhs} => {
             match op {
-                Operation::Assign => generate_assign(lhs, rhs, gstate, pos, high_byte),
-                Operation::Add | Operation::Sub | Operation::And | Operation::Or | Operation::Xor | Operation::Mul | Operation::Div  => generate_arithm(lhs, op, rhs, gstate, pos, high_byte),
+                Operation::Assign => {
+                    let left = generate_expr(lhs, gstate, pos, high_byte)?;
+                    let right = generate_expr(rhs, gstate, pos, high_byte)?;
+                    let ret = generate_assign(&left, &right, gstate, pos, high_byte);
+                    if !high_byte {
+                        match left {
+                            ExprType::Absolute(variable, _) => {
+                                let v = gstate.compiler_state.get_variable(variable);
+                                if v.var_type == VariableType::Short {
+                                    let left = generate_expr(lhs, gstate, pos, true)?;
+                                    let right = generate_expr(rhs, gstate, pos, true)?;
+                                    generate_assign(&left, &right, gstate, pos, true)?;
+                                }
+                            },
+                            _ => ()
+                        };
+                    }
+                    ret
+                },
+                Operation::Add(false) | Operation::Sub(false) | Operation::And(false) | Operation::Or(false) | Operation::Xor(false) | Operation::Mul(false) | Operation::Div(false) => {
+                    let left = generate_expr(lhs, gstate, pos, high_byte)?;
+                    let right = generate_expr(rhs, gstate, pos, high_byte)?;
+                    generate_arithm(&left, op, &right, gstate, pos, high_byte)
+                },
+                Operation::Add(true) | Operation::Sub(true) | Operation::And(true) | Operation::Or(true) | Operation::Xor(true) | Operation::Mul(true) | Operation::Div(true) => {
+                    let left = generate_expr(lhs, gstate, pos, high_byte)?;
+                    let right = generate_expr(rhs, gstate, pos, high_byte)?;
+                    let newright = generate_arithm(&left, op, &right, gstate, pos, high_byte)?;
+                    let ret = generate_assign(&left, &newright, gstate, pos, high_byte);
+                    if !high_byte {
+                        match left {
+                            ExprType::Absolute(variable, _) => {
+                                let v = gstate.compiler_state.get_variable(variable);
+                                if v.var_type == VariableType::Short {
+                                    let left = generate_expr(lhs, gstate, pos, true)?;
+                                    let right = generate_expr(rhs, gstate, pos, true)?;
+                                    let newright = generate_arithm(&left, op, &right, gstate, pos, true)?;
+                                    generate_assign(&left, &newright, gstate, pos, true)?;
+                                }
+                            },
+                            _ => ()
+                        };
+                    }
+                    ret
+                },
                 Operation::Eq => Err(Error::Unimplemented { feature: "Equal not implemented" }),
                 Operation::Neq => Err(Error::Unimplemented { feature: "Not equal not implemented" }),
                 Operation::Gt => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
                 Operation::Gte => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
                 Operation::Lt => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
                 Operation::Lte => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
-                Operation::Brs => generate_shift(lhs, op, rhs, gstate, pos),
-                Operation::Bls => generate_shift(lhs, op, rhs, gstate, pos),
+                Operation::Bls(true) => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
+                Operation::Brs(true) => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
+                Operation::Bls(false) => generate_shift(lhs, op, rhs, gstate, pos),
+                Operation::Brs(false) => generate_shift(lhs, op, rhs, gstate, pos),
             }
         },
         Expr::Identifier((var, sub)) => {

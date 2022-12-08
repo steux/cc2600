@@ -48,15 +48,15 @@ pub struct Variable {
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Operation {
-    Mul,
-    Div,
-    Add,
-    Sub,
-    And,
-    Or,
-    Xor,
-    Brs,
-    Bls,
+    Mul(bool),
+    Div(bool),
+    Add(bool),
+    Sub(bool),
+    And(bool),
+    Or(bool),
+    Xor(bool),
+    Brs(bool),
+    Bls(bool),
     Assign,
     Eq,
     Neq,
@@ -231,15 +231,15 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
         })
         .map_infix(|lhs, op, rhs| {
             let op = match op.as_rule() {
-                Rule::mul => Operation::Mul,
-                Rule::div => Operation::Div,
-                Rule::add => Operation::Add,
-                Rule::sub => Operation::Sub,
-                Rule::and => Operation::And,
-                Rule::or => Operation::Or,
-                Rule::xor => Operation::Xor,
-                Rule::brs => Operation::Brs,
-                Rule::bls => Operation::Bls,
+                Rule::mul => Operation::Mul(false),
+                Rule::div => Operation::Div(false),
+                Rule::add => Operation::Add(false),
+                Rule::sub => Operation::Sub(false),
+                Rule::and => Operation::And(false),
+                Rule::or => Operation::Or(false),
+                Rule::xor => Operation::Xor(false),
+                Rule::brs => Operation::Brs(false),
+                Rule::bls => Operation::Bls(false),
                 Rule::eq => Operation::Eq,
                 Rule::neq => Operation::Neq,
                 Rule::assign => Operation::Assign,
@@ -247,6 +247,15 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
                 Rule::gte => Operation::Gte,
                 Rule::lt => Operation::Lt,
                 Rule::lte => Operation::Lte,
+                Rule::mulass => Operation::Mul(true),
+                Rule::divass => Operation::Div(true),
+                Rule::pass => Operation::Add(true),
+                Rule::mass => Operation::Sub(true),
+                Rule::blsass => Operation::Bls(true),
+                Rule::brsass => Operation::Brs(true),
+                Rule::andass => Operation::And(true),
+                Rule::orass => Operation::Or(true),
+                Rule::xorass => Operation::Xor(true),
                 rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
             };
             Ok(Expr::BinOp {
@@ -527,7 +536,7 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
     let pratt =
         PrattParser::new()
         .op(Op::infix(Rule::comma, Assoc::Left))
-        .op(Op::infix(Rule::assign, Assoc::Right))
+        .op(Op::infix(Rule::assign, Assoc::Right) | Op::infix(Rule::mass, Assoc::Right) | Op::infix(Rule::pass, Assoc::Right))
         .op(Op::infix(Rule::lor, Assoc::Left))
         .op(Op::infix(Rule::land, Assoc::Left))
         .op(Op::infix(Rule::or, Assoc::Left))
