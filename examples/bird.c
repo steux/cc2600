@@ -42,10 +42,10 @@ char first_time;
 unsigned char i, j, k;
 unsigned char scroll_sequence;
 unsigned char scroll_counter;
-unsigned char lPFx[24];
-unsigned char rPFx[24];
-unsigned char lPFy[24];
-unsigned char rPFy[24];
+unsigned char lPFx[12];
+unsigned char rPFx[12];
+unsigned char lPFy[12];
+unsigned char rPFy[12];
 unsigned char left_window, right_window;
 unsigned short ybird;
 unsigned short yspeed;
@@ -340,7 +340,7 @@ void main()
         init();
     } else {
 #ifdef PAL
-        *TIM64T = 52; // ((48-4) * 76) / 64
+        *TIM64T = 52; 
 #else
         *TIM64T = 42;
 #endif

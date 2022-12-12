@@ -18,7 +18,8 @@ struct GeneratorState<'a> {
     flags: FlagsState<'a>,
     acc_in_use: bool,
     insert_code: bool,
-    deferred_plusplus: Vec<(ExprType<'a>, usize, bool)>
+    deferred_plusplus: Vec<(ExprType<'a>, usize, bool)>,
+    bankswitching_method: &'static str
 }
 
 impl<'a> GeneratorState<'a> {
@@ -1423,7 +1424,8 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         flags: FlagsState::Unknown,
         acc_in_use: false,
         insert_code,
-        deferred_plusplus: Vec::new()
+        deferred_plusplus: Vec::new(),
+        bankswitching_method: "4K"
     };
 
     gstate.write("\tPROCESSOR 6502\n\n")?;
@@ -1451,44 +1453,70 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         }
     }
 
-    gstate.write("\n\tSEG CODE\n\tORG $F000\n")?;
+    // Try to figure out what is the bankswitching method
+    let mut maxbank = 0;
+    for f in compiler_state.sorted_functions().iter() {
+         if f.1.bank > maxbank { maxbank = f.1.bank; }
+    }
+    if maxbank > 0 {
+        let bankswitching_address = match maxbank {
+            1 => {
+                gstate.bankswitching_method = "F8";
+                "$1FF8"
+            },
+            2 | 3 => {
+                gstate.bankswitching_method = "F6";
+                "$1FF6"
+            },
+            4 | 5 | 6 | 7 => {
+                gstate.bankswitching_method = "F4";
+                "$1FF4"
+            },
+            _ => { return Err(Error::Unimplemented { feature: "Bankswitching scheme not implemented" }); },
+        };
+        gstate.write(&format!("
+; Macro that implements Bank Switching trampoline
+; X = bank number
+; A = hi byte of destination PC
+; Y = lo byte of destination PC
+        MAC BANK_SWITCH_TRAMPOLINE
+        pha     ; push hi byte
+        tya     ; Y -> A
+        pha     ; push lo byte
+        lda {},x ; do the bank switch
+        rts     ; return to target
+        ENDM
+        ", bankswitching_address))?;
+    }
+    
 
     // Generate functions code
-    gstate.write("\n; Functions definitions\n")?;
-    for f in compiler_state.sorted_functions().iter() {
-        gstate.write(&format!("\n{}\tSUBROUTINE\n", f.0))?;
-        gstate.local_label_counter_for = 0;
-        gstate.local_label_counter_if = 0;
-        generate_statement(&f.1.code, &mut gstate)?;
-        gstate.write_asm("RTS", 6)?;
-    }
-  
-    // Generate ROM tables
-    gstate.write("\n; Tables in ROM\n")?;
-    gstate.write("\talign $100\n\n")?;
-    for v in compiler_state.sorted_variables().iter() {
-        if v.1.memory == VariableMemory::ROM {
-            match &v.1.def {
-                VariableDefinition::Array(arr) => {
-                    gstate.write(v.0)?;
-                    let mut counter = 0;
-                    for i in arr {
-                        if counter == 0 || counter == 16 {
-                            gstate.write("\n\thex ")?;
-                        }
-                        counter += 1;
-                        if counter == 16 { counter = 0; }
-                        gstate.write(&format!("{:02x}", i))?;
-                    } 
-                    gstate.write("\n")?;
-                },
-                _ => ()
-            };
-        }
-    }
+    gstate.write("\n; Functions definitions\n\tSEG CODE\n")?;
 
-    // Generate startup code
-    gstate.write("
+    let starting_code = if maxbank > 0 { "Start" } else { "Powerup" };
+    for bank in 0..=maxbank {
+        // Prelude code for each bank
+
+        gstate.write(&format!("\n\tORG ${}000\n\tRORG $F000\n", bank + 1))?;
+
+        if maxbank > 0 {
+            // Generate trampoline code
+            gstate.write("
+;----The following code is the same on all banks----
+Start
+; Ensure that bank 0 is selected
+        lda #>(Powerup-1)
+        ldy #<(Powerup-1)
+        ldx #0
+BankSwitch
+        BANK_SWITCH_TRAMPOLINE
+;----End of bank-identical code----
+        ")?;
+        }
+
+        // Generate startup code
+        if bank == 0 {
+            gstate.write("
 Powerup
         SEI		; Set the interrupt masking flag in the processor status register.
       ; The VCS has no interrupts, but the Atari 7800 which can run VCS
@@ -1514,16 +1542,61 @@ Powerup
       ; of the TIA we wish to use in our program.
 
         JMP main
+        ")?;
+        }
+        
+        // Generate functions code
+        for f in compiler_state.sorted_functions().iter() {
+            if f.1.bank == bank {
+                gstate.write(&format!("\n{}\tSUBROUTINE\n", f.0))?;
+                gstate.local_label_counter_for = 0;
+                gstate.local_label_counter_if = 0;
+                generate_statement(&f.1.code, &mut gstate)?;
+                gstate.write_asm("RTS", 6)?;
+            }
+        }
+
+        // Generate ROM tables
+        gstate.write("\n; Tables in ROM\n")?;
+        gstate.write("\talign $100\n\n")?;
+        for v in compiler_state.sorted_variables().iter() {
+            if let VariableMemory::ROM(rom_bank) = v.1.memory {
+                if rom_bank == bank {
+                    match &v.1.def {
+                        VariableDefinition::Array(arr) => {
+                            gstate.write(v.0)?;
+                            let mut counter = 0;
+                            for i in arr {
+                                if counter == 0 || counter == 16 {
+                                    gstate.write("\n\thex ")?;
+                                }
+                                counter += 1;
+                                if counter == 16 { counter = 0; }
+                                gstate.write(&format!("{:02x}", i))?;
+                            } 
+                            gstate.write("\n")?;
+                        },
+                        _ => ()
+                    };
+                }
+            }
+        }
+
+        // Epilogue code
+        gstate.write(&format!("
 
         ECHO ([$FFFC-.]d), \"bytes free\"
 
-        ORG $FFFA
+        ORG ${}FFA
+        RORG $FFFA
 
-        .word Powerup\t; NMI
-        .word Powerup\t; RESET
-        .word Powerup\t; IRQ
+        .word {}\t; NMI
+        .word {}\t; RESET
+        .word {}\t; IRQ
 
-        END\n")?;
+        END\n", bank + 1, starting_code, starting_code, starting_code))?;
 
+    }
+  
     Ok(())
 }

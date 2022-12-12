@@ -23,7 +23,7 @@ pub enum VariableType {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum VariableMemory {
-    ROM,
+    ROM(u32),
     Zeropage,
     Superchip,
 }
@@ -292,7 +292,8 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
             Rule::var_type => {
                 for p in pair.into_inner() {
                     match p.as_rule() {
-                        Rule::var_const => memory = VariableMemory::ROM,
+                        Rule::var_const => memory = VariableMemory::ROM(0),
+                        Rule::bank => memory = VariableMemory::ROM(u32::from_str_radix(p.into_inner().next().unwrap().as_str(), 10).unwrap()),
                         Rule::superchip => memory = VariableMemory::Superchip,
                         Rule::var_sign => if p.as_str().eq("unsigned") {
                             signed = false;

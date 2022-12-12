@@ -1,9 +1,9 @@
-bank2 void draw_bird1()
+void draw_bird1()
 {
 #include "bird1.c"
 }
 
-bank2 void kernel()
+void kernel()
 {
     X = 0;
     Y = KERNAL - 1;
