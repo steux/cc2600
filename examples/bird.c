@@ -295,7 +295,7 @@ void game_logic()
     if ((*INPT4 & 0x80) != 0) {
         if (button_pressed == 0) {
             button_pressed = 1;
-            yspeed = 300;
+            yspeed = 350;
         }
     } else button_pressed = 0;
     ybird = ybird + yspeed;
@@ -307,13 +307,6 @@ void game_logic()
 void bottom()
 {
     strobe(WSYNC);
-    *COLUBK = GREEN;
-    *PF0 = 0;
-    *PF1 = 0;
-    *PF2 = 0;
-    strobe(WSYNC);
-    strobe(WSYNC);
-
 #ifdef PAL
     for (X = PALBOTTOM; X != 0; X--) strobe(WSYNC);
 #endif
@@ -340,15 +333,16 @@ void main()
         init();
     } else {
 #ifdef PAL
-        *TIM64T = 52; 
+        *TIM64T = 51; 
 #else
-        *TIM64T = 42;
+        *TIM64T = 41;
 #endif
         // The game logic
         game_logic();
         *COLUBK = BLUE;
         while (*INTIM);
     }
+    strobe(WSYNC);
     
     if (scroll_sequence < 12) {
         kernel1();

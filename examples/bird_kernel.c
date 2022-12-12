@@ -1,9 +1,9 @@
-void draw_bird1()
+bank1 void draw_bird1()
 {
 #include "bird1.c"
 }
 
-void kernel()
+bank1 void kernel()
 {
     X = 0;
     Y = KERNAL - 1;
@@ -29,4 +29,10 @@ void kernel()
         strobe(HMOVE);
         START
     } while (Y != 0); 
+    strobe(WSYNC);
+    *COLUBK = GREEN;
+    *PF0 = 0;
+    *PF1 = 0;
+    *PF2 = 0;
+    strobe(WSYNC);
 }

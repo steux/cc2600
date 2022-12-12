@@ -19,7 +19,8 @@ struct GeneratorState<'a> {
     acc_in_use: bool,
     insert_code: bool,
     deferred_plusplus: Vec<(ExprType<'a>, usize, bool)>,
-    bankswitching_method: &'static str
+    bankswitching_method: &'static str,
+    current_bank: u32,
 }
 
 impl<'a> GeneratorState<'a> {
@@ -640,10 +641,20 @@ fn generate_function_call<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, 
                 Expr::Nothing => {
                     match gstate.compiler_state.functions.get(*var) {
                         None => Err(syntax_error(gstate.compiler_state, "Unknown function identifier", pos)),
-                        Some(_) => {
+                        Some(f) => {
                             let acc_in_use = gstate.acc_in_use;
                             if acc_in_use { gstate.write_asm("PHA", 3)?; }
-                            gstate.write_asm(&format!("JSR {}", *var), 6)?;
+                            
+                            if f.bank == gstate.current_bank {
+                                gstate.write_asm(&format!("JSR {}", *var), 6)?;
+                            } else {
+                                if gstate.current_bank == 0 {
+                                    // Generate bankswitching call
+                                    gstate.write_asm(&format!("JSR Call{}", *var), 6)?;
+                                } else {
+                                    return Err(syntax_error(gstate.compiler_state, "Banked code can only be called from bank 0 or same bank", pos))
+                                }
+                            } 
                             if acc_in_use { gstate.write_asm("PLA", 3)?; }
                             gstate.flags = FlagsState::Unknown;
                             Ok(())
@@ -749,7 +760,7 @@ fn generate_deref<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usi
 
 fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
 {
-    debug!("Expression: {:?}", expr);
+    //debug!("Expression: {:?}", expr);
     match expr {
         Expr::Integer(i) => Ok(ExprType::Immediate(*i)),
         Expr::BinOp {lhs, op, rhs} => {
@@ -876,7 +887,7 @@ fn flags_ok(flags: &FlagsState, expr_type: &ExprType) -> bool
 
 fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize, negate: bool, label: &str) -> Result<(), Error>
 {
-    debug!("Condition: {:?}", condition);
+    //debug!("Condition: {:?}", condition);
     match condition {
         Expr::BinOp {lhs, op, rhs} => {
             let l = generate_expr(lhs, gstate, pos, false)?;
@@ -1425,7 +1436,8 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         acc_in_use: false,
         insert_code,
         deferred_plusplus: Vec::new(),
-        bankswitching_method: "4K"
+        bankswitching_method: "4K",
+        current_bank: 0,
     };
 
     gstate.write("\tPROCESSOR 6502\n\n")?;
@@ -1458,19 +1470,20 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
     for f in compiler_state.sorted_functions().iter() {
          if f.1.bank > maxbank { maxbank = f.1.bank; }
     }
+    let bankswitching_address: u32;
     if maxbank > 0 {
-        let bankswitching_address = match maxbank {
+        bankswitching_address = match maxbank {
             1 => {
                 gstate.bankswitching_method = "F8";
-                "$1FF8"
+                0x1FF8
             },
             2 | 3 => {
                 gstate.bankswitching_method = "F6";
-                "$1FF6"
+                0x1FF6
             },
             4 | 5 | 6 | 7 => {
                 gstate.bankswitching_method = "F4";
-                "$1FF4"
+                0x1FF4
             },
             _ => { return Err(Error::Unimplemented { feature: "Bankswitching scheme not implemented" }); },
         };
@@ -1483,10 +1496,12 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         pha     ; push hi byte
         tya     ; Y -> A
         pha     ; push lo byte
-        lda {},x ; do the bank switch
+        lda ${:04x},x ; do the bank switch
         rts     ; return to target
         ENDM
         ", bankswitching_address))?;
+    } else {
+        bankswitching_address = 0;
     }
     
 
@@ -1494,9 +1509,13 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
     gstate.write("\n; Functions definitions\n\tSEG CODE\n")?;
 
     let starting_code = if maxbank > 0 { "Start" } else { "Powerup" };
+    let mut nb_banked_functions = 0;
+    let mut banked_function_address = 0;
+
     for bank in 0..=maxbank {
         // Prelude code for each bank
-
+        debug!("Generating code for bank #{}", bank);
+        gstate.current_bank = bank;
         gstate.write(&format!("\n\tORG ${}000\n\tRORG $F000\n", bank + 1))?;
 
         if maxbank > 0 {
@@ -1505,9 +1524,13 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
 ;----The following code is the same on all banks----
 Start
 ; Ensure that bank 0 is selected
-        lda #>(Powerup-1)
-        ldy #<(Powerup-1)
-        ldx #0
+        LDX #$FF	; We set the stack pointer (SP) register in the processor to point
+        TXS		; at the highest address of RAM.  If we use the stack then it will
+      ; consume memory space growing downward, starting at that top address.
+
+        lDA #>(Powerup-1)
+        lDY #<(Powerup-1)
+        lDX #0
 BankSwitch
         BANK_SWITCH_TRAMPOLINE
 ;----End of bank-identical code----
@@ -1548,6 +1571,8 @@ Powerup
         // Generate functions code
         for f in compiler_state.sorted_functions().iter() {
             if f.1.bank == bank {
+                debug!("Generating code for function #{}", f.0);
+
                 gstate.write(&format!("\n{}\tSUBROUTINE\n", f.0))?;
                 gstate.local_label_counter_for = 0;
                 gstate.local_label_counter_if = 0;
@@ -1584,19 +1609,62 @@ Powerup
 
         // Epilogue code
         gstate.write(&format!("
+        ECHO ([$FFFC-.]d), \"bytes free in bank {}\"
+        ", bank))?;
 
-        ECHO ([$FFFC-.]d), \"bytes free\"
+        if bank == 0 {
+            // Generate bankswitching functions code
+            for f in compiler_state.sorted_functions().iter() {
+                if f.1.bank != 0 {
+                    nb_banked_functions += 1;
+                }
+            }
+            banked_function_address = 0x1FE0 - nb_banked_functions * 10;
+            gstate.write(&format!("
+        ORG ${:04x}
+        RORG ${:04x}", banked_function_address, banked_function_address))?;
+                        for bank_ex in 1..=maxbank {
+                for f in compiler_state.sorted_functions().iter() {
+                    if f.1.bank == bank_ex {
+                        gstate.write(&format!("
+Call{}
+        LDX ${:04x}+{}
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+        RTS", f.0, bankswitching_address, f.1.bank))?;
+                    }
+                }
+            }
+        } else {
+            for f in compiler_state.sorted_functions().iter() {
+                let address = banked_function_address;
+                if f.1.bank == bank {
+                    gstate.write(&format!("
+        ORG ${:04x}
+        RORG ${:04x}
+        JSR {}
+        LDX ${:04x}
+                    ", address + f.1.bank * 0x1000 + 3, address + 3, f.0, bankswitching_address))?;
+                }
+                banked_function_address += 10;
+            }
+        }
 
+        gstate.write(&format!("
         ORG ${}FFA
         RORG $FFFA
 
         .word {}\t; NMI
         .word {}\t; RESET
         .word {}\t; IRQ
-
-        END\n", bank + 1, starting_code, starting_code, starting_code))?;
+        \n", bank + 1, starting_code, starting_code, starting_code))?;
 
     }
-  
+ 
+    gstate.write("\tEND\n")?;
     Ok(())
 }
