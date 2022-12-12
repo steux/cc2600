@@ -19,8 +19,10 @@ var_def = { int | array_def }
 array_def = { "{" ~ (int ~ ",")* ~ int ~ "}" }
 pointer = { "*" }
 
-func_decl = { inline? ~ "void" ~ id_name ~ "(" ~ ("void")? ~ ")" ~ block }
+func_decl = { inline? ~ bank? ~ "void" ~ id_name ~ "(" ~ ("void")? ~ ")" ~ block }
 inline = { "inline" }
+bank = ${ "bank" ~ bank_number }
+bank_number = { ASCII_NONZERO_DIGIT }
 
 block = { "{" ~ statement* ~ "}" }
 statement = {
@@ -55,7 +57,7 @@ cases = { ("case" ~ int ~ ":" ~ statement*)* ~ ("default" ~ ":" ~ statement*) }
 expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
     infix    =  _{ pass | mass | mulass | divass | blsass | brsass | andass | xorass | orass |
                    mul | div | add | sub | bls | brs | lte | lt | gte | gt | eq | neq |
-                   and | xor | or | land | lor | assign | comma
+                   and | xor | or | land | lor | assign | comma | ternary_cond1 | ternary_cond2
                    }
       mul    =   { "*" }  // Multiplication
       div    =   { "/" }  // Division
@@ -85,6 +87,8 @@ expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ pos
       xorass =   { "^=" } // Or assign
       orass  =   { "|=" } // Or assign
       comma  =   { "," }  // Comma (discard left)
+      ternary_cond1 = { "?" } // Ternary conditional (condition part)
+      ternary_cond2 = { ":" } // Ternary conditional (alternatives part)
     prefix   =  _{ neg | ppp | mmp | addr | deref }
       ppp    =   { "++" } // Increment
       mmp    =   { "--" } // Decrement

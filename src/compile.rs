@@ -123,6 +123,7 @@ pub struct StatementLoc<'a> {
 pub struct Function<'a> {
     order: usize,
     pub inline: bool,
+    pub bank: u32,
     pub code: StatementLoc<'a>,
 }
 
