@@ -479,10 +479,15 @@ fn compile_block<'a>(state: &CompilerState<'a>, p: Pair<'a, Rule>) -> Result<Sta
 fn compile_func_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<(), Error>
 {
     let mut inline = false;
+    let mut bank = 0u32;
     let mut p = pairs.into_iter();
     let mut pair = p.next().unwrap();
     if pair.as_rule() == Rule::inline { 
         inline = true; 
+        pair = p.next().unwrap();
+    }
+    if pair.as_rule() == Rule::bank { 
+        bank = u32::from_str_radix(pair.into_inner().next().unwrap().as_str(), 10).unwrap();
         pair = p.next().unwrap();
     }
     match pair.as_rule() {
@@ -495,6 +500,7 @@ fn compile_func_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) 
                     state.functions.insert(name.to_string(), Function {
                         order: state.functions.len(),
                         inline,
+                        bank,
                         code 
                     });
                 },
@@ -538,6 +544,8 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
         PrattParser::new()
         .op(Op::infix(Rule::comma, Assoc::Left))
         .op(Op::infix(Rule::assign, Assoc::Right) | Op::infix(Rule::mass, Assoc::Right) | Op::infix(Rule::pass, Assoc::Right))
+        .op(Op::infix(Rule::ternary_cond1, Assoc::Right))
+        .op(Op::infix(Rule::ternary_cond2, Assoc::Right))
         .op(Op::infix(Rule::lor, Assoc::Left))
         .op(Op::infix(Rule::land, Assoc::Left))
         .op(Op::infix(Rule::or, Assoc::Left))

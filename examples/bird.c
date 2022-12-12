@@ -53,111 +53,31 @@ unsigned char button_pressed;
 
 #define SPRITE_HEIGHT 17 
 
-#define WAIT Y--; asm("PHA"); asm("PLA");
-#define BEFORE X = Y >> 3  
+#define WAIT i = Y >> 4; Y--; 
+#define BEFORE X = i  
+
+#define kernel kernel1
+#define draw_bird1 draw_bird11
 #define START BEFORE; *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF1= rPFx[X]; *PF2 = rPFy[X];
+#include "bird_kernel.c"
 
-void draw_bird1()
-{
-#include "bird1.c"
-}
-
-void kernel1()
-{
-    X = 0;
-    Y = KERNAL - 1; 
-    
-    // Renable output (disable VBLANK)
-    strobe(WSYNC);
-    strobe(HMOVE);
-    *VBLANK = X;
-    START; 
-
-    do {
-        strobe(WSYNC);
-        strobe(HMOVE);
-        START
-    } while (Y != ybird >> 8);
-    strobe(WSYNC);
-    strobe(HMOVE);
-    START
-    draw_bird1();
-    do {
-        strobe(WSYNC);
-        strobe(HMOVE);
-        START
-    } while (Y != 0); 
-}
-
+#undef kernel
+#undef draw_bird1
 #undef START
+
+#define kernel kernel2
+#define draw_bird1 draw_bird12
 #define START BEFORE; *PF0 = lPFx[X]; *PF1 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF1 = rPFy[X];
+#include "bird_kernel.c"
 
-void draw_bird2()
-{
-#include "bird1.c"
-}
-
-void kernel2()
-{
-    X = 0; 
-    Y = KERNAL - 1; 
-    
-    // Renable output (disable VBLANK)
-    strobe(WSYNC);
-    strobe(HMOVE);
-    *VBLANK = X;
-    START; 
-
-    do {
-        strobe(WSYNC);
-        strobe(HMOVE);
-        START
-    } while (Y != ybird >> 8);
-    strobe(WSYNC);
-    strobe(HMOVE);
-    START
-    draw_bird2();
-    do {
-        strobe(WSYNC);
-        strobe(HMOVE);
-        START
-    } while (Y != 0); 
-}
-
+#undef kernel
+#undef draw_bird1
 #undef START
+
+#define kernel kernel3
+#define draw_bird1 draw_bird13
 #define START BEFORE; *PF0 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF2 = rPFy[X];
-
-void draw_bird3()
-{
-#include "bird1.c"
-}
-
-void kernel3()
-{
-    X = 0;
-    Y = KERNAL - 1; 
-    
-    // Renable output (disable VBLANK)
-    strobe(WSYNC);
-    strobe(HMOVE);
-    *VBLANK = X;
-    START; 
-
-    do {
-        strobe(WSYNC);
-        strobe(HMOVE);
-        START
-    } while (Y != ybird >> 8);
-    strobe(WSYNC);
-    strobe(HMOVE);
-    START
-    draw_bird3();
-    do {
-        strobe(WSYNC);
-        strobe(HMOVE);
-        START
-    } while (Y != 0); 
-}
+#include "bird_kernel.c"
 
 void init_sprites_pos()
 {
@@ -233,7 +153,7 @@ void load_scroll_sequence()
     rPFy[X] = k;
     X++;
 
-    for (; X != right_window + 6; X++) {
+    for (; X != right_window + 4; X++) {
         rPFx[X] = 0;
         rPFy[X] = 0;
     }
@@ -263,7 +183,7 @@ void load_scroll_sequence()
         k = s1_PF2[Y]; 
     }
 
-    for (; X != 24; X++) {
+    for (; X != 12; X++) {
         rPFx[X] = j;
         rPFy[X] = k;
     }
@@ -300,7 +220,7 @@ void load_scroll_sequence()
     lPFy[X] = k;
     X++;
 
-    for (; X != left_window + 6; X++) {
+    for (; X != left_window + 4; X++) {
         lPFx[X] = 0;
         lPFy[X] = 0;
     }
@@ -330,7 +250,7 @@ void load_scroll_sequence()
         k = s1_PF2[Y]; 
     }
 
-    for (; X != 24; X++) {
+    for (; X != 12; X++) {
         lPFx[X] = j;
         lPFy[X] = k;
     }
@@ -344,8 +264,8 @@ void init()
     scroll_counter = 0;
     first_time = 0;
     j = 0;
-    left_window = 6;
-    right_window = 10;
+    left_window = 0;
+    right_window = 0;
     ybird = 100 * 256;
     yspeed = 0;
     button_pressed = 0;
@@ -359,7 +279,7 @@ void game_logic()
         if (scroll_sequence == 20) left_window = right_window;
         if (scroll_sequence == 24) {
             right_window = right_window + 1;
-            if (right_window == 16) right_window = 0;
+            if (right_window == 8) right_window = 0;
             scroll_sequence = 0;
         }
     }
