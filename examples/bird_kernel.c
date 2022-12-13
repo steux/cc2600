@@ -1,8 +1,3 @@
-bank1 void draw_bird1()
-{
-#include "bird1.c"
-}
-
 bank1 void kernel()
 {
     X = 0;
@@ -23,7 +18,11 @@ bank1 void kernel()
     strobe(WSYNC);
     strobe(HMOVE);
     START
-    draw_bird1();
+#ifdef BIRD1
+#include "bird1.c"
+#else
+#include "bird2.c"
+#endif
     do {
         strobe(WSYNC);
         strobe(HMOVE);

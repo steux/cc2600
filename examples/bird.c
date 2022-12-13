@@ -48,34 +48,57 @@ unsigned char lPFy[12];
 unsigned char rPFy[12];
 unsigned char left_window, right_window;
 unsigned short ybird;
-unsigned short yspeed;
+signed short yspeed;
 unsigned char button_pressed;
+unsigned char bird_type;
+unsigned short score;
+unsigned short highscore;
 
 #define SPRITE_HEIGHT 17 
 
+#define BIRD1
 #define WAIT i = Y >> 4; Y--; 
 #define BEFORE X = i  
 
-#define kernel kernel1
-#define draw_bird1 draw_bird11
+#define kernel kernel11
 #define START BEFORE; *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF1= rPFx[X]; *PF2 = rPFy[X];
 #include "bird_kernel.c"
 
 #undef kernel
-#undef draw_bird1
 #undef START
 
-#define kernel kernel2
-#define draw_bird1 draw_bird12
+#define kernel kernel21
 #define START BEFORE; *PF0 = lPFx[X]; *PF1 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF1 = rPFy[X];
 #include "bird_kernel.c"
 
 #undef kernel
-#undef draw_bird1
 #undef START
 
-#define kernel kernel3
-#define draw_bird1 draw_bird13
+#define kernel kernel31
+#define START BEFORE; *PF0 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF2 = rPFy[X];
+#include "bird_kernel.c"
+
+#undef kernel
+#undef START
+
+#undef BIRD1
+#define bank1 bank2
+
+#define kernel kernel12
+#define START BEFORE; *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF1= rPFx[X]; *PF2 = rPFy[X];
+#include "bird_kernel.c"
+
+#undef kernel
+#undef START
+
+#define kernel kernel22
+#define START BEFORE; *PF0 = lPFx[X]; *PF1 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF1 = rPFy[X];
+#include "bird_kernel.c"
+
+#undef kernel
+#undef START
+
+#define kernel kernel32
 #define START BEFORE; *PF0 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF2 = rPFy[X];
 #include "bird_kernel.c"
 
@@ -277,6 +300,16 @@ void init()
     ybird = 100 * 256;
     yspeed = 0;
     button_pressed = 0;
+    bird_type = 0;
+    score = 0;
+    highscore = 0;
+}
+
+void gameover()
+{
+    ybird = 100 * 256;
+    yspeed = 0;
+    score = 0;
 }
 
 void game_logic()
@@ -292,21 +325,25 @@ void game_logic()
         }
     }
     yspeed -= 10;
-    if (ybird >> 8 < SPRITE_HEIGHT + 8) {
-        ybird = 100 * 256;
-        yspeed = 0;
-    }
-    if (ybird >> 8 > 190) {
-        ybird = 100 * 256;
-        yspeed = 0;
-    }
+    if (yspeed >> 8 < 0) bird_type = 0;
     if ((*INPT4 & 0x80) != 0) {
         if (button_pressed == 0) {
             button_pressed = 1;
             yspeed = 350;
+            bird_type = 1;
         }
     } else button_pressed = 0;
     ybird = ybird + yspeed;
+    if (ybird >> 8 < SPRITE_HEIGHT + 3) {
+        gameover();
+    }
+    if (ybird >> 8 > 189) {
+        gameover();
+    }
+    if ((*CXP0FB & 0x80) != 0) gameover();
+    if ((*CXP1FB & 0x80) != 0) gameover();
+    if ((*CXBLPF & 0x80) != 0) gameover();
+    strobe(CXCLR);
 
     load_scroll_sequence();
     scroll_counter++;
@@ -351,12 +388,20 @@ void main()
         while (*INTIM);
     }
     strobe(WSYNC);
-    
-    if (scroll_sequence < 12) {
-        kernel1();
-    } else if (scroll_sequence < 20) {
-        kernel2();
-    } else kernel3();
+   
+    if (bird_type == 0) {
+        if (scroll_sequence < 12) {
+            kernel11();
+        } else if (scroll_sequence < 20) {
+            kernel21();
+        } else kernel31();
+    } else {
+        if (scroll_sequence < 12) {
+            kernel12();
+        } else if (scroll_sequence < 20) {
+            kernel22();
+        } else kernel32();
+    }
 
     bottom();
   } while(1);

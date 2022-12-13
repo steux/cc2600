@@ -890,6 +890,8 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
     //debug!("Condition: {:?}", condition);
     match condition {
         Expr::BinOp {lhs, op, rhs} => {
+            // TODO: Check if this is a condition operator, otherwise process it as an expression
+            // to test for 0
             let l = generate_expr(lhs, gstate, pos, false)?;
             let r = generate_expr(rhs, gstate, pos, false)?;
             let left;
@@ -1479,10 +1481,12 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
             },
             2 | 3 => {
                 gstate.bankswitching_method = "F6";
+                maxbank = 3;
                 0x1FF6
             },
             4 | 5 | 6 | 7 => {
                 gstate.bankswitching_method = "F4";
+                maxbank = 7;
                 0x1FF4
             },
             _ => { return Err(Error::Unimplemented { feature: "Bankswitching scheme not implemented" }); },
@@ -1620,6 +1624,7 @@ Powerup
                 }
             }
             banked_function_address = 0x1FE0 - nb_banked_functions * 10;
+            debug!("Banked function address={:04x}", banked_function_address);
             gstate.write(&format!("
         ORG ${:04x}
         RORG ${:04x}", banked_function_address, banked_function_address))?;
@@ -1643,14 +1648,15 @@ Call{}
             for f in compiler_state.sorted_functions().iter() {
                 let address = banked_function_address;
                 if f.1.bank == bank {
+                    debug!("#{} Banked function address={:04x}", bank, banked_function_address);
                     gstate.write(&format!("
         ORG ${:04x}
         RORG ${:04x}
         JSR {}
         LDX ${:04x}
                     ", address + f.1.bank * 0x1000 + 3, address + 3, f.0, bankswitching_address))?;
+                    banked_function_address += 10;
                 }
-                banked_function_address += 10;
             }
         }
 
