@@ -24,6 +24,7 @@ int find_hmove(int dx)
     return -1;
 }
 
+#define PIXEL_WIDTH 3
 #define DEFAULT_BSIZE 4
 
 int main()
@@ -44,7 +45,7 @@ int main()
         unsigned int c0x = 0, c1x = 0;
         int x, i;
         // Analyze the characters on the line
-        for (x = 0, i = 0; i < strlen(line); i += 3, x++) {
+        for (x = 0, i = 0; i < strlen(line); i += PIXEL_WIDTH, x++) {
             char c = line[i];
             if (xc0 != 0 && xc0 != 8) { c0x <<= 1; xc0++; }
             if (xc1 != 0 && xc1 != 8) { c1x <<= 1; xc1++; }
@@ -102,7 +103,7 @@ int main()
         if (rbm == -1) rbm = x;
 
 #ifdef DEBUG
-        fprintf(stderr, "#%d: lc0=%d, c0x=%02x, lc1=%d, c1x=%02x\n", lnb, (int)lc0, (unsigned int)c0x, (int)lc1, (unsigned int)c1x);
+        fprintf(stderr, "#%d: lc0=%d, c0x=%02X, lc1=%d, c1x=%02X\n", lnb, (int)lc0, (unsigned int)c0x, (int)lc1, (unsigned int)c1x);
         fprintf(stderr, "#%d: lbm=%d, lb=%d, rb=%d, rbm=%d\n", lnb, (int)lbm, (int)lb, (int)rb, (int)rbm);
 #endif
 
@@ -123,27 +124,32 @@ int main()
                 grp0 = 0;
             }
         } else {
+            int ngrp0;
             if (lc0 < xp0) { // We certainly have to move left
                 ndxp0 = lc0 - xp0;
                 xp0 = lc0;
-                fprintf(stdout, "*HMP0 = 0x%02x;\n", find_hmove(ndxp0));
+                fprintf(stdout, "*HMP0 = 0x%02X;\n", find_hmove(ndxp0));
+                ngrp0 = c0x;
             } else {
-                int ngrp0 = c0x >> (lc0 - xp0);
-                if (ngrp0 << (lc0 - xp0) != c0x) {
-                    // Oops. Some bits were lost
-                    ndxp0 = xp0 - lc0;
-                    xp0 = lc0;
-                    fprintf(stdout, "*HMP0 = 0x%02x;\n", find_hmove(ndxp0));
-                    ngrp0 = c0x;
-                } // Perfect. it fits in 8 bits
-                if (ngrp0 != grp0) {
-                    grp0 = ngrp0;
-                    fprintf(stdout, "*GRP0 = 0x%02x;\n", grp0);
+                int c;
+                for (c = 0; c <= lc0 - xp0; c++) {
+                    ngrp0 = c0x >> (lc0 - (xp0 + c));
+                    if (ngrp0 << (lc0 - (xp0 + c)) == c0x) {
+                        // Perfect. it fits in 8 bits
+                        ndxp0 = c;
+                        xp0 = xp0 + c;
+                        if (ndxp0 != 0) fprintf(stdout, "*HMP0 = 0x%02X;\n", find_hmove(ndxp0));
+                        break;
+                    }
                 }
             }
-            if (ndxp0 == 0 && dxp0 != 0) {
-                fprintf(stdout, "*HMP0 = 0;\n");
+            if (ngrp0 != grp0) {
+                grp0 = ngrp0;
+                fprintf(stdout, "*GRP0 = 0x%02X;\n", grp0);
             }
+        }
+        if (ndxp0 == 0 && dxp0 != 0) {
+            fprintf(stdout, "*HMP0 = 0;\n");
         }
         dxp0 = ndxp0;
         if (lc1 == -1) {
@@ -152,23 +158,28 @@ int main()
                 grp1 = 0;
             }
         } else {
+            int ngrp1;
             if (lc1 < xp1) { // We certainly have to move left
                 ndxp1 = lc1 - xp1;
                 xp1 = lc1;
-                fprintf(stdout, "*HMP1 = 0x%02x;\n", find_hmove(ndxp1));
+                fprintf(stdout, "*HMP1 = 0x%02X;\n", find_hmove(ndxp1));
+                ngrp1 = c1x;
             } else {
-                int ngrp1 = c1x >> (lc1 - xp1);
-                if (ngrp1 << (lc1 - xp1) != c1x) {
-                    // Oops. Some bits were lost
-                    ndxp1 = xp1 - lc1;
-                    xp1 = lc1;
-                    fprintf(stdout, "*HMP1 = 0x%02x;\n", find_hmove(ndxp1));
-                    ngrp1 = c1x;
-                } // Perfect. it fits in 8 bits
-                if (ngrp1 != grp1) {
-                    grp1 = ngrp1;
-                    fprintf(stdout, "*GRP1 = 0x%02x;\n", grp1);
+                int c;
+                for (c = 0; c <= lc1 - xp1; c++) {
+                    ngrp1 = c1x >> (lc1 - (xp1 + c));
+                    if (ngrp1 << (lc1 - (xp1 + c)) == c1x) {
+                        // Perfect. it fits in 8 bits
+                        ndxp1 = c;
+                        xp1 = xp1 + c;
+                        if (ndxp1 != 0) fprintf(stdout, "*HMP1 = 0x%02X;\n", find_hmove(ndxp1));
+                        break;
+                    }
                 }
+            } 
+            if (ngrp1 != grp1) {
+                grp1 = ngrp1;
+                fprintf(stdout, "*GRP1 = 0x%02X;\n", grp1);
             }
         }
         if (ndxp1 == 0 && dxp1 != 0) {
@@ -200,23 +211,23 @@ int main()
                     case 4: bits = 0x20; break;
                     case 8: bits = 0x30; break;
                 }
-                fprintf(stdout, "*PFCTRL = 0x%02x;\n", bits);
+                fprintf(stdout, "*CTRLPF = 0x%02X;\n", bits);
             }
             // Check if there is a need to move the ball
-            if (xb > lb) {
+            if (xb > lb || xb + bsize > rbm) {
                 // We need to move the ball to the left
                 char nxb = lb;
                 while (nxb + bsize > rbm) nxb--;
                 ndxb = nxb - xb;
                 xb = nxb;
-                fprintf(stdout, "*HMBL = 0x%02x;\n", find_hmove(ndxb));
-            } else if (xb + bsize <= rb) {
+                fprintf(stdout, "*HMBL = 0x%02X;\n", find_hmove(ndxb));
+            } else if (xb + bsize <= rb || xb <= lbm) {
                 // We need to move the ball to the right
                 char nxb = rb - bsize + 1;
                 while (nxb <= lbm) nxb++;
                 ndxb = nxb - xb;
                 xb = nxb;
-                fprintf(stdout, "*HMBL = 0x%02x;\n", find_hmove(ndxb));
+                fprintf(stdout, "*HMBL = 0x%02X;\n", find_hmove(ndxb));
             }
         } else {
             // No ball. Was it there ?
@@ -239,28 +250,28 @@ int main()
     }
     
     fprintf(stdout, "strobe(WSYNC);\nstrobe(HMOVE);\nSTART\n");
-    if (grp0) fprintf(stdout, "*GRP0 = 0\n");
-    if (grp1) fprintf(stdout, "*GRP1 = 0\n");
+    if (grp0) fprintf(stdout, "*GRP0 = 0;\n");
+    if (grp1) fprintf(stdout, "*GRP1 = 0;\n");
     if (xp0 != 0) {
         dxp0 = -xp0;
-        fprintf(stdout, "*HMP0 = 0x%02x;\n", find_hmove(dxp0));
+        fprintf(stdout, "*HMP0 = 0x%02X;\n", find_hmove(dxp0));
     } else if (dxp0) {
         dxp0 = 0;
-        fprintf(stdout, "*HMP0 = 0\n");
+        fprintf(stdout, "*HMP0 = 0;\n");
     }
     if (xp1 != 0) {
         dxp1 = -xp1;
-        fprintf(stdout, "*HMP1 = 0x%02x;\n", find_hmove(dxp1));
+        fprintf(stdout, "*HMP1 = 0x%02X;\n", find_hmove(dxp1));
     } else if (dxp1) {
         dxp1 = 0;
-        fprintf(stdout, "*HMP1 = 0\n");
+        fprintf(stdout, "*HMP1 = 0;\n");
     }
     if (xb != 0) {
         dxb = -xb;
-        fprintf(stdout, "*HMBL = 0x%02x;\n", find_hmove(dxb));
+        fprintf(stdout, "*HMBL = 0x%02X;\n", find_hmove(dxb));
     } else if (dxp1) {
         dxb = 0;;
-        fprintf(stdout, "*HMBL = 0\n");
+        fprintf(stdout, "*HMBL = 0;\n");
     }
     if (benabled) {
         fprintf(stdout, "*ENABL = 0;\n");
@@ -268,18 +279,18 @@ int main()
     }
     
     fprintf(stdout, "\nstrobe(WSYNC);\nstrobe(HMOVE);\nSTART\n");
-    if (dxp0) fprintf(stdout, "*HMP0 = 0\n");
-    if (dxp1) fprintf(stdout, "*HMP1 = 0\n");
-    if (dxb) fprintf(stdout, "*HMBL = 0\n");
+    if (dxp0) fprintf(stdout, "*HMP0 = 0;\n");
+    if (dxp1) fprintf(stdout, "*HMP1 = 0;\n");
+    if (dxb) fprintf(stdout, "*HMBL = 0;\n");
     if (bsize != DEFAULT_BSIZE) {
         int bits = 0;
-        switch (bsize) {
+        switch (DEFAULT_BSIZE) {
             case 1: bits = 0x00; break;
             case 2: bits = 0x10; break;
             case 4: bits = 0x20; break;
             case 8: bits = 0x30; break;
         }
-        fprintf(stdout, "*PFCTRL = 0x%02x;\n", bits);
+        fprintf(stdout, "*CTRLPF = 0x%02X;\n", bits);
     }
     return 0;
 }

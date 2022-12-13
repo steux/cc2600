@@ -110,6 +110,14 @@ void init_sprites_pos()
     strobe(RESBL);
     strobe(WSYNC);
     strobe(HMOVE);
+
+    *HMBL = 0xF0;
+    strobe(WSYNC);
+    strobe(HMOVE);
+
+    *HMBL = 0x00;
+    strobe(WSYNC);
+    strobe(HMOVE);
 }
 
 void load_scroll_sequence()
