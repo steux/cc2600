@@ -1192,8 +1192,30 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                 Operation::Lt => true,
                 Operation::Lte => true,
                 Operation::Land => {
-                    generate_condition(lhs, gstate, pos, negate, label)?;
-                    return generate_condition(rhs, gstate, pos, negate, label);
+                    if negate {
+                        generate_condition(lhs, gstate, pos, true, label)?;
+                        return generate_condition(rhs, gstate, pos, true, label);
+                    } else {
+                        let ifstart_label = format!(".ifstart{}", gstate.local_label_counter_if);
+                        gstate.local_label_counter_if += 1;
+                        generate_condition(lhs, gstate, pos, true, &ifstart_label)?;
+                        generate_condition(rhs, gstate, pos, false, label)?;
+                        gstate.write_label(&ifstart_label)?;
+                        return Ok(());
+                    }
+                },
+                Operation::Lor => {
+                    if negate {
+                        let ifstart_label = format!(".ifstart{}", gstate.local_label_counter_if);
+                        gstate.local_label_counter_if += 1;
+                        generate_condition(lhs, gstate, pos, false, &ifstart_label)?;
+                        generate_condition(rhs, gstate, pos, true, label)?;
+                        gstate.write_label(&ifstart_label)?;
+                        return Ok(());
+                    } else {
+                        generate_condition(lhs, gstate, pos, false, label)?;
+                        return generate_condition(rhs, gstate, pos, false, label);
+                    }
                 },
                 _ => false,
             } {
