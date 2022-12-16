@@ -154,7 +154,7 @@ mod tests {
         compile(input.as_bytes(), &mut output, &args).unwrap();
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
-        assert!(result.contains("JMP .ifend1\n\tLDX #1\n.ifend1\n\tRTS"));
+        assert!(result.contains("JMP .ifend1\n\tLDX #1\n.ifend1"));
     }
 
     #[test]
@@ -171,7 +171,7 @@ mod tests {
         compile(input.as_bytes(), &mut output, &args).unwrap();
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
-        assert!(result.contains("main\tSUBROUTINE\n\tLDX #1\n.ifend1\n\tRTS"));
+        assert!(result.contains("main\tSUBROUTINE\n\tLDX #1\n.ifend1"));
     }
     
     #[test]
@@ -188,7 +188,7 @@ mod tests {
         compile(input.as_bytes(), &mut output, &args).unwrap();
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
-        assert!(result.contains("LDA i\n\tCMP #0\n\tBNE .ifend1\n\tLDA j\n\tCMP #0\n\tBNE .ifend1\n\tLDX #1\n.ifend1\n\tRTS"));
+        assert!(result.contains("LDA i\n\tCMP #0\n\tBNE .ifend1\n\tLDA j\n\tCMP #0\n\tBNE .ifend1\n\tLDX #1\n.ifend1"));
     }
     
     #[test]
@@ -205,7 +205,7 @@ mod tests {
         compile(input.as_bytes(), &mut output, &args).unwrap();
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
-        assert!(result.contains("LDA i\n\tCMP #0\n\tBEQ .ifstart1\n\tLDA j\n\tCMP #0\n\tBNE .ifend1\n.ifstart1\n\tLDX #1\n.ifend1\n\tRTS"));
+        assert!(result.contains("LDA i\n\tCMP #0\n\tBEQ .ifstart1\n\tLDA j\n\tCMP #0\n\tBNE .ifend1\n.ifstart1\n\tLDX #1\n.ifend1"));
     }
     
     #[test]
@@ -222,7 +222,7 @@ mod tests {
         compile(input.as_bytes(), &mut output, &args).unwrap();
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
-        assert!(result.contains("LDA i\n\tCMP #0\n\tBEQ .ifstart1\n\tLDA j\n\tCMP #0\n\tBEQ .ifstart1\n\tLDA k\n\tCMP #0\n\tBNE .ifend1\n.ifstart1\n\tLDX #1\n.ifend1\n\tRTS"));
+        assert!(result.contains("LDA i\n\tCMP #0\n\tBEQ .ifstart1\n\tLDA j\n\tCMP #0\n\tBEQ .ifstart1\n\tLDA k\n\tCMP #0\n\tBNE .ifend1\n.ifstart1\n\tLDX #1\n.ifend1"));
     }
     
     #[test]
@@ -239,6 +239,23 @@ mod tests {
         compile(input.as_bytes(), &mut output, &args).unwrap();
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
-        assert!(result.contains("LDA i\n\tCMP #0\n\tBNE .ifend1\n\tLDA j\n\tCMP #0\n\tBNE .ifend1\n\tLDA k\n\tCMP #0\n\tBNE .ifend1\n\tLDX #1\n.ifend1\n\tRTS"));
+        assert!(result.contains("LDA i\n\tCMP #0\n\tBNE .ifend1\n\tLDA j\n\tCMP #0\n\tBNE .ifend1\n\tLDA k\n\tCMP #0\n\tBNE .ifend1\n\tLDX #1\n.ifend1"));
+    }
+    
+    #[test]
+    fn not_test() {
+        let args = Args {
+            input: "string".to_string(),
+            output: "string".to_string(),
+            include_directories: Vec::new(),
+            defines: Vec::new(),
+            insert_code: false
+        };
+        let input = "void main() { X = 0; Y = !X; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("CPX #0\n\tBNE .else1\n\tLDA #1\n\tJMP .ifend1\n.else1\n\tLDA #0\n.ifend1\n\tTAY"));
     }
 }

@@ -737,7 +737,7 @@ fn generate_neg<'a>(expr: &Expr<'a>, _gstate: &mut GeneratorState<'a>, _pos: usi
     }
 }
 
-fn generate_not<'a>(expr: &Expr<'a>, _gstate: &mut GeneratorState<'a>, _pos: usize) -> Result<ExprType<'a>, Error>
+fn generate_not<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
 {
     match expr {
         Expr::Integer(i) => if *i != 0 {
@@ -745,7 +745,35 @@ fn generate_not<'a>(expr: &Expr<'a>, _gstate: &mut GeneratorState<'a>, _pos: usi
         } else {
             Ok(ExprType::Immediate(1))
         },
-        _ => { return Err(Error::Unimplemented { feature: "negation statement is partially implemented" }); },
+        _ => {
+            if gstate.acc_in_use {
+                gstate.write_asm("PHA", 3)?; 
+                gstate.local_label_counter_if += 1;
+                let ifend_label = format!(".ifend{}", gstate.local_label_counter_if);
+                let else_label = format!(".else{}", gstate.local_label_counter_if);
+                generate_condition(expr, gstate, pos, false, &else_label)?;
+                gstate.write_asm("LDA #1", 2)?;
+                gstate.write_asm(&format!("JMP {}", ifend_label), 3)?;
+                gstate.write_label(&else_label)?;
+                gstate.write_asm("LDA #0", 2)?;
+                gstate.write_label(&ifend_label)?;
+                gstate.write_asm("STA cctmp", 3)?;
+                gstate.write_asm("PLA", 3)?;
+                Ok(ExprType::Tmp(false))
+            } else {
+                gstate.local_label_counter_if += 1;
+                let ifend_label = format!(".ifend{}", gstate.local_label_counter_if);
+                let else_label = format!(".else{}", gstate.local_label_counter_if);
+                generate_condition(expr, gstate, pos, false, &else_label)?;
+                gstate.write_asm("LDA #1", 2)?;
+                gstate.write_asm(&format!("JMP {}", ifend_label), 3)?;
+                gstate.write_label(&else_label)?;
+                gstate.write_asm("LDA #0", 2)?;
+                gstate.write_label(&ifend_label)?;
+                gstate.acc_in_use = true;
+                Ok(ExprType::A(false))
+            }
+        }
     }
 }
 
