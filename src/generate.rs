@@ -737,6 +737,26 @@ fn generate_neg<'a>(expr: &Expr<'a>, _gstate: &mut GeneratorState<'a>, _pos: usi
     }
 }
 
+fn generate_not<'a>(expr: &Expr<'a>, _gstate: &mut GeneratorState<'a>, _pos: usize) -> Result<ExprType<'a>, Error>
+{
+    match expr {
+        Expr::Integer(i) => if *i != 0 {
+            Ok(ExprType::Immediate(0))
+        } else {
+            Ok(ExprType::Immediate(1))
+        },
+        _ => { return Err(Error::Unimplemented { feature: "negation statement is partially implemented" }); },
+    }
+}
+
+fn generate_bnot<'a>(expr: &Expr<'a>, _gstate: &mut GeneratorState<'a>, _pos: usize) -> Result<ExprType<'a>, Error>
+{
+    match expr {
+        Expr::Integer(i) => Ok(ExprType::Immediate(!*i)),
+        _ => { return Err(Error::Unimplemented { feature: "negation statement is partially implemented" }); },
+    }
+}
+
 fn generate_deref<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
 {
     match expr {
@@ -868,6 +888,8 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
             Ok(expr_type)
         },
         Expr::Neg(v) => generate_neg(v, gstate, pos),
+        Expr::Not(v) => generate_not(v, gstate, pos),
+        Expr::BNot(v) => generate_bnot(v, gstate, pos),
         Expr::Deref(v) => generate_deref(v, gstate, pos),
         Expr::Nothing => Ok(ExprType::Nothing),
     }

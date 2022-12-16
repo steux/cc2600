@@ -78,6 +78,8 @@ pub enum Expr<'a> {
         rhs: Box<Expr<'a>>,
     },
     Neg(Box<Expr<'a>>),
+    Not(Box<Expr<'a>>),
+    BNot(Box<Expr<'a>>),
     MinusMinus(Box<Expr<'a>>, bool),
     PlusPlus(Box<Expr<'a>>, bool),
     Deref(Box<Expr<'a>>),
@@ -267,6 +269,8 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
         })
         .map_prefix(|op, rhs| match op.as_rule() {
             Rule::neg => Ok(Expr::Neg(Box::new(rhs?))),
+            Rule::not => Ok(Expr::Not(Box::new(rhs?))),
+            Rule::bnot => Ok(Expr::BNot(Box::new(rhs?))),
             Rule::deref => Ok(Expr::Deref(Box::new(rhs?))),
             Rule::mmp => Ok(Expr::MinusMinus(Box::new(rhs?), false)),
             Rule::ppp => Ok(Expr::PlusPlus(Box::new(rhs?), false)),
@@ -556,7 +560,7 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
         .op(Op::infix(Rule::brs, Assoc::Left) | Op::infix(Rule::bls, Assoc::Left))
         .op(Op::infix(Rule::add, Assoc::Left) | Op::infix(Rule::sub, Assoc::Left))
         .op(Op::infix(Rule::mul, Assoc::Left) | Op::infix(Rule::div, Assoc::Left))
-        .op(Op::prefix(Rule::neg) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp) | Op::prefix(Rule::deref))
+        .op(Op::prefix(Rule::neg) | Op::prefix(Rule::not) | Op::prefix(Rule::bnot) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp) | Op::prefix(Rule::deref))
         .op(Op::postfix(Rule::call) | Op::postfix(Rule::mm) | Op::postfix(Rule::pp));
     
     // Prepare the context
