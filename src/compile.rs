@@ -63,7 +63,9 @@ pub enum Operation {
     Gt,
     Gte,
     Lt,
-    Lte
+    Lte,
+    Land,
+    Lor,
 }
 
 #[derive(Debug)]
@@ -259,6 +261,8 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
                 Rule::andass => Operation::And(true),
                 Rule::orass => Operation::Or(true),
                 Rule::xorass => Operation::Xor(true),
+                Rule::land => Operation::Land,
+                Rule::lor => Operation::Lor,
                 rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
             };
             Ok(Expr::BinOp {

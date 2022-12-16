@@ -836,6 +836,8 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                 Operation::Gte => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
                 Operation::Lt => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
                 Operation::Lte => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
+                Operation::Land => Err(Error::Unimplemented { feature: "Logical and not implemented" }),
+                Operation::Lor => Err(Error::Unimplemented { feature: "Logical or not implemented" }),
                 Operation::Bls(true) => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
                 Operation::Brs(true) => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
                 Operation::Bls(false) => generate_shift(lhs, op, rhs, gstate, pos),
@@ -1189,6 +1191,10 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                 Operation::Gte => true,
                 Operation::Lt => true,
                 Operation::Lte => true,
+                Operation::Land => {
+                    generate_condition(lhs, gstate, pos, negate, label)?;
+                    return generate_condition(rhs, gstate, pos, negate, label);
+                },
                 _ => false,
             } {
                 let l = generate_expr(lhs, gstate, pos, false)?;

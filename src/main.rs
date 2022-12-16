@@ -141,6 +141,23 @@ mod tests {
     }
     
     #[test]
+    fn if_test1() {
+        let args = Args {
+            input: "string".to_string(),
+            output: "string".to_string(),
+            include_directories: Vec::new(),
+            defines: Vec::new(),
+            insert_code: false
+        };
+        let input = "void main() { if (0) X = 1; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("JMP .ifend1\n\tLDX #1\n.ifend1\n\tRTS"));
+    }
+
+    #[test]
     fn if_test2() {
         let args = Args {
             input: "string".to_string(),
@@ -158,7 +175,7 @@ mod tests {
     }
     
     #[test]
-    fn if_test1() {
+    fn if_test3() {
         let args = Args {
             input: "string".to_string(),
             output: "string".to_string(),
@@ -166,11 +183,11 @@ mod tests {
             defines: Vec::new(),
             insert_code: false
         };
-        let input = "void main() { if (0) X = 1; }";
+        let input = "unsigned char i, j; void main() { i = 0; i = 0; if (i == 0 && j == 0) X = 1; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
-        assert!(result.contains("JMP .ifend1\n\tLDX #1\n.ifend1\n\tRTS"));
+        assert!(result.contains("LDA i\n\tCMP #0\n\tBNE .ifend1\n\tLDA j\n\tCMP #0\n\tBNE .ifend1\n\tLDX #1\n.ifend1\n\tRTS"));
     }
 }

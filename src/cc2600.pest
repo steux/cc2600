@@ -57,7 +57,7 @@ cases = { ("case" ~ int ~ ":" ~ statement*)* ~ ("default" ~ ":" ~ statement*) }
 expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
     infix    =  _{ pass | mass | mulass | divass | blsass | brsass | andass | xorass | orass |
                    mul | div | add | sub | bls | brs | lte | lt | gte | gt | eq | neq |
-                   and | xor | or | land | lor | assign | comma | ternary_cond1 | ternary_cond2
+                   land | lor | and | xor | or | assign | comma | ternary_cond1 | ternary_cond2
                    }
       mul    =   { "*" }  // Multiplication
       div    =   { "/" }  // Division
