@@ -139,4 +139,38 @@ mod tests {
         print!("{:?}", result);
         assert!(result.contains("LDA i\n\tCLC\n\tADC j\n\tSTA k\n\tLDA i+1\n\tADC j+1\n\tSTA k+1"));
     }
+    
+    #[test]
+    fn if_test2() {
+        let args = Args {
+            input: "string".to_string(),
+            output: "string".to_string(),
+            include_directories: Vec::new(),
+            defines: Vec::new(),
+            insert_code: false
+        };
+        let input = "void main() { if (!0) X = 1; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("main\tSUBROUTINE\n\tLDX #1\n.ifend1\n\tRTS"));
+    }
+    
+    #[test]
+    fn if_test1() {
+        let args = Args {
+            input: "string".to_string(),
+            output: "string".to_string(),
+            include_directories: Vec::new(),
+            defines: Vec::new(),
+            insert_code: false
+        };
+        let input = "void main() { if (0) X = 1; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("JMP .ifend1\n\tLDX #1\n.ifend1\n\tRTS"));
+    }
 }

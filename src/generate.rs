@@ -1196,6 +1196,9 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                 return generate_condition_ex(&l, op, &r, gstate, pos, negate, label);
             }
         },
+        Expr::Not(expr) => {
+            return generate_condition(expr, gstate, pos, !negate, label); 
+        },
         _ => ()
     };
     
@@ -1221,7 +1224,7 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                         gstate.write_asm(&format!("JMP {}", label), 3)?;
                     }
                 }
-                cmp = false;
+                return Ok(());
             },
             ExprType::Absolute(varname, offset) => {
                 if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
