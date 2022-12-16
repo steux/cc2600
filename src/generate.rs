@@ -885,334 +885,375 @@ fn flags_ok(flags: &FlagsState, expr_type: &ExprType) -> bool
     }
 }
 
+fn generate_branch_instruction<'a>(op: &Operation, signed: bool, gstate: &mut GeneratorState<'a>, label: &str) -> Result<(), Error>
+{
+    // Branch instruction
+    match op {
+        Operation::Neq => {
+            gstate.write_asm(&format!("BNE {}", label), 2)?;
+            return Ok(());
+        },
+        Operation::Eq => {
+            gstate.write_asm(&format!("BEQ {}", label), 2)?;
+            return Ok(());
+        },
+        Operation::Lt => {
+            if signed {
+                gstate.write_asm(&format!("BMI {}", label), 2)?;
+            } else {
+                gstate.write_asm(&format!("BCC {}", label), 2)?;
+            } 
+            Ok(())
+        },
+        Operation::Gt => {
+            let label_here = format!(".ifhere{}", gstate.local_label_counter_if);
+            if signed {
+                gstate.write_asm(&format!("BEQ {}", label_here), 2)?;
+                gstate.write_asm(&format!("BPL {}", label), 2)?;
+            } else {
+                gstate.write_asm(&format!("BEQ {}", label_here), 2)?;
+                gstate.write_asm(&format!("BCS {}", label), 2)?;
+            }
+            gstate.write_label(&label_here)?;
+            Ok(())
+        },
+        Operation::Lte => {
+            if signed {
+                gstate.write_asm(&format!("BMI {}", label), 2)?;
+                gstate.write_asm(&format!("BEQ {}", label), 2)?;
+            } else {
+                gstate.write_asm(&format!("BCC {}", label), 2)?;
+                gstate.write_asm(&format!("BEQ {}", label), 2)?;
+            } 
+            Ok(())
+        },
+        Operation::Gte => {
+            if signed {
+                gstate.write_asm(&format!("BPL {}", label), 2)?;
+            } else {
+                gstate.write_asm(&format!("BCS {}", label), 2)?;
+            } 
+            Ok(())
+        },
+        _ => Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
+    }
+
+}
+
+fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>, gstate: &mut GeneratorState<'a>, _pos: usize, negate: bool, label: &str) -> Result<(), Error>
+{
+    let left;
+    let right;
+
+    let switch = match &l {
+        ExprType::X | ExprType::Y => {
+            left = &l; right = &r;
+            false
+        }, 
+        _ => match &r {
+            ExprType::A(_) => {
+                left = &r; right = &l;
+                true 
+            },
+            _ => {
+                left = &l; right = &r;
+                false
+            }
+        }
+    };
+
+    let opx = if negate {
+        match op {
+            Operation::Eq => Operation::Neq,
+            Operation::Neq => Operation::Eq,
+            Operation::Gt => Operation::Lte,
+            Operation::Gte => Operation::Lt,
+            Operation::Lt => Operation::Gte,
+            Operation::Lte => Operation::Lt,
+            _ => unreachable!()
+        }
+    } else { *op };
+
+    let operator = if switch {
+        match op {
+            Operation::Eq => Operation::Eq,
+            Operation::Neq => Operation::Neq,
+            Operation::Gt => Operation::Lt,
+            Operation::Gte => Operation::Lte,
+            Operation::Lt => Operation::Gt,
+            Operation::Lte => Operation::Gte,
+            _ => unreachable!()
+        }
+    } else { opx };
+
+    if let ExprType::Immediate(v) = *right {
+        if *v == 0 {
+            // Let's see if we can shortcut compare instruction 
+            if flags_ok(&gstate.flags, &left) {
+                match operator {
+                    Operation::Neq => {
+                        gstate.write_asm(&format!("BNE {}", label), 2)?;
+                        return Ok(());
+                    },
+                    Operation::Eq => {
+                        gstate.write_asm(&format!("BEQ {}", label), 2)?;
+                        return Ok(());
+                    },
+                    _ => {
+                        let signed = match left {
+                            ExprType::Absolute(varname, _offset) => {
+                                gstate.compiler_state.get_variable(varname).signed
+                            },
+                            ExprType::AbsoluteX(varname) => {
+                                gstate.compiler_state.get_variable(varname).signed
+                            },
+                            ExprType::AbsoluteY(varname) => {
+                                gstate.compiler_state.get_variable(varname).signed
+                            },
+                            ExprType::A(sign) => *sign,
+                            ExprType::Tmp(sign) => *sign,
+                            ExprType::Y => false,
+                            ExprType::X => false,
+                            ExprType::Immediate(v) => {
+                                if *v != 0 {
+                                    gstate.write_asm(&format!("JMP {}", label), 3)?;
+                                }
+                                return Ok(());
+                            },
+                            _ => unreachable!()
+                        };
+                        return generate_branch_instruction(&operator, signed, gstate, label);
+                    } 
+                }
+            } 
+        }
+    }
+
+    // Compare instruction
+    let signed;
+    let cmp;
+    match left {
+        ExprType::Absolute(varname, offset) => {
+            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+            let v = gstate.compiler_state.get_variable(varname);
+            signed = v.signed;
+            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
+            if *offset > 0 {
+                gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
+            } else {
+                gstate.write_asm(&format!("LDA {}", varname), cycles)?;
+            }
+            cmp = true;
+        },
+        ExprType::AbsoluteX(varname) => {
+            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+            let v = gstate.compiler_state.get_variable(varname);
+            signed = v.signed;
+            gstate.write_asm(&format!("LDA {},X", varname), 4)?;
+            cmp = true;
+        },
+        ExprType::AbsoluteY(varname) => {
+            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+            let v = gstate.compiler_state.get_variable(varname);
+            signed = v.signed;
+            gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
+            cmp = true;
+        },
+        ExprType::A(sign) => {
+            cmp = true;
+            signed = *sign;
+            gstate.acc_in_use = false;
+        },
+        ExprType::Tmp(sign) => {
+            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+            signed = *sign;
+            gstate.write_asm("LDA cctmp", 3)?;
+            cmp = true;
+        },
+        ExprType::Y => {
+            signed = false;
+            match right {
+                ExprType::Immediate(v) => {
+                    gstate.write_asm(&format!("CPY #{}", v), 2)?;
+                    cmp = false;
+                },
+                ExprType::Absolute(varname, offset) => {
+                    let v = gstate.compiler_state.get_variable(varname);
+                    let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
+                    if *offset > 0 {
+                        gstate.write_asm(&format!("CPY {}+{}", varname, offset), cycles)?;
+                    } else {
+                        gstate.write_asm(&format!("CPY {}", varname), cycles)?;
+                    }
+                    cmp = false;
+                },
+                ExprType::A(_) => {
+                    gstate.write_asm("STA cctmp", 3)?;
+                    gstate.write_asm("CPY cctmp", 3)?;
+                    cmp = false;
+                    gstate.acc_in_use = false;
+                }
+                _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
+            } 
+        },
+        ExprType::X => {
+            signed = false;
+            match right {
+                ExprType::Immediate(v) => {
+                    gstate.write_asm(&format!("CPX #{}", v), 2)?;
+                    cmp = false;
+                },
+                ExprType::Absolute(varname, offset) => {
+                    let v = gstate.compiler_state.get_variable(varname);
+                    let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
+                    if *offset > 0 {
+                        gstate.write_asm(&format!("CPX {}+{}", varname, offset), cycles)?;
+                    } else {
+                        gstate.write_asm(&format!("CPX {}", varname), cycles)?;
+                    }
+                    cmp = false;
+                },
+                ExprType::A(_) => {
+                    gstate.write_asm(&format!("STA cctmp"), 3)?;
+                    gstate.write_asm(&format!("CPX cctmp"), 3)?;
+                    cmp = false;
+                    gstate.acc_in_use = false;
+                }
+                _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
+            } 
+        },
+        _ => { return Err(Error::Unimplemented { feature: "condition statement is partially implemented" }); },
+    }
+
+    if cmp {
+        match right {
+            ExprType::Immediate(v) => {
+                gstate.write_asm(&format!("CMP #{}", v), 2)?;
+            },
+            ExprType::Absolute(name, offset) => {
+                let v = gstate.compiler_state.get_variable(name);
+                let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
+                if *offset > 0 {
+                    gstate.write_asm(&format!("CMP {}+{}", name, offset), cycles)?;
+                } else {
+                    gstate.write_asm(&format!("CMP {}", name), cycles)?;
+                }
+            },
+            ExprType::AbsoluteX(name) => {
+                gstate.write_asm(&format!("CMP {},X", name), 4)?;
+            },
+            ExprType::AbsoluteY(name) => {
+                gstate.write_asm(&format!("CMP {},Y", name), 4)?;
+            },
+            _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
+        } 
+        if gstate.acc_in_use { 
+            gstate.write_asm("PLA", 3)?; 
+        }
+    }
+
+    generate_branch_instruction(&operator, signed, gstate, label)
+}
+
 fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize, negate: bool, label: &str) -> Result<(), Error>
 {
     //debug!("Condition: {:?}", condition);
     match condition {
         Expr::BinOp {lhs, op, rhs} => {
-            // TODO: Check if this is a condition operator, otherwise process it as an expression
-            // to test for 0
-            let l = generate_expr(lhs, gstate, pos, false)?;
-            let r = generate_expr(rhs, gstate, pos, false)?;
-            let left;
-            let right;
-
-            let switch = match &l {
-                ExprType::X | ExprType::Y => {
-                    left = &l; right = &r;
-                    false
-                }, 
-                _ => match &r {
-                    ExprType::A(_) => {
-                        left = &r; right = &l;
-                        true 
-                    },
-                    _ => {
-                        left = &l; right = &r;
-                        false
-                    }
-                }
-            };
-           
-            let opx = if negate {
-                match op {
-                    Operation::Eq => Operation::Neq,
-                    Operation::Neq => Operation::Eq,
-                    Operation::Gt => Operation::Lte,
-                    Operation::Gte => Operation::Lt,
-                    Operation::Lt => Operation::Gte,
-                    Operation::Lte => Operation::Lt,
-                    _ => unreachable!()
-                }
-            } else { *op };
-          
-            let operator = if switch {
-                match op {
-                    Operation::Eq => Operation::Eq,
-                    Operation::Neq => Operation::Neq,
-                    Operation::Gt => Operation::Lt,
-                    Operation::Gte => Operation::Lte,
-                    Operation::Lt => Operation::Gt,
-                    Operation::Lte => Operation::Gte,
-                    _ => unreachable!()
-                }
-            } else { opx };
-
-            if let ExprType::Immediate(v) = *right {
-                if v == 0 {
-                // Let's see if we can shortcut compare instruction 
-                    if flags_ok(&gstate.flags, &left) {
-                        match operator {
-                            Operation::Neq => {
-                                gstate.write_asm(&format!("BNE {}", label), 2)?;
-                                return Ok(());
-                            },
-                            Operation::Eq => {
-                                gstate.write_asm(&format!("BEQ {}", label), 2)?;
-                                return Ok(());
-                            },
-                            _ => unreachable!(),
-                        }
-                    } 
-                }
-            }
-
-            // Compare instruction
-            let signed;
-            let cmp;
-            match left {
-                ExprType::Absolute(varname, offset) => {
-                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                    let v = gstate.compiler_state.get_variable(varname);
-                    signed = v.signed;
-                    let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                    if *offset > 0 {
-                        gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
-                    } else {
-                        gstate.write_asm(&format!("LDA {}", varname), cycles)?;
-                    }
-                    cmp = true;
-                },
-                ExprType::AbsoluteX(varname) => {
-                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                    let v = gstate.compiler_state.get_variable(varname);
-                    signed = v.signed;
-                    gstate.write_asm(&format!("LDA {},X", varname), 4)?;
-                    cmp = true;
-                },
-                ExprType::AbsoluteY(varname) => {
-                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                    let v = gstate.compiler_state.get_variable(varname);
-                    signed = v.signed;
-                    gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
-                    cmp = true;
-                },
-                ExprType::A(sign) => {
-                    cmp = true;
-                    signed = *sign;
-                    gstate.acc_in_use = false;
-                },
-                ExprType::Tmp(sign) => {
-                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                    signed = *sign;
-                    gstate.write_asm("LDA cctmp", 3)?;
-                    cmp = true;
-                },
-                ExprType::Y => {
-                    signed = false;
-                    match right {
-                        ExprType::Immediate(v) => {
-                            gstate.write_asm(&format!("CPY #{}", v), 2)?;
-                            cmp = false;
-                        },
-                        ExprType::Absolute(varname, offset) => {
-                            let v = gstate.compiler_state.get_variable(varname);
-                            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            if *offset > 0 {
-                                gstate.write_asm(&format!("CPY {}+{}", varname, offset), cycles)?;
-                            } else {
-                                gstate.write_asm(&format!("CPY {}", varname), cycles)?;
-                            }
-                            cmp = false;
-                        },
-                        ExprType::A(_) => {
-                            gstate.write_asm("STA cctmp", 3)?;
-                            gstate.write_asm("CPY cctmp", 3)?;
-                            cmp = false;
-                            gstate.acc_in_use = false;
-                        }
-                        _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
-                    } 
-                },
-                ExprType::X => {
-                    signed = false;
-                    match right {
-                        ExprType::Immediate(v) => {
-                            gstate.write_asm(&format!("CPX #{}", v), 2)?;
-                            cmp = false;
-                        },
-                        ExprType::Absolute(varname, offset) => {
-                            let v = gstate.compiler_state.get_variable(varname);
-                            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            if *offset > 0 {
-                                gstate.write_asm(&format!("CPX {}+{}", varname, offset), cycles)?;
-                            } else {
-                                gstate.write_asm(&format!("CPX {}", varname), cycles)?;
-                            }
-                            cmp = false;
-                        },
-                        ExprType::A(_) => {
-                            gstate.write_asm(&format!("STA cctmp"), 3)?;
-                            gstate.write_asm(&format!("CPX cctmp"), 3)?;
-                            cmp = false;
-                            gstate.acc_in_use = false;
-                        }
-                        _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
-                    } 
-                },
-                _ => { return Err(Error::Unimplemented { feature: "condition statement is partially implemented" }); },
-            }
-
-            if cmp {
-                match right {
-                    ExprType::Immediate(v) => {
-                        gstate.write_asm(&format!("CMP #{}", v), 2)?;
-                    },
-                    ExprType::Absolute(name, offset) => {
-                        let v = gstate.compiler_state.get_variable(name);
-                        let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                        if *offset > 0 {
-                            gstate.write_asm(&format!("CMP {}+{}", name, offset), cycles)?;
-                        } else {
-                            gstate.write_asm(&format!("CMP {}", name), cycles)?;
-                        }
-                    },
-                    ExprType::AbsoluteX(name) => {
-                        gstate.write_asm(&format!("CMP {},X", name), 4)?;
-                    },
-                    ExprType::AbsoluteY(name) => {
-                        gstate.write_asm(&format!("CMP {},Y", name), 4)?;
-                    },
-                    _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
-                } 
-                if gstate.acc_in_use { 
-                    gstate.write_asm("PLA", 3)?; 
-                }
-            }
-
-            gstate.flags = FlagsState::Unknown;
-            
-            // Branch instruction
-            match operator {
-                Operation::Neq => {
-                    gstate.write_asm(&format!("BNE {}", label), 2)?;
-                    return Ok(());
-                },
-                Operation::Eq => {
-                    gstate.write_asm(&format!("BEQ {}", label), 2)?;
-                    return Ok(());
-                },
-                Operation::Lt => {
-                    if signed {
-                        gstate.write_asm(&format!("BMI {}", label), 2)?;
-                    } else {
-                        gstate.write_asm(&format!("BCC {}", label), 2)?;
-                    } 
-                    Ok(())
-                },
-                Operation::Gt => {
-                    let label_here = format!(".ifhere{}", gstate.local_label_counter_if);
-                    if signed {
-                        gstate.write_asm(&format!("BEQ {}", label_here), 2)?;
-                        gstate.write_asm(&format!("BPL {}", label), 2)?;
-                    } else {
-                        gstate.write_asm(&format!("BEQ {}", label_here), 2)?;
-                        gstate.write_asm(&format!("BCS {}", label), 2)?;
-                    }
-                    gstate.write_label(&label_here)?;
-                    Ok(())
-                },
-                Operation::Lte => {
-                    if signed {
-                        gstate.write_asm(&format!("BMI {}", label), 2)?;
-                        gstate.write_asm(&format!("BEQ {}", label), 2)?;
-                    } else {
-                        gstate.write_asm(&format!("BCC {}", label), 2)?;
-                        gstate.write_asm(&format!("BEQ {}", label), 2)?;
-                    } 
-                    Ok(())
-                },
-                Operation::Gte => {
-                    if signed {
-                        gstate.write_asm(&format!("BPL {}", label), 2)?;
-                    } else {
-                        gstate.write_asm(&format!("BCS {}", label), 2)?;
-                    } 
-                    Ok(())
-                },
-                _ => Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
+            if match op {
+                Operation::Eq => true,
+                Operation::Neq => true,
+                Operation::Gt => true,
+                Operation::Gte => true,
+                Operation::Lt => true,
+                Operation::Lte => true,
+                _ => false,
+            } {
+                let l = generate_expr(lhs, gstate, pos, false)?;
+                let r = generate_expr(rhs, gstate, pos, false)?;
+                return generate_condition_ex(&l, op, &r, gstate, pos, negate, label);
             }
         },
-        _ => {
-            let cmp;
-            let expr = generate_expr(condition, gstate, pos, false)?;
-            if flags_ok(&gstate.flags, &expr) {
-                if negate {
-                    gstate.write_asm(&format!("BEQ {}", label), 2)?;
-                } else {
-                    gstate.write_asm(&format!("BNE {}", label), 2)?;
-                }
-                Ok(())
-            } else {
-                gstate.flags = FlagsState::Unknown;
-                match expr {
-                    ExprType::Immediate(v) => {
-                        if v != 0 {
-                            if !negate {
-                                gstate.write_asm(&format!("JMP {}", label), 3)?;
-                            }
-                        } else {
-                            if negate {
-                                gstate.write_asm(&format!("JMP {}", label), 3)?;
-                            }
-                        }
-                        cmp = false;
-                    },
-                    ExprType::Absolute(varname, offset) => {
-                        if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                        let v = gstate.compiler_state.get_variable(varname);
-                        let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                        if offset > 0 {
-                            gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
-                        } else {
-                            gstate.write_asm(&format!("LDA {}", varname), cycles)?;
-                        }
-                        cmp = true;
-                    },
-                    ExprType::AbsoluteX(varname) => {
-                        if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                        gstate.write_asm(&format!("LDA {},X", varname), 4)?;
-                        cmp = true;
-                    },
-                    ExprType::AbsoluteY(varname) => {
-                        if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                        gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
-                        cmp = true;
-                    },
-                    ExprType::A(_) => {
-                        cmp = true;
-                        gstate.acc_in_use = false;
-                    },
-                    ExprType::Y => {
-                        gstate.write_asm("CPY #0", 2)?;
-                        cmp = false;
-                    },
-                    ExprType::X => {
-                        gstate.write_asm("CPX #0", 2)?;
-                        cmp = false;
+        _ => ()
+    };
+    
+    let cmp;
+    let expr = generate_expr(condition, gstate, pos, false)?;
+    if flags_ok(&gstate.flags, &expr) {
+        if negate {
+            gstate.write_asm(&format!("BEQ {}", label), 2)?;
+        } else {
+            gstate.write_asm(&format!("BNE {}", label), 2)?;
+        }
+        Ok(())
+    } else {
+        gstate.flags = FlagsState::Unknown;
+        match expr {
+            ExprType::Immediate(v) => {
+                if v != 0 {
+                    if !negate {
+                        gstate.write_asm(&format!("JMP {}", label), 3)?;
                     }
-                    ExprType::Tmp(_) => {
-                        if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                        gstate.write_asm("LDA cctmp", 3)?;
-                        cmp = true;
-                    },
-                    _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
+                } else {
+                    if negate {
+                        gstate.write_asm(&format!("JMP {}", label), 3)?;
+                    }
                 }
+                cmp = false;
+            },
+            ExprType::Absolute(varname, offset) => {
+                if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+                let v = gstate.compiler_state.get_variable(varname);
+                let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
+                if offset > 0 {
+                    gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
+                } else {
+                    gstate.write_asm(&format!("LDA {}", varname), cycles)?;
+                }
+                cmp = true;
+            },
+            ExprType::AbsoluteX(varname) => {
+                if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+                gstate.write_asm(&format!("LDA {},X", varname), 4)?;
+                cmp = true;
+            },
+            ExprType::AbsoluteY(varname) => {
+                if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+                gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
+                cmp = true;
+            },
+            ExprType::A(_) => {
+                cmp = true;
+                gstate.acc_in_use = false;
+            },
+            ExprType::Y => {
+                gstate.write_asm("CPY #0", 2)?;
+                cmp = false;
+            },
+            ExprType::X => {
+                gstate.write_asm("CPX #0", 2)?;
+                cmp = false;
+            }
+            ExprType::Tmp(_) => {
+                if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+                gstate.write_asm("LDA cctmp", 3)?;
+                cmp = true;
+            },
+            _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
+        }
 
-                if cmp {
-                    gstate.write_asm("CMP #0", 2)?;
-                    if gstate.acc_in_use { 
-                        gstate.write_asm("PLA", 3)?; 
-                    }
-                }
-                if negate {
-                    gstate.write_asm(&format!("BEQ {}", label), 2)?;
-                } else {
-                    gstate.write_asm(&format!("BNE {}", label), 2)?;
-                }
-                Ok(())
+        if cmp {
+            gstate.write_asm("CMP #0", 2)?;
+            if gstate.acc_in_use { 
+                gstate.write_asm("PLA", 3)?; 
             }
         }
+        if negate {
+            gstate.write_asm(&format!("BEQ {}", label), 2)?;
+        } else {
+            gstate.write_asm(&format!("BNE {}", label), 2)?;
+        }
+        Ok(())
     }
 }
 
