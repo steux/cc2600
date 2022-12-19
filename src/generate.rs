@@ -431,7 +431,7 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
 fn generate_arithm<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>, gstate: &mut GeneratorState<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
 {
     let mut acc_in_use = gstate.acc_in_use;
-    
+    debug!("Arithm: {:?},{:?},{:?}", left, op, right);    
     match left {
         ExprType::Immediate(l) => {
             match right {
@@ -472,9 +472,18 @@ fn generate_arithm<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>
             if acc_in_use { gstate.write_asm("PHA", 3)?; }
             gstate.write_asm(&format!("LDA {},X", varname), 4)?;
         },
-        ExprType::AbsoluteY(varname) => {
+        ExprType::AbsoluteY(variable) => {
             if acc_in_use { gstate.write_asm("PHA", 3)?; }
-            gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
+            let v = gstate.compiler_state.get_variable(variable);
+            if v.var_type == VariableType::CharPtr && !v.var_const {
+                if v.size == 1 {
+                    gstate.write_asm(&format!("LDA ({}),Y", variable), 5)?;
+                } else {
+                    return Err(syntax_error(gstate.compiler_state, "X-Indirect adressing mode not available with Y register", pos));
+                }
+            } else {
+                gstate.write_asm(&format!("LDA {},Y", variable), 4)?;
+            }
         },
         ExprType::X => {
             if acc_in_use { gstate.write_asm("PHA", 3)?; }
@@ -549,7 +558,15 @@ fn generate_arithm<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>
         ExprType::AbsoluteY(varname) => {
             let v = gstate.compiler_state.get_variable(varname);
             signed = v.signed; 
-            gstate.write_asm(&format!("{} {},Y", operation, varname), 4)?;
+            if v.var_type == VariableType::CharPtr && !v.var_const {
+                if v.size == 1 {
+                    gstate.write_asm(&format!("{} ({}),Y", operation, varname), 5)?;
+                } else {
+                    return Err(syntax_error(gstate.compiler_state, "X-Indirect adressing mode not available with Y register", pos));
+                }
+            } else {
+                gstate.write_asm(&format!("{} {},Y", operation, varname), 4)?;
+            }
         },
         ExprType::X => {
             signed = false;
@@ -559,6 +576,10 @@ fn generate_arithm<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>
         ExprType::Y => {
             signed = false;
             gstate.write_asm("STY cctmp", 3)?;
+            gstate.write_asm(&format!("{} cctmp", operation), 4)?;
+        },
+        ExprType::Tmp(s) => {
+            signed = *s;
             gstate.write_asm(&format!("{} cctmp", operation), 4)?;
         },
         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
@@ -575,32 +596,21 @@ fn generate_arithm<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>
 
 fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
 {
-    let acc_in_use = gstate.acc_in_use;
-    if acc_in_use { gstate.write_asm("PHA", 3)?; }
     let left = generate_expr(lhs, gstate, pos, false)?;
     let right = generate_expr(rhs, gstate, pos, false)?;
+    let mut acc_in_use = gstate.acc_in_use;
     let signed;
     match left {
         ExprType::Absolute(varname, offset) => {
             let v = gstate.compiler_state.get_variable(varname);
             signed = v.signed; 
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-            if v.var_type == VariableType::Short && *op == Operation::Brs(false) {
+            if (v.var_type == VariableType::Short || v.var_type == VariableType::CharPtr) && *op == Operation::Brs(false) {
                 // Special shift 8 case for extracting higher byte
                 match right {
                     ExprType::Immediate(v) => {
                         if v == 8 {
-                            gstate.write_asm(&format!("LDA {}+{}", varname, offset + 1), cycles)?;
-                            gstate.acc_in_use = true;
-                            if acc_in_use {
-                                gstate.write_asm("STA cctmp", 3)?;
-                                gstate.write_asm("PLA", 3)?;
-                                gstate.flags = FlagsState::Unknown;
-                                return Ok(ExprType::Tmp(signed));
-                            } else {
-                                gstate.flags = FlagsState::Absolute(varname, offset + 1);
-                                return Ok(ExprType::A(signed));
-                            }
+                            return Ok(ExprType::Absolute(varname, offset + 1));
                         } else {
                             return Err(syntax_error(gstate.compiler_state, "Incorrect right value for right shift operation on short (constant 8 only supported)", pos));
                         } 
@@ -608,6 +618,7 @@ fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &m
                     _ => return Err(syntax_error(gstate.compiler_state, "Incorrect right value for right shift operation on short (constant 8 only supported)", pos))
                 };
             } else {
+                if acc_in_use { gstate.write_asm("PHA", 3)?; }
                 if offset > 0 {
                     gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
                 } else {
@@ -616,25 +627,33 @@ fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &m
             }
         },
         ExprType::AbsoluteX(varname) => {
+            if acc_in_use { gstate.write_asm("PHA", 3)?; }
             let v = gstate.compiler_state.get_variable(varname);
             signed = v.signed; 
             gstate.write_asm(&format!("LDA {},X", varname), 4)?;
         },
         ExprType::AbsoluteY(varname) => {
+            if acc_in_use { gstate.write_asm("PHA", 3)?; }
             let v = gstate.compiler_state.get_variable(varname);
             signed = v.signed; 
             gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
         },
         ExprType::X => {
+            if acc_in_use { gstate.write_asm("PHA", 3)?; }
             signed = false;
             gstate.write_asm("TXA", 2)?;
         },
         ExprType::Y => {
+            if acc_in_use { gstate.write_asm("PHA", 3)?; }
             signed = false;
             gstate.write_asm("TYA", 2)?;
         },
-        ExprType::A(s) => { signed = s; },
+        ExprType::A(s) => { 
+            acc_in_use = false;
+            signed = s; 
+        },
         ExprType::Tmp(s) => {
+            if acc_in_use { gstate.write_asm("PHA", 3)?; }
             signed = s;
             gstate.write_asm("LDA cctmp", 3)?;
         },
@@ -860,7 +879,7 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                         match left {
                             ExprType::Absolute(variable, _) => {
                                 let v = gstate.compiler_state.get_variable(variable);
-                                if v.var_type == VariableType::Short {
+                                if v.var_type == VariableType::Short || v.var_type == VariableType::CharPtr {
                                     let left = generate_expr(lhs, gstate, pos, true)?;
                                     let right = generate_expr(rhs, gstate, pos, true)?;
                                     generate_assign(&left, &right, gstate, pos, true)?;
@@ -873,7 +892,9 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                 },
                 Operation::Add(false) | Operation::Sub(false) | Operation::And(false) | Operation::Or(false) | Operation::Xor(false) | Operation::Mul(false) | Operation::Div(false) => {
                     let left = generate_expr(lhs, gstate, pos, high_byte)?;
+                    debug!("Left: {:?}", &left);
                     let right = generate_expr(rhs, gstate, pos, high_byte)?;
+                    debug!("Right: {:?}", &right);
                     generate_arithm(&left, op, &right, gstate, pos, high_byte)
                 },
                 Operation::Add(true) | Operation::Sub(true) | Operation::And(true) | Operation::Or(true) | Operation::Xor(true) | Operation::Mul(true) | Operation::Div(true) => {
@@ -885,7 +906,7 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                         match left {
                             ExprType::Absolute(variable, _) => {
                                 let v = gstate.compiler_state.get_variable(variable);
-                                if v.var_type == VariableType::Short {
+                                if v.var_type == VariableType::Short || v.var_type == VariableType::CharPtr {
                                     let left = generate_expr(lhs, gstate, pos, true)?;
                                     let right = generate_expr(rhs, gstate, pos, true)?;
                                     let newright = generate_arithm(&left, op, &right, gstate, pos, true)?;
@@ -916,6 +937,7 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                 "X" => Ok(ExprType::X),
                 "Y" => Ok(ExprType::Y),
                 variable => {
+                    //debug!("Identifier: {:?}", variable);
                     let v = gstate.compiler_state.get_variable(variable);
                     if let VariableDefinition::Value(val) = &v.def {
                         Ok(ExprType::Immediate(*val))
