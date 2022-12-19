@@ -34,7 +34,7 @@ bank1 void kernel()
         strobe(WSYNC);
         strobe(HMOVE);
         START2
-        j = background_ptr[Y];
+        j = background_ptr1[Y];
     } while (Y != ybird >> 8);
     strobe(WSYNC);
     strobe(HMOVE);
@@ -45,11 +45,12 @@ bank1 void kernel()
 #else
 #include "bird2.c"
 #endif
-    
+  
     do {
         strobe(WSYNC);
         strobe(HMOVE);
         START2
+        j = background_ptr2[Y];
     } while (Y != 0); 
     strobe(WSYNC);
     *COLUBK = GREEN;

@@ -551,6 +551,16 @@ fn generate_arithm<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>
             signed = v.signed; 
             gstate.write_asm(&format!("{} {},Y", operation, varname), 4)?;
         },
+        ExprType::X => {
+            signed = false;
+            gstate.write_asm("STX cctmp", 3)?;
+            gstate.write_asm(&format!("{} cctmp", operation), 4)?;
+        },
+        ExprType::Y => {
+            signed = false;
+            gstate.write_asm("STY cctmp", 3)?;
+            gstate.write_asm(&format!("{} cctmp", operation), 4)?;
+        },
         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
     };
     gstate.flags = FlagsState::Unknown;

@@ -39,7 +39,7 @@ const unsigned char GREEN = 0xC6;
 #endif
 
 char first_time;
-unsigned char i, j, k;
+unsigned char i, j, k, l;
 unsigned char scroll_sequence;
 unsigned char scroll_counter;
 unsigned char lPFx[12];
@@ -55,7 +55,8 @@ unsigned char score_low;
 unsigned char score_high;
 unsigned char highscore_low;
 unsigned char highscore_high;
-unsigned char *background_ptr;
+unsigned char *background_ptr1;
+unsigned char *background_ptr2;
 
 #define SPRITE_HEIGHT 17 
 
