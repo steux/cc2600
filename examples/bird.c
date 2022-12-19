@@ -51,55 +51,74 @@ unsigned short ybird;
 signed short yspeed;
 unsigned char button_pressed;
 unsigned char bird_type;
-unsigned short score;
-unsigned short highscore;
+unsigned char score_low;
+unsigned char score_high;
+unsigned char highscore_low;
+unsigned char highscore_high;
+unsigned char *background_ptr;
 
 #define SPRITE_HEIGHT 17 
 
 #define BIRD1
+#define BEFORE X = i;   
 #define WAIT i = Y >> 4; Y--; 
-#define BEFORE X = i  
+#define BEFORE2 X = i; *COLUBK = j;  
+#define WAIT2 i = right_shift4[Y]; Y--; 
 
 #define kernel kernel11
 #define START BEFORE; *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF1= rPFx[X]; *PF2 = rPFy[X];
+#define START2 BEFORE2; *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT2; *PF1= rPFx[X]; *PF2 = rPFy[X];
 #include "bird_kernel.c"
 
 #undef kernel
 #undef START
+#undef START2
 
 #define kernel kernel21
 #define START BEFORE; *PF0 = lPFx[X]; *PF1 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF1 = rPFy[X];
+#define START2 BEFORE2; *PF0 = lPFx[X]; *PF1 = lPFy[X]; WAIT2; *PF0 = rPFx[X]; *PF1 = rPFy[X];
 #include "bird_kernel.c"
 
 #undef kernel
 #undef START
+#undef START2
 
 #define kernel kernel31
 #define START BEFORE; *PF0 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF2 = rPFy[X];
+#define START2 BEFORE2; *PF0 = lPFx[X]; *PF2 = lPFy[X]; WAIT2; *PF0 = rPFx[X]; *PF2 = rPFy[X];
 #include "bird_kernel.c"
 
 #undef kernel
 #undef START
+#undef START2
 
 #undef BIRD1
 #define bank1 bank2
+#define right_shift4 right_shift4_bank2
+#undef WAIT2
+#define WAIT2 i = right_shift4[Y]; Y--; 
 
 #define kernel kernel12
 #define START BEFORE; *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF1= rPFx[X]; *PF2 = rPFy[X];
+#define START2 BEFORE2; *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT2; *PF1= rPFx[X]; *PF2 = rPFy[X];
 #include "bird_kernel.c"
 
 #undef kernel
 #undef START
+#undef START2
 
 #define kernel kernel22
 #define START BEFORE; *PF0 = lPFx[X]; *PF1 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF1 = rPFy[X];
+#define START2 BEFORE2; *PF0 = lPFx[X]; *PF1 = lPFy[X]; WAIT2; *PF0 = rPFx[X]; *PF1 = rPFy[X];
 #include "bird_kernel.c"
 
 #undef kernel
 #undef START
+#undef START2
 
 #define kernel kernel32
 #define START BEFORE; *PF0 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF2 = rPFy[X];
+#define START2 BEFORE2; *PF0 = lPFx[X]; *PF2 = lPFy[X]; WAIT2; *PF0 = rPFx[X]; *PF2 = rPFy[X];
 #include "bird_kernel.c"
 
 void init_sprites_pos()
@@ -289,27 +308,17 @@ void load_scroll_sequence()
     
 void init()
 {
-    for (X = BLANK - 8; X != 0; X--) strobe(WSYNC);
     init_sprites_pos();
-    scroll_sequence = 0;
-    scroll_counter = 0;
     first_time = 0;
-    j = 0;
-    left_window = 0;
-    right_window = 0;
     ybird = 100 * 256;
-    yspeed = 0;
-    button_pressed = 0;
-    bird_type = 0;
-    score = 0;
-    highscore = 0;
 }
 
 void gameover()
 {
     ybird = 100 * 256;
     yspeed = 0;
-    score = 0;
+    score_low = 0;
+    score_high = 0;
 }
 
 void game_logic()
@@ -595,5 +604,12 @@ void main()
             printf("0x%02x};\n", PF[d][c]);
         }
     }
+    printf("const unsigned char *const right_shift4[256]={\n\t");
+    for (i = 0; i < 256; i++) {
+        printf("0x%02x", i >> 4);
+        if (i != 255) printf(",");
+        if (!((i + 1) % 16)) printf("\n\t");
+    }
+    printf("};\n");
 }
 #endif

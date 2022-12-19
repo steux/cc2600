@@ -141,6 +141,7 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                     Ok(ExprType::X)
                 },
                 ExprType::AbsoluteY(name) => {
+                    // TODO; Check if the target variable is a pointer (indirect adressing)
                     gstate.write_asm(&format!("LDX {},Y", name), 4)?;
                     gstate.flags = FlagsState::X;
                     Ok(ExprType::X)
@@ -328,10 +329,13 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                     }
                 },
                 _ => {
+                    let mut acc_in_use = gstate.acc_in_use;
+                    let signed;
                     match right {
                         ExprType::Absolute(variable, offset) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             let v = gstate.compiler_state.get_variable(variable);
+                            signed = v.signed;
                             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                             if *offset > 0 {
                                 gstate.write_asm(&format!("LDA {}+{}", variable, offset), cycles)?;
@@ -342,12 +346,24 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                         },
                         ExprType::AbsoluteX(variable) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+                            let v = gstate.compiler_state.get_variable(variable);
+                            signed = v.signed;
                             gstate.write_asm(&format!("LDA {},X", variable), 4)?;
                             gstate.flags = FlagsState::AbsoluteX(variable);
                         },
                         ExprType::AbsoluteY(variable) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                            gstate.write_asm(&format!("LDA {},Y", variable), 4)?;
+                            let v = gstate.compiler_state.get_variable(variable);
+                            signed = v.signed;
+                            if v.var_type == VariableType::CharPtr && !v.var_const {
+                                if v.size == 1 {
+                                    gstate.write_asm(&format!("LDA ({}),Y", variable), 5)?;
+                                } else {
+                                    return Err(syntax_error(gstate.compiler_state, "X-Indirect adressing mode not available with Y register", pos));
+                                }
+                            } else {
+                                gstate.write_asm(&format!("LDA {},Y", variable), 4)?;
+                            }
                             gstate.flags = FlagsState::AbsoluteY(variable);
                         },
                         ExprType::Immediate(v) => {
@@ -356,15 +372,21 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                                 false => v & 0xff,
                                 true => (v >> 8) & 0xff,
                             };
+                            signed = false;
                             gstate.write_asm(&format!("LDA #{}", vx), 2)?;
                             gstate.flags = if vx > 0 { FlagsState::Positive } else if vx < 0 { FlagsState::Negative } else { FlagsState::Zero };
                         },
-                        ExprType::Tmp(_) => {
+                        ExprType::Tmp(s) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+                            signed = *s;
                             gstate.write_asm("LDA cctmp", 3)?;
                             gstate.flags = FlagsState::Unknown;
                         },
-                        ExprType::A(_) => gstate.acc_in_use = false,
+                        ExprType::A(s) => {
+                            signed = *s;
+                            acc_in_use = false;
+                            gstate.acc_in_use = false;
+                        },
                         _ => unreachable!()
                     };
                     match left {
@@ -386,9 +408,16 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                         ExprType::AbsoluteY(variable) => {
                             gstate.write_asm(&format!("STA {},Y", variable), 5)?;
                         },
+                        ExprType::A(_) => {
+                            gstate.acc_in_use = true;
+                            return Ok(ExprType::A(signed));
+                        },
+                        ExprType::Tmp(_) => {
+                            return Ok(ExprType::Tmp(signed));
+                        },
                         _ => return Err(syntax_error(gstate.compiler_state, "Bad left value in assignement", pos)),
                     };
-                    if gstate.acc_in_use {
+                    if acc_in_use {
                         gstate.write_asm("PLA", 3)?;
                         gstate.flags = FlagsState::Unknown;
                     }

@@ -6,12 +6,12 @@
 // TIA REGISTERS MEMORY MAP
 
 unsigned char * const VSYNC       = 0x00; //  0000 00x0   Vertical Sync Set-Clear
-unsigned char * const VBLANK		  = 0x01; //  xx00 00x0   Vertical Blank Set-Clear
-unsigned char * const WSYNC		    = 0x02; //  ---- ----   Wait for Horizontal Blank
-unsigned char * const RSYNC		    = 0x03; //  ---- ----   Reset Horizontal Sync Counter
-unsigned char * const NUSIZ0		  = 0x04; //  00xx 0xxx   Number-Size player/missle 0
-unsigned char * const NUSIZ1		  = 0x05; //  00xx 0xxx   Number-Size player/missle 1
-unsigned char * const COLUP0		  = 0x06; //  xxxx xxx0   Color-Luminance Player 0
+unsigned char * const VBLANK	  = 0x01; //  xx00 00x0   Vertical Blank Set-Clear
+unsigned char * const WSYNC       = 0x02; //  ---- ----   Wait for Horizontal Blank
+unsigned char * const RSYNC       = 0x03; //  ---- ----   Reset Horizontal Sync Counter
+unsigned char * const NUSIZ0	  = 0x04; //  00xx 0xxx   Number-Size player/missle 0
+unsigned char * const NUSIZ1	  = 0x05; //  00xx 0xxx   Number-Size player/missle 1
+unsigned char * const COLUP0	  = 0x06; //  xxxx xxx0   Color-Luminance Player 0
 unsigned char * const COLUP1      = 0x07; //  xxxx xxx0   Color-Luminance Player 1
 unsigned char * const COLUPF      = 0x08; //  xxxx xxx0   Color-Luminance Playfield
 unsigned char * const COLUBK      = 0x09; //  xxxx xxx0   Color-Luminance Background
