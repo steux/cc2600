@@ -1775,7 +1775,7 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         // Prelude code for each bank
         debug!("Generating code for bank #{}", bank);
         gstate.current_bank = bank;
-        gstate.write(&format!("\n\tORG ${}000\n\tRORG $F000\n", bank + 1))?;
+        gstate.write(&format!("\n\tORG ${}000\n\tRORG $F000\n", bank))?;
 
         if maxbank > 0 && bank != 0 {
             // Generate trampoline code
@@ -1864,11 +1864,11 @@ Powerup
                     nb_banked_functions += 1;
                 }
             }
-            banked_function_address = 0x1FE0 - nb_banked_functions * 10;
+            banked_function_address = 0x0FE0 - nb_banked_functions * 10;
             debug!("Banked function address={:04x}", banked_function_address);
             gstate.write(&format!("
         ORG ${:04x}
-        RORG ${:04x}", banked_function_address, banked_function_address))?;
+        RORG ${:04x}", banked_function_address, 0xF000 + banked_function_address))?;
             for bank_ex in 1..=maxbank {
                 for f in compiler_state.sorted_functions().iter() {
                     if f.1.bank == bank_ex {
@@ -1895,7 +1895,7 @@ Call{}
         RORG ${:04x}
         JSR {}
         LDX ${:04x}
-                    ", address + f.1.bank * 0x1000 + 3, address + 3, f.0, bankswitching_address))?;
+                    ", address + f.1.bank * 0x1000 + 3, 0xF000 + address + 3, f.0, bankswitching_address))?;
                     banked_function_address += 10;
                 }
             }
@@ -1909,7 +1909,7 @@ Call{}
         .word {}\t; NMI
         .word {}\t; RESET
         .word {}\t; IRQ
-        \n", bank + 1, starting_code, starting_code, starting_code))?;
+        \n", bank, starting_code, starting_code, starting_code))?;
 
     }
  
