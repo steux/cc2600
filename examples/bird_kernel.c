@@ -74,10 +74,10 @@ bank1 void kernel()
     strobe(WSYNC);
     // 2 lines
     background_ptr1 = rainbow;
-    background_ptr1 += MAX_RAINBOW_OFFSET + RAINBOW_SIZE;
+    background_ptr1 += MAX_RAINBOW_OFFSET + RAINBOW_SIZE - 1;
     background_ptr1 -= (ybird >> 8);
     background_ptr2 = background_ptr1;
-    background_ptr2 += 192;
+    background_ptr2 += 193;
     background_ptr1 -= rainbow_offset;
     background_ptr2 += rainbow_offset;
 
@@ -104,6 +104,7 @@ bank1 void kernel()
 #include "bird2.c"
 #endif
  
+    j = background_ptr2[Y];
     do {
         strobe(WSYNC);
         strobe(HMOVE);

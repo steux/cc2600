@@ -379,7 +379,7 @@ void game_logic()
     load_scroll_sequence();
     scroll_counter++;
 
-    rainbow_offset++;
+    rainbow_offset = 16;
     if (rainbow_offset == 50 + 16) rainbow_offset = 0;
 }
 
