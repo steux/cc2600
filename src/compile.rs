@@ -329,11 +329,20 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                             match px.as_rule() {
                                 Rule::int => def = VariableDefinition::Value(parse_int(px.into_inner().next().unwrap())),
                                 Rule::array_def => {
+                                    if let VariableMemory::ROM(_) = memory {} else {
+                                        memory = VariableMemory::ROM(0);
+                                    }
+                                    if var_type == VariableType::Char {
+                                        var_type = VariableType::CharPtr;
+                                    } else {
+                                        return Err(syntax_error(state, "Array of short integers are not available", px.as_span().start()));
+                                    }
                                     let mut v = Vec::new();
                                     for pxx in px.into_inner() {
                                         v.push(parse_int(pxx.into_inner().next().unwrap()));
                                     }
                                     def = VariableDefinition::Array(v);
+                                    var_const = true;
                                 },
                                 _ => unreachable!()
 

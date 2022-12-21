@@ -55,7 +55,7 @@ enum ExprType<'a> {
     Nothing,
     Immediate(i32),
     Tmp(bool),
-    Absolute(&'a str, u16),
+    Absolute(&'a str, bool, u16), // variable, eight_bits, offset
     AbsoluteX(&'a str),
     AbsoluteY(&'a str),
     A(bool), X, Y,
@@ -66,7 +66,7 @@ enum FlagsState<'a> {
     Unknown,
     X, Y,
     Zero, Positive, Negative,
-    Absolute(&'a str, u16),
+    Absolute(&'a str, bool, u16),
     AbsoluteX(&'a str),
     AbsoluteY(&'a str),
 }
@@ -118,8 +118,11 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                     gstate.flags = FlagsState::X;
                     Ok(ExprType::X)
                 },
-                ExprType::Absolute(name, offset) => {
+                ExprType::Absolute(name, eight_bits, offset) => {
                     let v = gstate.compiler_state.get_variable(name);
+                    if !eight_bits {
+                        return Err(syntax_error(gstate.compiler_state, "Can't assign 16 bits data to X", pos));
+                    }
                     if *offset > 0 {
                         gstate.write_asm(&format!("LDX {}+{}", name, offset), if v.memory == VariableMemory::Zeropage {3} else {4})?;
                     } else {
@@ -182,8 +185,11 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                     gstate.flags = FlagsState::X;
                     Ok(ExprType::Y)
                 },
-                ExprType::Absolute(name, offset) => {
+                ExprType::Absolute(name, eight_bits, offset) => {
                     let v = gstate.compiler_state.get_variable(name);
+                    if !eight_bits {
+                        return Err(syntax_error(gstate.compiler_state, "Can't assign 16 bits data to Y", pos));
+                    }
                     if *offset > 0 {
                         gstate.write_asm(&format!("LDY {}+{}", name, offset), if v.memory == VariableMemory::Zeropage {3} else {4})?;
                     } else {
@@ -238,13 +244,28 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
             match right {
                 ExprType::X => {
                     match left {
-                        ExprType::Absolute(variable, offset) => {
+                        ExprType::Absolute(variable, eight_bits, offset) => {
                             let v = gstate.compiler_state.get_variable(variable);
                             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                             if *offset > 0 {
                                 gstate.write_asm(&format!("STX {}+{}", variable, offset), cycles)?;
                             } else {
                                 gstate.write_asm(&format!("STX {}", variable), cycles)?;
+                            }
+                            if !eight_bits {
+                                if *offset == 0 {
+                                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+                                    gstate.write_asm("LDA #0", 2)?;
+                                    gstate.write_asm(&format!("STA {}+1", variable), cycles)?;
+                                    if gstate.acc_in_use { 
+                                        gstate.write_asm("PLA", 3)?;
+                                        gstate.flags = FlagsState::Unknown;
+                                    } else {
+                                        gstate.flags = FlagsState::Zero;
+                                    }
+                                } else {
+                                    unreachable!(); 
+                                }
                             }
                             Ok(ExprType::X)
                         },
@@ -284,13 +305,28 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                 },
                 ExprType::Y => {
                     match left {
-                        ExprType::Absolute(variable, offset) => {
+                        ExprType::Absolute(variable, eight_bits, offset) => {
                             let v = gstate.compiler_state.get_variable(variable);
                             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                             if *offset > 0 {
                                 gstate.write_asm(&format!("STY {}+{}", variable, offset), cycles)?;
                             } else {
                                 gstate.write_asm(&format!("STY {}", variable), cycles)?;
+                            }
+                            if !eight_bits {
+                                if *offset == 0 {
+                                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+                                    gstate.write_asm("LDA #0", 2)?;
+                                    gstate.write_asm(&format!("STA {}+1", variable), cycles)?;
+                                    if gstate.acc_in_use { 
+                                        gstate.write_asm("PLA", 3)?;
+                                        gstate.flags = FlagsState::Unknown;
+                                    } else {
+                                        gstate.flags = FlagsState::Zero;
+                                    }
+                                } else {
+                                    unreachable!(); 
+                                }
                             }
                             Ok(ExprType::Y)
                         },
@@ -332,17 +368,32 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                     let mut acc_in_use = gstate.acc_in_use;
                     let signed;
                     match right {
-                        ExprType::Absolute(variable, offset) => {
+                        ExprType::Absolute(variable, eight_bits, offset) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                             let v = gstate.compiler_state.get_variable(variable);
                             signed = v.signed;
-                            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            if *offset > 0 {
-                                gstate.write_asm(&format!("LDA {}+{}", variable, offset), cycles)?;
+                            if v.var_type == VariableType::CharPtr && !eight_bits && v.var_const {
+                                if high_byte {
+                                    gstate.write_asm(&format!("LDA #>{}", variable), 2)?;
+                                } else {
+                                    gstate.write_asm(&format!("LDA #<{}", variable), 2)?;
+                                }
+                                gstate.flags = FlagsState::Unknown;
                             } else {
-                                gstate.write_asm(&format!("LDA {}", variable), cycles)?;
+                                let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
+                                if high_byte && *eight_bits {
+                                    gstate.write_asm("LDA #0", 2)?;
+                                    gstate.flags = FlagsState::Zero;
+                                } else {
+                                    let off = if high_byte { *offset + 1 } else { *offset };
+                                    if off > 0 {
+                                        gstate.write_asm(&format!("LDA {}+{}", variable, off), cycles)?;
+                                    } else {
+                                        gstate.write_asm(&format!("LDA {}", variable), cycles)?;
+                                    }
+                                    gstate.flags = FlagsState::Absolute(variable, *eight_bits, off);
+                                }
                             }
-                            gstate.flags = FlagsState::Absolute(variable, *offset);
                         },
                         ExprType::AbsoluteX(variable) => {
                             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
@@ -390,7 +441,7 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                         _ => unreachable!()
                     };
                     match left {
-                        ExprType::Absolute(variable, offset) => {
+                        ExprType::Absolute(variable, _eight_bits, offset) => {
                             let v = gstate.compiler_state.get_variable(variable);
                             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                             let off = if high_byte { *offset + 1 } else { *offset };
@@ -457,15 +508,19 @@ fn generate_arithm<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>
                 }
             };
         },
-        ExprType::Absolute(varname, offset) => {
+        ExprType::Absolute(varname, eight_bits, offset) => {
             if acc_in_use { gstate.write_asm("PHA", 3)?; }
             let v = gstate.compiler_state.get_variable(varname);
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-            let off = if high_byte { *offset + 1 } else { *offset };
-            if off > 0 {
-                gstate.write_asm(&format!("LDA {}+{}", varname, off), cycles)?;
+            if high_byte && *eight_bits {
+                gstate.write_asm("LDA #0", 2)?;
             } else {
-                gstate.write_asm(&format!("LDA {}", varname), cycles)?;
+                let off = if high_byte { *offset + 1 } else { *offset };
+                if off > 0 {
+                    gstate.write_asm(&format!("LDA {}+{}", varname, off), cycles)?;
+                } else {
+                    gstate.write_asm(&format!("LDA {}", varname), cycles)?;
+                }
             }
         },
         ExprType::AbsoluteX(varname) => {
@@ -539,15 +594,19 @@ fn generate_arithm<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>
             gstate.write_asm(&format!("{} #{}", operation, vx), 2)?;
             signed = if *v < 0 { true } else { false };
         },
-        ExprType::Absolute(varname, offset) => {
+        ExprType::Absolute(varname, eight_bits, offset) => {
             let v = gstate.compiler_state.get_variable(varname);
             signed = v.signed; 
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-            let off = if high_byte { *offset + 1 } else { *offset };
-            if off > 0 {
-                gstate.write_asm(&format!("{} {}+{}", operation, varname, off), cycles)?;
+            if high_byte && *eight_bits {
+                gstate.write_asm(&format!("{} #0", operation), 2)?;
             } else {
-                gstate.write_asm(&format!("{} {}", operation, varname), cycles)?;
+                let off = if high_byte { *offset + 1 } else { *offset };
+                if off > 0 {
+                    gstate.write_asm(&format!("{} {}+{}", operation, varname, off), cycles)?;
+                } else {
+                    gstate.write_asm(&format!("{} {}", operation, varname), cycles)?;
+                }
             }
         },
         ExprType::AbsoluteX(varname) => {
@@ -601,7 +660,7 @@ fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &m
     let mut acc_in_use = gstate.acc_in_use;
     let signed;
     match left {
-        ExprType::Absolute(varname, offset) => {
+        ExprType::Absolute(varname, _eight_bits, offset) => {
             let v = gstate.compiler_state.get_variable(varname);
             signed = v.signed; 
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
@@ -610,7 +669,7 @@ fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &m
                 match right {
                     ExprType::Immediate(v) => {
                         if v == 8 {
-                            return Ok(ExprType::Absolute(varname, offset + 1));
+                            return Ok(ExprType::Absolute(varname, true, offset + 1));
                         } else {
                             return Err(syntax_error(gstate.compiler_state, "Incorrect right value for right shift operation on short (constant 8 only supported)", pos));
                         } 
@@ -747,7 +806,7 @@ fn generate_plusplus<'a>(expr_type: &ExprType<'a>, gstate: &mut GeneratorState<'
             gstate.flags = FlagsState::Y;
             Ok(ExprType::Y)
         },
-        ExprType::Absolute(variable, offset) => {
+        ExprType::Absolute(variable, eight_bits, offset) => {
             let v = gstate.compiler_state.get_variable(variable);
             let cycles = if v.memory == VariableMemory::Zeropage { 5 } else { 6 };
             if *offset > 0 {
@@ -763,8 +822,8 @@ fn generate_plusplus<'a>(expr_type: &ExprType<'a>, gstate: &mut GeneratorState<'
                     gstate.write_asm(&format!("DEC {}", variable), cycles)?;
                 }
             }
-            gstate.flags = FlagsState::Absolute(variable, *offset);
-            Ok(ExprType::Absolute(variable, *offset))
+            gstate.flags = FlagsState::Absolute(variable, *eight_bits, *offset);
+            Ok(ExprType::Absolute(variable, *eight_bits, *offset))
         },
         ExprType::AbsoluteX(variable) => {
             let v = gstate.compiler_state.get_variable(variable);
@@ -843,7 +902,7 @@ fn generate_bnot<'a>(expr: &Expr<'a>, _gstate: &mut GeneratorState<'a>, _pos: us
     }
 }
 
-fn generate_deref<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+fn generate_eight_bits<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
 {
     match expr {
         Expr::Identifier((var, sub)) => {
@@ -852,7 +911,7 @@ fn generate_deref<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usi
                 let sub_output = generate_expr(sub, gstate, pos, false)?;
                 match sub_output {
                     ExprType::Nothing => {
-                        Ok(ExprType::Absolute(var, 0))
+                        Ok(ExprType::Absolute(var, true, 0))
                     },
                     _ => Err(syntax_error(gstate.compiler_state, "No subscript is allowed in this context", pos))
                 }
@@ -877,9 +936,8 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                     let ret = generate_assign(&left, &right, gstate, pos, high_byte);
                     if !high_byte {
                         match left {
-                            ExprType::Absolute(variable, _) => {
-                                let v = gstate.compiler_state.get_variable(variable);
-                                if v.var_type == VariableType::Short || v.var_type == VariableType::CharPtr {
+                            ExprType::Absolute(_, eight_bits, _) => {
+                                if !eight_bits {
                                     let left = generate_expr(lhs, gstate, pos, true)?;
                                     let right = generate_expr(rhs, gstate, pos, true)?;
                                     generate_assign(&left, &right, gstate, pos, true)?;
@@ -904,9 +962,9 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                     let ret = generate_assign(&left, &newright, gstate, pos, high_byte);
                     if !high_byte {
                         match left {
-                            ExprType::Absolute(variable, _) => {
+                            ExprType::Absolute(variable, eight_bits, _) => {
                                 let v = gstate.compiler_state.get_variable(variable);
-                                if v.var_type == VariableType::Short || v.var_type == VariableType::CharPtr {
+                                if v.var_type == VariableType::Short || (v.var_type == VariableType::CharPtr && !eight_bits) {
                                     let left = generate_expr(lhs, gstate, pos, true)?;
                                     let right = generate_expr(rhs, gstate, pos, true)?;
                                     let newright = generate_arithm(&left, op, &right, gstate, pos, true)?;
@@ -944,10 +1002,10 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                     } else {
                         let sub_output = generate_expr(sub, gstate, pos, false)?;
                         match sub_output {
-                            ExprType::Nothing => Ok(ExprType::Absolute(variable, 0)),
+                            ExprType::Nothing => Ok(ExprType::Absolute(variable, v.var_type != VariableType::Short && v.var_type != VariableType::CharPtr, 0)),
                             ExprType::X => Ok(ExprType::AbsoluteX(variable)),
                             ExprType::Y => Ok(ExprType::AbsoluteY(variable)),
-                            ExprType::Immediate(v) => Ok(ExprType::Absolute(variable, v as u16)),
+                            ExprType::Immediate(v) => Ok(ExprType::Absolute(variable, true, v as u16)),
                             _ => Err(syntax_error(gstate.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                         }
                     }
@@ -981,7 +1039,7 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
         Expr::Neg(v) => generate_neg(v, gstate, pos),
         Expr::Not(v) => generate_not(v, gstate, pos),
         Expr::BNot(v) => generate_bnot(v, gstate, pos),
-        Expr::Deref(v) => generate_deref(v, gstate, pos),
+        Expr::Deref(v) => generate_eight_bits(v, gstate, pos),
         Expr::Nothing => Ok(ExprType::Nothing),
     }
 }
@@ -991,7 +1049,7 @@ fn flags_ok(flags: &FlagsState, expr_type: &ExprType) -> bool
     match flags {
         FlagsState::X => *expr_type == ExprType::X,
         FlagsState::Y => *expr_type == ExprType::Y,
-        FlagsState::Absolute(var, offset) => *expr_type == ExprType::Absolute(*var, *offset),
+        FlagsState::Absolute(var, eight_bits, offset) => *expr_type == ExprType::Absolute(*var, *eight_bits, *offset),
         FlagsState::AbsoluteX(var) => *expr_type == ExprType::AbsoluteX(var),
         FlagsState::AbsoluteY(var) => *expr_type == ExprType::AbsoluteY(var),
         _ => false
@@ -1053,7 +1111,7 @@ fn generate_branch_instruction<'a>(op: &Operation, signed: bool, gstate: &mut Ge
 
 }
 
-fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>, gstate: &mut GeneratorState<'a>, _pos: usize, negate: bool, label: &str) -> Result<(), Error>
+fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>, gstate: &mut GeneratorState<'a>, pos: usize, negate: bool, label: &str) -> Result<(), Error>
 {
     let left;
     let right;
@@ -1114,7 +1172,7 @@ fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>,
                     },
                     _ => {
                         let signed = match left {
-                            ExprType::Absolute(varname, _offset) => {
+                            ExprType::Absolute(varname, _eight_bits, _offset) => {
                                 gstate.compiler_state.get_variable(varname).signed
                             },
                             ExprType::AbsoluteX(varname) => {
@@ -1146,9 +1204,12 @@ fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>,
     let signed;
     let cmp;
     match left {
-        ExprType::Absolute(varname, offset) => {
+        ExprType::Absolute(varname, eight_bits, offset) => {
             if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
             let v = gstate.compiler_state.get_variable(varname);
+            if !eight_bits {
+                return Err(syntax_error(gstate.compiler_state, "Comparision is not implemented on 16 bits data", pos));
+            }
             signed = v.signed;
             let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
             if *offset > 0 {
@@ -1190,8 +1251,11 @@ fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>,
                     gstate.write_asm(&format!("CPY #{}", v), 2)?;
                     cmp = false;
                 },
-                ExprType::Absolute(varname, offset) => {
+                ExprType::Absolute(varname, eight_bits, offset) => {
                     let v = gstate.compiler_state.get_variable(varname);
+                    if !eight_bits {
+                        return Err(syntax_error(gstate.compiler_state, "Comparision is not implemented on 16 bits data", pos));
+                    }
                     let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                     if *offset > 0 {
                         gstate.write_asm(&format!("CPY {}+{}", varname, offset), cycles)?;
@@ -1216,8 +1280,11 @@ fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>,
                     gstate.write_asm(&format!("CPX #{}", v), 2)?;
                     cmp = false;
                 },
-                ExprType::Absolute(varname, offset) => {
+                ExprType::Absolute(varname, eight_bits, offset) => {
                     let v = gstate.compiler_state.get_variable(varname);
+                    if !eight_bits {
+                        return Err(syntax_error(gstate.compiler_state, "Comparision is not implemented on 16 bits data", pos));
+                    }
                     let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                     if *offset > 0 {
                         gstate.write_asm(&format!("CPX {}+{}", varname, offset), cycles)?;
@@ -1243,8 +1310,11 @@ fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>,
             ExprType::Immediate(v) => {
                 gstate.write_asm(&format!("CMP #{}", v), 2)?;
             },
-            ExprType::Absolute(name, offset) => {
+            ExprType::Absolute(name, eight_bits, offset) => {
                 let v = gstate.compiler_state.get_variable(name);
+                if !eight_bits {
+                    return Err(syntax_error(gstate.compiler_state, "Comparision is not implemented on 16 bits data", pos));
+                }
                 let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                 if *offset > 0 {
                     gstate.write_asm(&format!("CMP {}+{}", name, offset), cycles)?;
@@ -1343,9 +1413,12 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                 }
                 return Ok(());
             },
-            ExprType::Absolute(varname, offset) => {
+            ExprType::Absolute(varname, eight_bits, offset) => {
                 if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
                 let v = gstate.compiler_state.get_variable(varname);
+                if !eight_bits {
+                    return Err(syntax_error(gstate.compiler_state, "Comparision is not implemented on 16 bits data", pos));
+                }
                 let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
                 if offset > 0 {
                     gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
