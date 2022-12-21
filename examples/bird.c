@@ -1,3 +1,10 @@
+#define MAX_RAINBOW_OFFSET 50 
+//#define MAX_RAINBOW_OFFSET (192 - 16 - 2) 
+
+#ifdef __ATARI2600__
+#include "vcs.h"
+unsigned char X, Y;
+
 #ifdef PAL
 const unsigned char RED = 0x64;
 const unsigned char BLUE = 0xB2;
@@ -19,10 +26,6 @@ const unsigned char ORANGE = 0xfa;
 const unsigned char GREY = 0x04;
 const unsigned char GREEN = 0xC6;
 #endif
-
-#ifdef __ATARI2600__
-#include "vcs.h"
-unsigned char X, Y;
 
 #define KERNAL 192
 #ifdef PAL
@@ -363,6 +366,9 @@ void game_logic()
 
     load_scroll_sequence();
     scroll_counter++;
+
+    rainbow_offset++;
+    if (rainbow_offset == 50 + 16) rainbow_offset = 0;
 }
 
 const bank3 unsigned char score_line1_PF0[100]={
@@ -646,8 +652,8 @@ void main()
                 }
                 break;
         }
-        printf("const unsigned char rainbow_%s[%d]={\n\t", (j)?"PAL":"NTSC", (192- sprite_height) * 3 + 2 * rainbow_height);
-        for (i = 0; i < 192 - sprite_height; i++) {
+        printf("const unsigned char rainbow_%s[%d]={\n\t", (j)?"PAL":"NTSC", 2 * MAX_RAINBOW_OFFSET + (192 - sprite_height) + 2 * rainbow_height);
+        for (i = 0; i < MAX_RAINBOW_OFFSET; i++) {
             printf("0x%02x, ", (j)?blue_pal:blue_ntsc);
             if (!((i + 1) % 16)) printf("\n\t");
         }
@@ -665,7 +671,7 @@ void main()
             printf("0x%02x, ", rainbow[rainbow_height - 1 - i]);
         }
         printf("\n\t");
-        for (i = 0; i < 192 - sprite_height - 1; i++) {
+        for (i = 0; i < MAX_RAINBOW_OFFSET - 1; i++) {
             printf("0x%02x, ", (j)?blue_pal:blue_ntsc);
             if (!((i + 1) % 16)) printf("\n\t");
         }

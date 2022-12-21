@@ -1843,7 +1843,7 @@ Powerup
 
         // Generate ROM tables
         gstate.write("\n; Tables in ROM\n")?;
-        gstate.write("\talign $100\n\n")?;
+        //gstate.write("\talign $100\n\n")?;
         for v in compiler_state.sorted_variables().iter() {
             if let VariableMemory::ROM(rom_bank) = v.1.memory {
                 if rom_bank == bank {
