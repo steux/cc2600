@@ -57,6 +57,7 @@ unsigned short ybird;
 signed short yspeed;
 unsigned char button_pressed;
 unsigned char bird_type;
+unsigned char bird_animation_counter;
 unsigned char score_low;
 unsigned char score_high;
 unsigned char highscore_low;
@@ -349,9 +350,20 @@ void game_logic()
         if (button_pressed == 0) {
             button_pressed = 1;
             yspeed = 350;
-            bird_type = 1;
+            if (bird_type == 0) 
+                bird_type = 1;
+            else {
+                bird_type = 0;
+                bird_animation_counter = 5;
+            }
         }
     } else button_pressed = 0;
+
+    if (bird_animation_counter != 0) {
+        bird_animation_counter--;
+        if (bird_animation_counter == 0) bird_type = 1;
+    }
+
     ybird = ybird + yspeed;
     if (ybird >> 8 < 20) {
         gameover();
