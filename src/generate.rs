@@ -1768,7 +1768,6 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
     // Generate functions code
     gstate.write("\n; Functions definitions\n\tSEG CODE\n")?;
 
-    let starting_code = if maxbank > 0 { "Start" } else { "Powerup" };
     let mut nb_banked_functions = 0;
     let mut banked_function_address = 0;
 
@@ -1778,15 +1777,14 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         gstate.current_bank = bank;
         gstate.write(&format!("\n\tORG ${}000\n\tRORG $F000\n", bank + 1))?;
 
-        if maxbank > 0 {
+        if maxbank > 0 && bank != 0 {
             // Generate trampoline code
             gstate.write("
-;----The following code is the same on all banks----
+;----The following code is the same on all banks, except bank 0----
 Start
 ; Ensure that bank 0 is selected
-        LDX #$FF	; We set the stack pointer (SP) register in the processor to point
-        TXS		; at the highest address of RAM.  If we use the stack then it will
-      ; consume memory space growing downward, starting at that top address.
+        LDX #$FF
+        TXS
 
         lDA #>(Powerup-1)
         lDY #<(Powerup-1)
@@ -1802,27 +1800,14 @@ BankSwitch
             gstate.write("
 Powerup
         SEI		; Set the interrupt masking flag in the processor status register.
-      ; The VCS has no interrupts, but the Atari 7800 which can run VCS
-      ; software does have interrupts so we need to turn them off to be
-      ; compatible with the 7800.
+        CLD		; Clear the BCD mode flag in the processor status register. 
+        LDX #$FF	
+        TXS
 
-        CLD		; Clear the BCD mode flag in the processor status register.  At
-      ; powerup the processor status register flags can be in any state.
-      ; We do not want to perform math in BCD mode at this time, so we
-      ; make sure it is turned off.
-
-        LDX #$FF	; We set the stack pointer (SP) register in the processor to point
-        TXS		; at the highest address of RAM.  If we use the stack then it will
-      ; consume memory space growing downward, starting at that top address.
-
-        LDA #0		; This loop clears every byte of RAM in the VCS, and every writable
-.loop	  STA $00,X	; register in the TIA chip to the known state of zero.   Remember at
-        DEX		; power up the bits of RAM and Registers are in an unknown state.
-        BNE .loop	; If we neglected to put them into a known state, then our program 
-      ; may behave differently each time it runs.  We chose to set them all
-      ; to zero, because in the TIA setting a register to zero tends to
-      ; turn features off.  We will later turn back on only the features
-      ; of the TIA we wish to use in our program.
+        LDA #0
+.loop	  STA $00,X	
+        DEX	
+        BNE .loop
 
         JMP main
         ")?;
@@ -1884,7 +1869,7 @@ Powerup
             gstate.write(&format!("
         ORG ${:04x}
         RORG ${:04x}", banked_function_address, banked_function_address))?;
-                        for bank_ex in 1..=maxbank {
+            for bank_ex in 1..=maxbank {
                 for f in compiler_state.sorted_functions().iter() {
                     if f.1.bank == bank_ex {
                         gstate.write(&format!("
@@ -1916,6 +1901,7 @@ Call{}
             }
         }
 
+        let starting_code = if maxbank > 0 && bank != 0 { "Start" } else { "Powerup" };
         gstate.write(&format!("
         ORG ${}FFA
         RORG $FFFA
