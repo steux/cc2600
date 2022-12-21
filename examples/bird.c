@@ -66,6 +66,26 @@ unsigned char *background_ptr1;
 unsigned char *background_ptr2;
 unsigned char rainbow_offset;
 
+// TIATracker variables
+// =====================================================================
+// Permanent variables. These are states needed by the player.
+// =====================================================================
+char tt_timer;                // current music timer value
+char tt_cur_pat_index_c0;     // current pattern index into tt_SequenceTable
+char tt_cur_pat_index_c1;     
+char tt_cur_note_index_c0;    // note index into current pattern
+char tt_cur_note_index_c1;    
+char tt_envelope_index_c0;    // index into ADSR envelope
+char tt_envelope_index_c1;    
+char tt_cur_ins_c0;           // current instrument
+char tt_cur_ins_c1;     
+
+// =====================================================================
+// Temporary variables. These will be overwritten during a call to the
+// player routine, but can be used between calls for other things.
+// =====================================================================
+char *tt_ptr; 
+
 #define SPRITE_HEIGHT 16 
 #define RAINBOW_SIZE 16
 
