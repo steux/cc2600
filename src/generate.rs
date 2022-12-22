@@ -300,6 +300,14 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                             }
                             Ok(ExprType::X)
                         },
+                        ExprType::A(_) => {
+                            if gstate.acc_in_use {
+                                return Err(syntax_error(gstate.compiler_state, "Code too complex for the compiler", pos))
+                            }
+                            gstate.write_asm(&"TXA", 2)?;
+                            gstate.acc_in_use = true;
+                            return Ok(ExprType::A(false));
+                        },
                         _ => Err(syntax_error(gstate.compiler_state, "Bad left value in assignement", pos)),
                     }
                 },
@@ -360,6 +368,14 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                                 }
                             }
                             Ok(ExprType::Y)
+                        },
+                        ExprType::A(_) => {
+                            if gstate.acc_in_use {
+                                return Err(syntax_error(gstate.compiler_state, "Code too complex for the compiler", pos))
+                            }
+                            gstate.write_asm(&"TYA", 2)?;
+                            gstate.acc_in_use = true;
+                            return Ok(ExprType::A(false));
                         },
                         _ => Err(syntax_error(gstate.compiler_state, "Bad left value in assignement", pos)),
                     }
@@ -460,6 +476,9 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                             gstate.write_asm(&format!("STA {},Y", variable), 5)?;
                         },
                         ExprType::A(_) => {
+                            if acc_in_use {
+                                return Err(syntax_error(gstate.compiler_state, "Code too complex for the compiler", pos))
+                            }
                             gstate.acc_in_use = true;
                             return Ok(ExprType::A(signed));
                         },
@@ -748,6 +767,58 @@ fn generate_shift<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>,
     }
 }
 
+fn generate_ternary<'a>(condition: &Expr<'a>, alternatives: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+{
+    match alternatives {
+        Expr::BinOp {lhs, op, rhs} => {
+            if *op == Operation::TernaryCond2 {
+                if gstate.acc_in_use {
+                    gstate.write_asm("PHA", 3)?; 
+                    gstate.local_label_counter_if += 1;
+                    let ifend_label = format!(".ifend{}", gstate.local_label_counter_if);
+                    let else_label = format!(".else{}", gstate.local_label_counter_if);
+                    generate_condition(condition, gstate, pos, true, &else_label)?;
+                    let left = generate_expr(lhs, gstate, pos, false)?;
+                    let la = generate_assign(&ExprType::A(false), &left, gstate, pos, false)?;
+                    gstate.write_asm(&format!("JMP {}", ifend_label), 3)?;
+                    gstate.write_label(&else_label)?;
+                    gstate.acc_in_use = false;
+                    let right = generate_expr(rhs, gstate, pos, false)?;
+                    let ra = generate_assign(&ExprType::A(false), &right, gstate, pos, false)?;
+                    gstate.write_label(&ifend_label)?;
+                    gstate.write_asm("STA cctmp", 3)?;
+                    gstate.write_asm("PLA", 3)?;
+                    if la != ra {
+                        return Err(syntax_error(gstate.compiler_state, "Different alternative types in ?: expression", pos))
+                    }
+                    Ok(la)
+                } else {
+                    gstate.local_label_counter_if += 1;
+                    let ifend_label = format!(".ifend{}", gstate.local_label_counter_if);
+                    let else_label = format!(".else{}", gstate.local_label_counter_if);
+                    generate_condition(condition, gstate, pos, true, &else_label)?;
+                    let left = generate_expr(lhs, gstate, pos, false)?;
+                    let la = generate_assign(&ExprType::A(false), &left, gstate, pos, false)?;
+                    gstate.write_asm(&format!("JMP {}", ifend_label), 3)?;
+                    gstate.write_label(&else_label)?;
+                    gstate.acc_in_use = false;
+                    let right = generate_expr(rhs, gstate, pos, false)?;
+                    let ra = generate_assign(&ExprType::A(false), &right, gstate, pos, false)?;
+                    gstate.write_label(&ifend_label)?;
+                    gstate.acc_in_use = true;
+                    if la != ra {
+                        return Err(syntax_error(gstate.compiler_state, "Different alternative types in ?: expression", pos))
+                    }
+                    Ok(la)
+                }
+            } else {
+                Err(syntax_error(gstate.compiler_state, "Missing alternatives in ?: expression", pos))
+            }
+        },
+        _ => Err(syntax_error(gstate.compiler_state, "Missing alternatives in ?: expression", pos))
+    }
+}
+
 fn generate_function_call<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
 {
     match expr {
@@ -1022,7 +1093,9 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                     let left = generate_expr(lhs, gstate, pos, false)?;
                     let right = generate_expr(rhs, gstate, pos, false)?;
                     generate_shift(&left, op, &right, gstate, pos)
-                }
+                },
+                Operation::TernaryCond1 => generate_ternary(lhs, rhs, gstate, pos),
+                Operation::TernaryCond2 => unreachable!(),
             }
         },
         Expr::Identifier((var, sub)) => {

@@ -66,6 +66,8 @@ pub enum Operation {
     Lte,
     Land,
     Lor,
+    TernaryCond1,
+    TernaryCond2
 }
 
 #[derive(Debug)]
@@ -263,6 +265,8 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
                 Rule::xorass => Operation::Xor(true),
                 Rule::land => Operation::Land,
                 Rule::lor => Operation::Lor,
+                Rule::ternary_cond1 => Operation::TernaryCond1,
+                Rule::ternary_cond2 => Operation::TernaryCond2,
                 rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
             };
             Ok(Expr::BinOp {
