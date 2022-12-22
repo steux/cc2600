@@ -110,7 +110,7 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
             match right {
                 ExprType::Immediate(v) => {
                     gstate.write_asm(&format!("LDX #{}", v), 2)?;
-                    gstate.flags = if *v > 0 { FlagsState::Positive } else if *v < 0 { FlagsState::Negative } else { FlagsState::Zero };
+                    gstate.flags = FlagsState::X; 
                     Ok(ExprType::X) 
                 },
                 ExprType::Tmp(_) => {
@@ -177,12 +177,12 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
             match right {
                 ExprType::Immediate(v) => {
                     gstate.write_asm(&format!("LDY #{}", v), 2)?;
-                    gstate.flags = if *v > 0 { FlagsState::Positive } else if *v < 0 { FlagsState::Negative } else { FlagsState::Zero };
+                    gstate.flags = FlagsState::Y; 
                     Ok(ExprType::Y) 
                 },
                 ExprType::Tmp(_) => {
                     gstate.write_asm("LDY cctmp", 3)?;
-                    gstate.flags = FlagsState::X;
+                    gstate.flags = FlagsState::Y;
                     Ok(ExprType::Y)
                 },
                 ExprType::Absolute(name, eight_bits, offset) => {
@@ -653,10 +653,8 @@ fn generate_arithm<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>
     }
 }
 
-fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+fn generate_shift<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
 {
-    let left = generate_expr(lhs, gstate, pos, false)?;
-    let right = generate_expr(rhs, gstate, pos, false)?;
     let mut acc_in_use = gstate.acc_in_use;
     let signed;
     match left {
@@ -668,7 +666,7 @@ fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &m
                 // Special shift 8 case for extracting higher byte
                 match right {
                     ExprType::Immediate(v) => {
-                        if v == 8 {
+                        if *v == 8 {
                             return Ok(ExprType::Absolute(varname, true, offset + 1));
                         } else {
                             return Err(syntax_error(gstate.compiler_state, "Incorrect right value for right shift operation on short (constant 8 only supported)", pos));
@@ -678,7 +676,7 @@ fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &m
                 };
             } else {
                 if acc_in_use { gstate.write_asm("PHA", 3)?; }
-                if offset > 0 {
+                if *offset > 0 {
                     gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
                 } else {
                     gstate.write_asm(&format!("LDA {}", varname), cycles)?;
@@ -709,11 +707,11 @@ fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &m
         },
         ExprType::A(s) => { 
             acc_in_use = false;
-            signed = s; 
+            signed = *s; 
         },
         ExprType::Tmp(s) => {
             if acc_in_use { gstate.write_asm("PHA", 3)?; }
-            signed = s;
+            signed = *s;
             gstate.write_asm("LDA cctmp", 3)?;
         },
         _ => return Err(syntax_error(gstate.compiler_state, "Bad left value for shift operation", pos))
@@ -730,8 +728,8 @@ fn generate_shift<'a>(lhs: &Expr<'a>, op: &Operation, rhs: &Expr<'a>, gstate: &m
     };
     match right {
         ExprType::Immediate(v) => {
-            if v >= 0 && v <= 8 {
-                for _ in 0..v {
+            if *v >= 0 && *v <= 8 {
+                for _ in 0..*v {
                     gstate.write_asm(&format!("{}", operation), 2)?;
                 }
             } else {
@@ -854,6 +852,37 @@ fn generate_neg<'a>(expr: &Expr<'a>, _gstate: &mut GeneratorState<'a>, _pos: usi
     }
 }
 
+fn generate_expr_cond<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+{
+    if gstate.acc_in_use {
+        gstate.write_asm("PHA", 3)?; 
+        gstate.local_label_counter_if += 1;
+        let ifend_label = format!(".ifend{}", gstate.local_label_counter_if);
+        let else_label = format!(".else{}", gstate.local_label_counter_if);
+        generate_condition(expr, gstate, pos, false, &else_label)?;
+        gstate.write_asm("LDA #0", 2)?;
+        gstate.write_asm(&format!("JMP {}", ifend_label), 3)?;
+        gstate.write_label(&else_label)?;
+        gstate.write_asm("LDA #1", 2)?;
+        gstate.write_label(&ifend_label)?;
+        gstate.write_asm("STA cctmp", 3)?;
+        gstate.write_asm("PLA", 3)?;
+        Ok(ExprType::Tmp(false))
+    } else {
+        gstate.local_label_counter_if += 1;
+        let ifend_label = format!(".ifend{}", gstate.local_label_counter_if);
+        let else_label = format!(".else{}", gstate.local_label_counter_if);
+        generate_condition(expr, gstate, pos, false, &else_label)?;
+        gstate.write_asm("LDA #0", 2)?;
+        gstate.write_asm(&format!("JMP {}", ifend_label), 3)?;
+        gstate.write_label(&else_label)?;
+        gstate.write_asm("LDA #1", 2)?;
+        gstate.write_label(&ifend_label)?;
+        gstate.acc_in_use = true;
+        Ok(ExprType::A(false))
+    }
+}
+
 fn generate_not<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
 {
     match expr {
@@ -902,7 +931,7 @@ fn generate_bnot<'a>(expr: &Expr<'a>, _gstate: &mut GeneratorState<'a>, _pos: us
     }
 }
 
-fn generate_eight_bits<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+fn generate_deref<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
 {
     match expr {
         Expr::Identifier((var, sub)) => {
@@ -950,9 +979,7 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                 },
                 Operation::Add(false) | Operation::Sub(false) | Operation::And(false) | Operation::Or(false) | Operation::Xor(false) | Operation::Mul(false) | Operation::Div(false) => {
                     let left = generate_expr(lhs, gstate, pos, high_byte)?;
-                    debug!("Left: {:?}", &left);
                     let right = generate_expr(rhs, gstate, pos, high_byte)?;
-                    debug!("Right: {:?}", &right);
                     generate_arithm(&left, op, &right, gstate, pos, high_byte)
                 },
                 Operation::Add(true) | Operation::Sub(true) | Operation::And(true) | Operation::Or(true) | Operation::Xor(true) | Operation::Mul(true) | Operation::Div(true) => {
@@ -976,18 +1003,18 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
                     }
                     ret
                 },
-                Operation::Eq => Err(Error::Unimplemented { feature: "Equal not implemented" }),
-                Operation::Neq => Err(Error::Unimplemented { feature: "Not equal not implemented" }),
-                Operation::Gt => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
-                Operation::Gte => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
-                Operation::Lt => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
-                Operation::Lte => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
-                Operation::Land => Err(Error::Unimplemented { feature: "Logical and not implemented" }),
-                Operation::Lor => Err(Error::Unimplemented { feature: "Logical or not implemented" }),
-                Operation::Bls(true) => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
-                Operation::Brs(true) => Err(Error::Unimplemented { feature: "Comparison not implemented" }),
-                Operation::Bls(false) => generate_shift(lhs, op, rhs, gstate, pos),
-                Operation::Brs(false) => generate_shift(lhs, op, rhs, gstate, pos),
+                Operation::Eq | Operation::Neq | Operation::Gt | Operation::Gte | Operation::Lt | Operation::Lte | Operation::Land | Operation::Lor => generate_expr_cond(expr, gstate, pos),
+                Operation::Bls(true) | Operation::Brs(true) => {
+                    let left = generate_expr(lhs, gstate, pos, false)?;
+                    let right = generate_expr(rhs, gstate, pos, false)?;
+                    let newright = generate_shift(&left, op, &right, gstate, pos)?;
+                    generate_assign(&left, &newright, gstate, pos, false)
+                },
+                Operation::Bls(false) | Operation::Brs(false) => {
+                    let left = generate_expr(lhs, gstate, pos, false)?;
+                    let right = generate_expr(rhs, gstate, pos, false)?;
+                    generate_shift(&left, op, &right, gstate, pos)
+                }
             }
         },
         Expr::Identifier((var, sub)) => {
@@ -1039,7 +1066,7 @@ fn generate_expr<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usiz
         Expr::Neg(v) => generate_neg(v, gstate, pos),
         Expr::Not(v) => generate_not(v, gstate, pos),
         Expr::BNot(v) => generate_bnot(v, gstate, pos),
-        Expr::Deref(v) => generate_eight_bits(v, gstate, pos),
+        Expr::Deref(v) => generate_deref(v, gstate, pos),
         Expr::Nothing => Ok(ExprType::Nothing),
     }
 }
