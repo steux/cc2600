@@ -844,11 +844,15 @@ fn generate_plusplus<'a>(expr_type: &ExprType<'a>, gstate: &mut GeneratorState<'
     }
 }
 
-fn generate_neg<'a>(expr: &Expr<'a>, _gstate: &mut GeneratorState<'a>, _pos: usize) -> Result<ExprType<'a>, Error>
+fn generate_neg<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
 {
     match expr {
         Expr::Integer(i) => Ok(ExprType::Immediate(-*i)),
-        _ => { return Err(Error::Unimplemented { feature: "negation statement is partially implemented" }); },
+        _ => {
+            let left = ExprType::Immediate(0);
+            let right = generate_expr(expr, gstate, pos, false)?;
+            generate_arithm(&left, &Operation::Sub(false), &right, gstate, pos, false)
+        }
     }
 }
 
@@ -923,11 +927,15 @@ fn generate_not<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize
     }
 }
 
-fn generate_bnot<'a>(expr: &Expr<'a>, _gstate: &mut GeneratorState<'a>, _pos: usize) -> Result<ExprType<'a>, Error>
+fn generate_bnot<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
 {
     match expr {
         Expr::Integer(i) => Ok(ExprType::Immediate(!*i)),
-        _ => { return Err(Error::Unimplemented { feature: "negation statement is partially implemented" }); },
+        _ => { 
+            let left = generate_expr(expr, gstate, pos, false)?;
+            let right = ExprType::Immediate(0xff);
+            generate_arithm(&left, &Operation::Xor(false), &right, gstate, pos, false)
+        },
     }
 }
 
