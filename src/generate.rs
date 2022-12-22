@@ -1648,6 +1648,43 @@ fn generate_if<'a>(condition: &Expr<'a>, body: &StatementLoc<'a>, else_body: Opt
     Ok(())
 }
 
+fn generate_switch<'a>(expr: &Expr<'a>, cases: &Vec<(Vec<i32>, Vec<StatementLoc<'a>>)> , gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
+{
+    let e = generate_expr(expr, gstate, pos, false)?;
+    gstate.local_label_counter_if += 1;
+    let switchend_label = format!(".switchend{}", gstate.local_label_counter_if);
+    match gstate.loops.last() {
+        Some(l) => gstate.loops.push((l.0.clone(), switchend_label.clone())),
+        None => gstate.loops.push(("".to_string(), switchend_label.clone()))
+    }
+    for case in cases {
+        gstate.local_label_counter_if += 1;
+        let switchnextcase_label = format!(".switchnextcase{}", gstate.local_label_counter_if);
+        match case.0.len() {
+            0 => (),
+            1 => {
+                generate_condition_ex(&e, &Operation::Eq, &ExprType::Immediate(case.0[0]), gstate, pos, true, &switchnextcase_label)?;
+            },
+            _ => {
+                gstate.local_label_counter_if += 1;
+                let switchnextstatement_label = format!(".switchnextstatement{}", gstate.local_label_counter_if);
+                for i in &case.0 {
+                    generate_condition_ex(&e, &Operation::Eq, &ExprType::Immediate(*i), gstate, pos, false, &switchnextstatement_label)?;
+                }
+                gstate.write_asm(&format!("JMP {}", switchnextcase_label), 3)?;
+                gstate.write_label(&switchnextstatement_label)?;
+            }
+        }
+        for code in &case.1 {
+            generate_statement(code, gstate)?;
+        }
+        gstate.write_label(&switchnextcase_label)?;
+    }
+    gstate.write_label(&switchend_label)?;
+    gstate.loops.pop();
+    Ok(())
+}
+
 fn generate_while<'a>(condition: &Expr<'a>, body: &StatementLoc<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
 {
     gstate.local_label_counter_while += 1;
@@ -1692,8 +1729,10 @@ fn generate_break<'a>(gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(),
 fn generate_continue<'a>(gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
 {
     let cont_label = match gstate.loops.last() {
-        None => return Err(syntax_error(gstate.compiler_state, "Break statement outside loop", pos)),
-        Some((cl, _)) => cl,
+        None => return Err(syntax_error(gstate.compiler_state, "Continue statement outside loop", pos)),
+        Some((cl, _)) => if cl == "" {
+            return Err(syntax_error(gstate.compiler_state, "Continue statement outside loop", pos));
+        } else {cl}
     };
     gstate.write_asm(&format!("JMP {}", cont_label), 3)?;
     Ok(())
@@ -1752,16 +1791,22 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
     gstate.acc_in_use = false;
     // Generate different kind of statements
     match &code.statement {
+        Statement::Expression(expr) => { 
+            generate_expr(&expr, gstate, code.pos, false)?;
+        },
         Statement::Block(statements) => {
             for code in statements {
                 generate_statement(&code, gstate)?;
             }
         },
-        Statement::Expression(expr) => { 
-            generate_expr(&expr, gstate, code.pos, false)?;
-        },
         Statement::For { init, condition, update, body } => { 
             generate_for_loop(init, condition, update, body.as_ref(), gstate, code.pos)?; 
+        },
+        Statement::If { condition, body, else_body } => { 
+            match else_body {
+                None => generate_if(condition, body.as_ref(), None, gstate, code.pos)?,
+                Some(ebody) => generate_if(condition, body.as_ref(), Some(ebody.as_ref()), gstate, code.pos)?,
+            }; 
         },
         Statement::While { condition, body } => { 
             generate_while(condition, body.as_ref(), gstate, code.pos)?; 
@@ -1769,11 +1814,8 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
         Statement::DoWhile { body, condition } => { 
             generate_do_while(body.as_ref(), condition, gstate, code.pos)?; 
         },
-        Statement::If { condition, body, else_body } => { 
-            match else_body {
-                None => generate_if(condition, body.as_ref(), None, gstate, code.pos)?,
-                Some(ebody) => generate_if(condition, body.as_ref(), Some(ebody.as_ref()), gstate, code.pos)?,
-            }; 
+        Statement::Switch { expr, cases } => {
+            generate_switch(expr, cases, gstate, code.pos)?;
         },
         Statement::Break => { generate_break(gstate, code.pos)?; }
         Statement::Continue => { generate_continue(gstate, code.pos)?; }

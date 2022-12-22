@@ -52,7 +52,8 @@ asm_statement = { "asm" ~ "(" ~ quoted_string ~ ")" ~ ";"}
 strobe_statement = { "strobe" ~ "(" ~ expr ~ ")" ~ ";"}
 nothing = { "" }
 
-cases = { ("case" ~ int ~ ":" ~ statement*)* ~ ("default" ~ ":" ~ statement*) }
+cases = { ("case" ~ int ~ ":" ~ ((!"default" ~ statement)*))* ~ default_case? }
+default_case = { "default" ~ ":" ~ statement* } 
 
 expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ postfix* )* }
     infix    =  _{ pass | mass | mulass | divass | blsass | brsass | andass | xorass | orass |

@@ -293,4 +293,22 @@ mod tests {
         print!("{:?}", result);
         assert!(result.contains("LDX #0\n\tBNE .else1\n\tLDA #16\n\tJMP .ifend1\n.else1\n\tLDA #32\n.ifend1\n\tTAY"));
     }
+    
+    #[test]
+    fn switch_test() {
+        //env_logger::init();
+        let args = Args {
+            input: "string".to_string(),
+            output: "string".to_string(),
+            include_directories: Vec::new(),
+            defines: Vec::new(),
+            insert_code: false
+        };
+        let input = "void main() { switch(X) { case 0: case 1: Y = 0; case 2: Y = 1; break; default: Y = 2; } }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("CPX #0\n\tBEQ .switchnextstatement3\n\tCPX #1\n\tBEQ .switchnextstatement3\n\tJMP .switchnextcase2\n.switchnextstatement3\n\tLDY #0\n.switchnextcase2\n\tCPX #2\n\tBNE .switchnextcase4\n\tLDY #1\n\tJMP .switchend1\n.switchnextcase4\n\tLDY #2\n.switchnextcase5\n.switchend1"));
+    }
 }

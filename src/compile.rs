@@ -70,7 +70,7 @@ pub enum Operation {
     TernaryCond2
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr<'a> {
     Nothing,
     Integer(i32),
@@ -89,7 +89,7 @@ pub enum Expr<'a> {
     Deref(Box<Expr<'a>>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement<'a> {
     Block(Vec<StatementLoc<'a>>),
     Expression(Expr<'a>),
@@ -112,6 +112,10 @@ pub enum Statement<'a> {
         body: Box<StatementLoc<'a>>,
         condition: Expr<'a>,
     },
+    Switch {
+        expr: Expr<'a>,
+        cases: Vec<(Vec<i32>, Vec<StatementLoc<'a>>)>
+    },
     Break,
     Continue,
     Return,
@@ -119,7 +123,7 @@ pub enum Statement<'a> {
     Strobe(Expr<'a>)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StatementLoc<'a> {
     pub pos: usize,
     pub statement: Statement<'a>
@@ -436,6 +440,50 @@ fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Res
             Ok(StatementLoc {
                 pos, statement: Statement::While {
                     condition, body: Box::new(body) 
+                }
+            })
+        },
+        Rule::switch_statement => {
+            let mut p = pair.into_inner();
+            let mut cases = Vec::<(Vec<i32>, Vec<StatementLoc<'a>>)>::new();
+            let expr = parse_expr(state, p.next().unwrap().into_inner())?;
+            let c = p.next().unwrap().into_inner();
+            debug!("Cases: {:?}", c);
+            let mut case_set = (Vec::<i32>::new(), Vec::<StatementLoc<'a>>::new());
+            let mut last_was_a_statement = false;
+            for i in c {
+                match i.as_rule() {
+                    Rule::int => {
+                        if last_was_a_statement {
+                            cases.push(case_set.clone());
+                            case_set = (Vec::<i32>::new(), Vec::<StatementLoc<'a>>::new());
+                        }
+                        case_set.0.push(parse_int(i.into_inner().next().unwrap()));
+                    },
+                    Rule::statement => {
+                        case_set.1.push(compile_statement(state, i.into_inner().next().unwrap())?);
+                        last_was_a_statement = true;
+                    },
+                    Rule::default_case => {
+                        cases.push(case_set.clone());
+                        let mut default_set = (Vec::<i32>::new(), Vec::<StatementLoc<'a>>::new());
+                        let d = i.into_inner();
+                        for j in d {
+                            match j.as_rule() {
+                                Rule::statement => {
+                                    default_set.1.push(compile_statement(state, j.into_inner().next().unwrap())?);
+                                },
+                                _ => unreachable!()
+                            }
+                        }
+                        cases.push(default_set);
+                    },
+                    _ => unreachable!()
+                }
+            }
+            Ok(StatementLoc {
+                pos, statement: Statement::Switch {
+                    expr, cases 
                 }
             })
         },
