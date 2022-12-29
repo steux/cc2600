@@ -96,31 +96,43 @@ char *tt_ptr;
 #define WAIT2 i = right_shift4[Y]; Y--; 
 
 #define kernel kernel11
-#define START BEFORE; *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF1= rPFx[X]; *PF2 = rPFy[X];
-#define START2 BEFORE2; *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT2; *PF1= rPFx[X]; *PF2 = rPFy[X];
+#define LEFT_PLAYFIELD *PF1 = lPFx[X]; *PF2 = lPFy[X]
+#define RIGHT_PLAYFIELD *PF1 = rPFx[X]; *PF2 = rPFy[X]
+#define START BEFORE; LEFT_PLAYFIELD; WAIT; RIGHT_PLAYFIELD; 
+#define START2 BEFORE2; LEFT_PLAYFIELD; WAIT2; RIGHT_PLAYFIELD;
 #include "bird_kernel.c"
 
 #undef kernel
 #undef START
 #undef START2
+#undef LEFT_PLAYFIELD
+#undef RIGHT_PLAYFIELD
 
 #define kernel kernel21
-#define START BEFORE; *PF0 = lPFx[X]; *PF1 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF1 = rPFy[X];
-#define START2 BEFORE2; *PF0 = lPFx[X]; *PF1 = lPFy[X]; WAIT2; *PF0 = rPFx[X]; *PF1 = rPFy[X];
+#define LEFT_PLAYFIELD *PF0 = lPFx[X]; *PF1 = lPFy[X]
+#define RIGHT_PLAYFIELD *PF0 = rPFx[X]; *PF1 = rPFy[X]
+#define START BEFORE; LEFT_PLAYFIELD; WAIT; RIGHT_PLAYFIELD; 
+#define START2 BEFORE2; LEFT_PLAYFIELD; WAIT2; RIGHT_PLAYFIELD;
 #include "bird_kernel.c"
 
 #undef kernel
 #undef START
 #undef START2
+#undef LEFT_PLAYFIELD
+#undef RIGHT_PLAYFIELD
 
 #define kernel kernel31
-#define START BEFORE; *PF0 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF2 = rPFy[X];
-#define START2 BEFORE2; *PF0 = lPFx[X]; *PF2 = lPFy[X]; WAIT2; *PF0 = rPFx[X]; *PF2 = rPFy[X];
+#define LEFT_PLAYFIELD *PF0 = lPFx[X]; *PF2 = lPFy[X]
+#define RIGHT_PLAYFIELD *PF0 = rPFx[X]; *PF2 = rPFy[X]
+#define START BEFORE; LEFT_PLAYFIELD; WAIT; RIGHT_PLAYFIELD; 
+#define START2 BEFORE2; LEFT_PLAYFIELD; WAIT2; RIGHT_PLAYFIELD;
 #include "bird_kernel.c"
 
 #undef kernel
 #undef START
 #undef START2
+#undef LEFT_PLAYFIELD
+#undef RIGHT_PLAYFIELD
 
 #undef BIRD1
 #define bank1 bank2
@@ -130,26 +142,36 @@ char *tt_ptr;
 #define WAIT2 i = right_shift4[Y]; Y--; 
 
 #define kernel kernel12
-#define START BEFORE; *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF1= rPFx[X]; *PF2 = rPFy[X];
-#define START2 BEFORE2; *PF1 = lPFx[X]; *PF2 = lPFy[X]; WAIT2; *PF1= rPFx[X]; *PF2 = rPFy[X];
+#define LEFT_PLAYFIELD *PF1 = lPFx[X]; *PF2 = lPFy[X]
+#define RIGHT_PLAYFIELD *PF1 = rPFx[X]; *PF2 = rPFy[X]
+#define START BEFORE; LEFT_PLAYFIELD; WAIT; RIGHT_PLAYFIELD; 
+#define START2 BEFORE2; LEFT_PLAYFIELD; WAIT2; RIGHT_PLAYFIELD;
 #include "bird_kernel.c"
 
 #undef kernel
 #undef START
 #undef START2
+#undef LEFT_PLAYFIELD
+#undef RIGHT_PLAYFIELD
 
 #define kernel kernel22
-#define START BEFORE; *PF0 = lPFx[X]; *PF1 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF1 = rPFy[X];
-#define START2 BEFORE2; *PF0 = lPFx[X]; *PF1 = lPFy[X]; WAIT2; *PF0 = rPFx[X]; *PF1 = rPFy[X];
+#define LEFT_PLAYFIELD *PF0 = lPFx[X]; *PF1 = lPFy[X]
+#define RIGHT_PLAYFIELD *PF0 = rPFx[X]; *PF1 = rPFy[X]
+#define START BEFORE; LEFT_PLAYFIELD; WAIT; RIGHT_PLAYFIELD; 
+#define START2 BEFORE2; LEFT_PLAYFIELD; WAIT2; RIGHT_PLAYFIELD;
 #include "bird_kernel.c"
 
 #undef kernel
 #undef START
 #undef START2
+#undef LEFT_PLAYFIELD
+#undef RIGHT_PLAYFIELD
 
 #define kernel kernel32
-#define START BEFORE; *PF0 = lPFx[X]; *PF2 = lPFy[X]; WAIT; *PF0 = rPFx[X]; *PF2 = rPFy[X];
-#define START2 BEFORE2; *PF0 = lPFx[X]; *PF2 = lPFy[X]; WAIT2; *PF0 = rPFx[X]; *PF2 = rPFy[X];
+#define LEFT_PLAYFIELD *PF0 = lPFx[X]; *PF2 = lPFy[X]
+#define RIGHT_PLAYFIELD *PF0 = rPFx[X]; *PF2 = rPFy[X]
+#define START BEFORE; LEFT_PLAYFIELD; WAIT; RIGHT_PLAYFIELD; 
+#define START2 BEFORE2; LEFT_PLAYFIELD; WAIT2; RIGHT_PLAYFIELD;
 #include "bird_kernel.c"
 
 void init_sprites_pos()
@@ -403,6 +425,13 @@ void game_logic()
     if (rainbow_offset == 50 + 16) rainbow_offset = 0;
 }
 
+const bank3 unsigned char gameover0[13] = { 0x38, 0x79, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xc1, 0xc0, 0xf8, 0x78, 0x38};
+const bank3 unsigned char gameover1[13] = { 0xed, 0xed, 0x6d, 0x6d, 0x6d, 0x6d, 0x6d, 0x6d, 0xef, 0xef, 0x00, 0x00, 0x00};
+const bank3 unsigned char gameover2[13] = { 0x33, 0x4c, 0x5c, 0x5c, 0x5f, 0x5b, 0x5b, 0x5b, 0xdb, 0x9f, 0x0e, 0x00, 0x00};
+const bank3 unsigned char gameover3[13] = { 0x08, 0x1c, 0x3e, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x3e, 0x1c, 0x08};
+const bank3 unsigned char gameover4[13] = { 0xc0, 0xe1, 0xf3, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0x03, 0x01, 0x00, 0x00};
+const bank3 unsigned char gameover5[13] = { 0x8c, 0x8c, 0x8c, 0x8c, 0xec, 0x6c, 0x6f, 0x6f, 0x67, 0xe3, 0xc0, 0x00, 0x00};
+
 const bank3 unsigned char score_line1_PF0[100]={
 	0x77, 0x47, 0x77, 0x77, 0x57, 0x77, 0x77, 0x77, 
 	0x77, 0x77, 0x74, 0x44, 0x74, 0x74, 0x54, 0x74, 
@@ -592,6 +621,8 @@ void main()
     }
     strobe(WSYNC);
    
+    Y = KERNAL - 1;
+    i = (KERNAL - 1) / 16; 
     if (bird_type == 0) {
         if (scroll_sequence < 12) {
             kernel11();
