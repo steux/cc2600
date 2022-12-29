@@ -82,7 +82,7 @@ bank1 void kernel()
     strobe(WSYNC);
     strobe(HMOVE);
     *VBLANK = 0;
-    START2; 
+    START; 
 
     do {
         strobe(WSYNC);
@@ -107,11 +107,12 @@ bank1 void kernel()
         strobe(HMOVE);
         START2
         j = background_ptr2[Y];
-    } while (Y >= 50);
+    } while (Y >= 10);
 
     strobe(WSYNC);
     strobe(HMOVE);
     START2
+    j = background_ptr2[Y];
     *ENAM0 = 2;
     *ENAM1 = 2;
         
@@ -124,6 +125,8 @@ bank1 void kernel()
 
     strobe(WSYNC);
     *COLUBK = GREEN;
+    *ENAM0 = 0;
+    *ENAM1 = 0;
     *PF0 = 0;
     *PF1 = 0;
     *PF2 = 0;

@@ -14,6 +14,7 @@ const unsigned char WHITE = 0x0e;
 const unsigned char YELLOW = 0x2c;
 const unsigned char ORANGE = 0x4c;
 const unsigned char GREY = 0x04;
+const unsigned char LGREEN = 0x5d;
 const unsigned char GREEN = 0x58;
 #else
 const unsigned char RED = 0x36;
@@ -24,6 +25,7 @@ const unsigned char WHITE = 0x0e;
 const unsigned char YELLOW = 0x1e;
 const unsigned char ORANGE = 0xfa;
 const unsigned char GREY = 0x04;
+const unsigned char LGREEN = 0xCd;
 const unsigned char GREEN = 0xC6;
 #endif
 
@@ -65,6 +67,7 @@ unsigned char highscore_high;
 unsigned char *background_ptr1;
 unsigned char *background_ptr2;
 unsigned char rainbow_offset;
+unsigned char difficulty;
 
 // TIATracker variables
 // =====================================================================
@@ -179,8 +182,8 @@ void init_sprites_pos()
     strobe(WSYNC);
     *COLUP0 = RED; 
     *COLUP1 = WHITE; 
-    *GRP0 = 0;
-    *GRP1 = 0;
+    *NUSIZ0 = 0x30;
+    *NUSIZ1 = 0x20;
     asm("pha");
     asm("pla");
     strobe(RESP0);
@@ -189,13 +192,11 @@ void init_sprites_pos()
     *HMBL = 0x70; 
     strobe(WSYNC);
     strobe(HMOVE);
-  
     *HMP0 = 0xE0; 
     *HMP1 = 0x70;
     *HMBL = 0x40; 
     strobe(WSYNC);
     strobe(HMOVE);
-
     *HMP0 = 0x00;
     *HMP1 = 0x00;
     *HMBL = 0x00;
@@ -352,28 +353,46 @@ void init()
     init_sprites_pos();
     first_time = 0;
     ybird = 100 * 256;
+    yspeed = 0;
+    score_low = 0;
+    score_high = 0;
+#ifdef PAL
+    difficulty = 8;
+#else
+    difficulty = 10;
+#endif
 }
 
 void gameover()
 {
-    ybird = 100 * 256;
-    yspeed = 0;
-    score_low = 0;
-    score_high = 0;
+    init();
 }
 
 void game_logic()
 {
-    if (scroll_counter == 10) {
+    if (scroll_counter == difficulty) {
         scroll_counter = 0;
         scroll_sequence++;
         if (scroll_sequence == 20) left_window = right_window;
+        if (scroll_sequence == 16) {
+            score_low++;
+            if (score_low == 100) {
+                score_low = 0;
+                score_high++;
+            }
+            if (score_high > highscore_high || (score_high == highscore_high && score_low > highscore_low)) {
+                highscore_high = score_high;
+                highscore_low = score_low;
+            }
+        }
         if (scroll_sequence == 24) {
             right_window = right_window + 1;
             if (right_window == 8) right_window = 0;
             scroll_sequence = 0;
         }
     }
+    *HMM0 = 0x10;
+    if (scroll_counter & 3) *HMM1 = 0x10;
     yspeed -= 10;
     if (yspeed >> 8 < 0) bird_type = 0;
     if ((*INPT4 & 0x80) != 0) {
@@ -395,7 +414,7 @@ void game_logic()
     }
 
     ybird = ybird + yspeed;
-    if (ybird >> 8 < 20) {
+    if (ybird >> 8 < 22) {
         gameover();
     }
     if (ybird >> 8 > 189) {
@@ -606,16 +625,15 @@ void main()
         // The game logic
         game_logic();
 
-        *HMM0 = 0x10;
-        *HMM1 = 0x20;
+        *ENAM0 = 0;
+        *ENAM1 = 0;
         while (*INTIM);
     }
     strobe(WSYNC);
     strobe(HMOVE);
-    *ENAM0 = 0;
-    *ENAM1 = 0;
     Y = KERNAL - 1;
     i = (KERNAL - 1) / 16; 
+    *COLUBK = YELLOW;
     *HMM0 = 0x00;
     *HMM1 = 0x00;
    
