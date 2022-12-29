@@ -177,39 +177,27 @@ char *tt_ptr;
 void init_sprites_pos()
 {
     strobe(WSYNC);
-
     *COLUP0 = RED; 
-    *HMP0 = 0;
-    *GRP0 = 0;
-    *GRP0 = 0;
-    *GRP0 = 0;
-    *GRP0 = 0;
-    strobe(RESP0);
-    strobe(WSYNC);
-
     *COLUP1 = WHITE; 
-    *HMP1 = 0;
-    *GRP1 = 0;
-    *GRP1 = 0;
-    *GRP1 = 0;
     *GRP0 = 0;
+    *GRP1 = 0;
+    asm("pha");
+    asm("pla");
+    strobe(RESP0);
     strobe(RESP1);
-    strobe(WSYNC);
-
-    *COLUBK = BLUE;
-    *COLUPF = BLACK;
-    *GRP1 = 0;
-    *GRP1 = 0;
-    *CTRLPF = 0x20;
-    *GRP0 = 0;
     strobe(RESBL);
+    *HMBL = 0x70; 
+    strobe(WSYNC);
+    strobe(HMOVE);
+  
+    *HMP0 = 0xE0; 
+    *HMP1 = 0x70;
+    *HMBL = 0x40; 
     strobe(WSYNC);
     strobe(HMOVE);
 
-    *HMBL = 0xF0;
-    strobe(WSYNC);
-    strobe(HMOVE);
-
+    *HMP0 = 0x00;
+    *HMP1 = 0x00;
     *HMBL = 0x00;
     strobe(WSYNC);
     strobe(HMOVE);
@@ -617,12 +605,20 @@ void main()
 #endif
         // The game logic
         game_logic();
+
+        *HMM0 = 0x10;
+        *HMM1 = 0x20;
         while (*INTIM);
     }
     strobe(WSYNC);
-   
+    strobe(HMOVE);
+    *ENAM0 = 0;
+    *ENAM1 = 0;
     Y = KERNAL - 1;
     i = (KERNAL - 1) / 16; 
+    *HMM0 = 0x00;
+    *HMM1 = 0x00;
+   
     if (bird_type == 0) {
         if (scroll_sequence < 12) {
             kernel11();

@@ -107,32 +107,20 @@ bank1 void kernel()
         strobe(HMOVE);
         START2
         j = background_ptr2[Y];
-    } while (Y >= 6);
+    } while (Y >= 50);
 
     strobe(WSYNC);
     strobe(HMOVE);
-    LEFT_PLAYFIELD;
-    RIGHT_PLAYFIELD;
-
-    strobe(WSYNC);
-    strobe(HMOVE);
-    LEFT_PLAYFIELD;
-    RIGHT_PLAYFIELD;
-
-    strobe(WSYNC);
-    strobe(HMOVE);
-    LEFT_PLAYFIELD;
-    RIGHT_PLAYFIELD;
-
-    strobe(WSYNC);
-    strobe(HMOVE);
-    LEFT_PLAYFIELD;
-    RIGHT_PLAYFIELD;
-
-    strobe(WSYNC);
-    strobe(HMOVE);
-    LEFT_PLAYFIELD;
-    RIGHT_PLAYFIELD;
+    START2
+    *ENAM0 = 2;
+    *ENAM1 = 2;
+        
+    do {
+        strobe(WSYNC);
+        strobe(HMOVE);
+        START2
+        j = background_ptr2[Y];
+    } while (Y != 0);
 
     strobe(WSYNC);
     *COLUBK = GREEN;
