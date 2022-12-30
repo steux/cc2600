@@ -110,8 +110,22 @@ bank1 void kernel()
     START2
     j = background_ptr2[Y];
     *ENAM0 = 2;
-    *ENAM1 = 2;
         
+    /*
+    do {
+        strobe(WSYNC);
+        strobe(HMOVE);
+        START2
+        j = background_ptr2[Y];
+    } while (Y >= 5);
+
+    strobe(WSYNC);
+    strobe(HMOVE);
+    START2
+    j = background_ptr2[Y];
+    */
+    *ENAM1 = 2;
+    
     do {
         strobe(WSYNC);
         strobe(HMOVE);
