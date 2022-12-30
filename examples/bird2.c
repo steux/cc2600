@@ -117,7 +117,7 @@ strobe(HMOVE);
 START
 *GRP0 = 0;
 *HMP0 = 0x20;
-*COLUP1 = LGREEN;
+*COLUP1 = DGREEN;
 *COLUP0 = GREEN;
 
 strobe(WSYNC);

@@ -14,8 +14,10 @@ const unsigned char WHITE = 0x0e;
 const unsigned char YELLOW = 0x2c;
 const unsigned char ORANGE = 0x4c;
 const unsigned char GREY = 0x04;
-const unsigned char LGREEN = 0x5d;
+const unsigned char LGREEN = 0x5c;
 const unsigned char GREEN = 0x58;
+const unsigned char DGREEN = 0x54;
+const unsigned char BROWN = 0x20;
 #else
 const unsigned char RED = 0x36;
 const unsigned char BLUE = 0x84;
@@ -25,8 +27,10 @@ const unsigned char WHITE = 0x0e;
 const unsigned char YELLOW = 0x1e;
 const unsigned char ORANGE = 0xfa;
 const unsigned char GREY = 0x04;
-const unsigned char LGREEN = 0xCd;
-const unsigned char GREEN = 0xC6;
+const unsigned char LGREEN = 0xcc;
+const unsigned char GREEN = 0xc6;
+const unsigned char DGREEN = 0xc2;
+const unsigned char BROWN = 0xF0;
 #endif
 
 #define KERNAL 192
@@ -350,6 +354,7 @@ void load_scroll_sequence()
     
 void init()
 {
+    *COLUPF = BROWN;
     init_sprites_pos();
     first_time = 0;
     ybird = 100 * 256;
@@ -693,10 +698,10 @@ void main()
             printf("0x%02x};\n", PF[d][c]);
         }
     }
-    printf("const unsigned char right_shift4[256]={\n\t");
-    for (i = 0; i < 256; i++) {
+    printf("const unsigned char right_shift4[192]={\n\t");
+    for (i = 0; i < 192; i++) {
         printf("0x%02x", i >> 4);
-        if (i != 255) printf(",");
+        if (i != 191) printf(",");
         if (!((i + 1) % 16)) printf("\n\t");
     }
     printf("};\n");
