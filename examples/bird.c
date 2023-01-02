@@ -1,5 +1,4 @@
 #define MAX_RAINBOW_OFFSET 50 
-//#define MAX_RAINBOW_OFFSET (192 - 16 - 2) 
 
 #ifdef __ATARI2600__
 #include "vcs.h"
@@ -181,7 +180,7 @@ char *tt_ptr;
 #define START2 BEFORE2; LEFT_PLAYFIELD; WAIT2; RIGHT_PLAYFIELD;
 #include "bird_kernel.c"
 
-void init_sprites_pos()
+void init_bird_sprite_pos()
 {
     strobe(WSYNC);
     *COLUP0 = RED; 
@@ -355,7 +354,7 @@ void load_scroll_sequence()
 void init()
 {
     *COLUPF = BROWN;
-    init_sprites_pos();
+    init_bird_sprite_pos();
     first_time = 0;
     ybird = 100 * 256;
     yspeed = 0;
@@ -439,10 +438,53 @@ void game_logic()
 
 const bank3 unsigned char gameover0[13] = { 0x38, 0x79, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xc1, 0xc0, 0xf8, 0x78, 0x38};
 const bank3 unsigned char gameover1[13] = { 0xed, 0xed, 0x6d, 0x6d, 0x6d, 0x6d, 0x6d, 0x6d, 0xef, 0xef, 0x00, 0x00, 0x00};
-const bank3 unsigned char gameover2[13] = { 0x33, 0x4c, 0x5c, 0x5c, 0x5f, 0x5b, 0x5b, 0x5b, 0xdb, 0x9f, 0x0e, 0x00, 0x00};
+const bank3 unsigned char gameover2[13] = { 0x44, 0x4c, 0x5c, 0x5c, 0x5f, 0x5b, 0x5b, 0x5b, 0xdb, 0x9f, 0x0e, 0x00, 0x00};
 const bank3 unsigned char gameover3[13] = { 0x08, 0x1c, 0x3e, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x3e, 0x1c, 0x08};
 const bank3 unsigned char gameover4[13] = { 0xc0, 0xe1, 0xf3, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0x03, 0x01, 0x00, 0x00};
 const bank3 unsigned char gameover5[13] = { 0x8c, 0x8c, 0x8c, 0x8c, 0xec, 0x6c, 0x6f, 0x6f, 0x67, 0xe3, 0xc0, 0x00, 0x00};
+
+bank3 void display_gameover()
+{
+    strobe(WSYNC);
+    strobe(HMOVE);
+    *COLUBK = BLACK;
+    *GRP0 = 0;
+    *GRP1 = 0;
+    *NUSIZ0 = 0x33;
+    *NUSIZ1 = 0x33;
+    *COLUP0 = WHITE;
+    *COLUP1 = WHITE;
+    strobe(RESP0);
+    strobe(RESP1);
+    *VDELP0 = 1;
+    *VDELP1 = 1;
+    *HMP1 = 0x20;
+    *HMP0 = 0x10;
+    strobe(WSYNC);
+    strobe(HMOVE);
+    for (Y = 12; Y != 255; Y--) {
+        strobe(WSYNC);
+        i = Y;
+        *GRP0 = gameover0[Y];
+        *GRP1 = gameover1[Y];
+        *GRP0 = gameover2[Y];
+        X = gameover4[Y];
+        j = gameover5[Y];
+        asm("lda gameover3,Y");
+        Y = j;
+        asm("sta GRP1");
+        *GRP0 = X;
+        *GRP1 = Y;
+        strobe(GRP0);
+        Y = i;
+    }
+    strobe(WSYNC);
+    strobe(HMOVE);
+    *VDELP0 = 0;
+    *VDELP1 = 0;
+    *GRP0 = 0;
+    *GRP1 = 0;
+}
 
 const bank3 unsigned char score_line1_PF0[100]={
 	0x77, 0x47, 0x77, 0x77, 0x57, 0x77, 0x77, 0x77, 
@@ -598,13 +640,15 @@ void bottom()
 {
     strobe(WSYNC);
 #ifdef PAL
-    for (X = PALBOTTOM; X != 0; X--) strobe(WSYNC);
+    display_gameover();
+    for (X = PALBOTTOM - 16; X != 0; X--) strobe(WSYNC);
 #endif
 
     *VBLANK = 2; // Enable VBLANK again
                  // Now we have 30 lines of VBLANK
                  //strobe(HMCLR);
-    for (X = OVERSCAN; X != 0; X--) strobe(WSYNC);
+    init_bird_sprite_pos(); // 4 lines
+    for (X = OVERSCAN - 4; X != 0; X--) strobe(WSYNC);
 }
 
 void main()
