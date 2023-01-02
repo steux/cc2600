@@ -2,6 +2,7 @@ mod cpp;
 mod error;
 mod compile;
 mod generate;
+mod assemble;
 
 use std::fs::File;
 use std::io::BufReader;

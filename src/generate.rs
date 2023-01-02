@@ -1,5 +1,6 @@
 use crate::error::Error;
 use crate::compile::*;
+use crate::assemble::Assembly;
 
 use std::io::Write;
 
@@ -51,7 +52,7 @@ impl<'a> GeneratorState<'a> {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-enum ExprType<'a> {
+pub enum ExprType<'a> {
     Nothing,
     Immediate(i32),
     Tmp(bool),
@@ -1657,6 +1658,8 @@ fn generate_switch<'a>(expr: &Expr<'a>, cases: &Vec<(Vec<i32>, Vec<StatementLoc<
         Some(l) => gstate.loops.push((l.0.clone(), switchend_label.clone())),
         None => gstate.loops.push(("".to_string(), switchend_label.clone()))
     }
+    gstate.local_label_counter_if += 1;
+    let mut switchnextstatement_label = format!(".switchnextstatement{}", gstate.local_label_counter_if);
     for case in cases {
         gstate.local_label_counter_if += 1;
         let switchnextcase_label = format!(".switchnextcase{}", gstate.local_label_counter_if);
@@ -1666,20 +1669,22 @@ fn generate_switch<'a>(expr: &Expr<'a>, cases: &Vec<(Vec<i32>, Vec<StatementLoc<
                 generate_condition_ex(&e, &Operation::Eq, &ExprType::Immediate(case.0[0]), gstate, pos, true, &switchnextcase_label)?;
             },
             _ => {
-                gstate.local_label_counter_if += 1;
-                let switchnextstatement_label = format!(".switchnextstatement{}", gstate.local_label_counter_if);
                 for i in &case.0 {
                     generate_condition_ex(&e, &Operation::Eq, &ExprType::Immediate(*i), gstate, pos, false, &switchnextstatement_label)?;
                 }
                 gstate.write_asm(&format!("JMP {}", switchnextcase_label), 3)?;
-                gstate.write_label(&switchnextstatement_label)?;
             }
         }
+        gstate.write_label(&switchnextstatement_label)?;
         for code in &case.1 {
             generate_statement(code, gstate)?;
         }
+        gstate.local_label_counter_if += 1;
+        switchnextstatement_label = format!(".switchnextstatement{}", gstate.local_label_counter_if);
+        gstate.write_asm(&format!("JMP {}", switchnextstatement_label), 3)?;
         gstate.write_label(&switchnextcase_label)?;
     }
+    gstate.write_label(&switchnextstatement_label)?;
     gstate.write_label(&switchend_label)?;
     gstate.loops.pop();
     Ok(())
