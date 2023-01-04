@@ -71,6 +71,7 @@ unsigned char *background_ptr1;
 unsigned char *background_ptr2;
 unsigned char rainbow_offset;
 unsigned char difficulty;
+unsigned char random;
 
 // TIATracker variables
 // =====================================================================
@@ -411,17 +412,50 @@ void init()
     difficulty = 10;
 #endif
     button_pressed = 1;
+    random = 0xaa;
+}
+
+void getready()
+{
+    button_pressed = 1;
+    ybird = 100 * 256;
+    left_window = -1;
+    right_window = 4;
+    scroll_sequence = 0;
+    state = 1;
+    score_low = 00;
+    score_high = 00;
+    load_scroll_sequence();
 }
 
 void gameover()
 {
     button_pressed = 1;
     state = 3;
+    yspeed = 0;
+    if (ybird >> 8 > KERNAL - 30) {
+       ybird = (KERNAL - 30) * 256;
+    } 
+}
+
+void rand()
+{
+    asm("lda random");
+    asm("asl");
+    asm("eor random");
+    asm("asl");
+    asm("eor random");
+    asm("asl");
+    asm("asl");
+    asm("eor random");
+    asm("asl");
+    asm("rol random");
 }
 
 void next_sequence()
 {
-
+    rand();
+    right_window = random & 0x07;
 }
 
 void scrolling()
@@ -430,7 +464,7 @@ void scrolling()
         scroll_counter = 0;
         scroll_sequence++;
         if (scroll_sequence == 20) left_window = right_window;
-        if (state == 2 && scroll_sequence == 16) {
+        if (state == 2 && scroll_sequence == 12 && left_window != -1) {
             score_low++;
             if (score_low == 100) {
                 score_low = 0;
@@ -443,7 +477,7 @@ void scrolling()
             }
         }
         if (scroll_sequence == 24) {
-            if (state == 3) next_sequence();
+            if (state == 2) next_sequence();
             scroll_sequence = 0;
         }
     }
@@ -1008,8 +1042,15 @@ void main()
         if (ybird >> 8 < 22) {
             ybird = 22 * 256;
         }
-        if (ybird >> 8 > 189) {
-            ybird = 189 * 256;
+        if (ybird >> 8 > 186) {
+            ybird = 186 * 256;
+        }
+    } else if (state == 3) {
+        yspeed -= 10;
+        ybird = ybird + yspeed;
+        if (ybird >> 8 < 22) {
+            ybird = 22 * 256;
+            yspeed = 0;
         }
     }
     
@@ -1019,15 +1060,7 @@ void main()
         } 
         if ((*INPT4 & 0x80) != 0) {
             if (button_pressed == 0) {
-                button_pressed = 1;
-                ybird = 100 * 256;
-                left_window = -1;
-                right_window = 4;
-                scroll_sequence = 0;
-                state = 1;
-                score_low = 00;
-                score_high = 00;
-                load_scroll_sequence();
+                getready();
             }
         } else button_pressed = 0;
     } else if (state == 1) {
@@ -1041,6 +1074,19 @@ void main()
                 state = 2;
             }
         } else button_pressed = 0;
+#ifdef PAL
+            if (*SWCHB & 0x80) {
+                difficulty = 4;
+            } else {
+                difficulty = 8;
+            }
+#else
+            if (SWCHB & 0x80) {
+                difficulty = 5;
+            } else {
+                difficulty = 10;
+            }
+#endif
     } else if (state == 2) {
         game_logic();
     } else if (state == 3) {
@@ -1051,15 +1097,7 @@ void main()
         else bird_type = 0;
         if ((*INPT4 & 0x80) != 0) {
             if (button_pressed == 0) {
-                button_pressed = 1;
-                ybird = 100 * 256;
-                left_window = -1;
-                right_window = 4;
-                scroll_sequence = 0;
-                state = 1;
-                score_low = 00;
-                score_high = 00;
-                load_scroll_sequence();
+                getready();
             }
         } else button_pressed = 0;
     }
@@ -1069,6 +1107,7 @@ void main()
     *GRP0 = 0;
     *GRP1 = 0;
     strobe(CXCLR);
+    if (!(*SWCHB & 0x01)) init(); 
     
     while (*INTIM);
 
