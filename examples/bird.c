@@ -1,4 +1,4 @@
-#define MAX_RAINBOW_OFFSET 10 
+#define MAX_RAINBOW_OFFSET 16 
 
 #ifdef __ATARI2600__
 #include "vcs.h"
@@ -353,13 +353,12 @@ void load_scroll_sequence()
     
 void init()
 {
-    *COLUPF = BROWN;
     init_bird_sprite_pos();
     first_time = 0;
     ybird = 100 * 256;
     yspeed = 0;
-    score_low = 0;
-    score_high = 0;
+    score_low = 00;
+    score_high = 99;
 #ifdef PAL
     difficulty = 8;
 #else
@@ -418,11 +417,13 @@ void game_logic()
     }
 
     ybird = ybird + yspeed;
-    if (ybird >> 8 < 24) {
-        gameover();
+    if (ybird >> 8 < 22) {
+        ybird = 22 * 256;
+        //gameover();
     }
     if (ybird >> 8 > 189) {
-        gameover();
+        ybird = 189 * 256;
+        //gameover();
     }
     if ((*CXP0FB & 0x80) != 0) gameover();
     if ((*CXP1FB & 0x80) != 0) gameover();
@@ -588,177 +589,226 @@ void display_getready()
 
 #include "bird_score.c"
 
+// 20 pixels high
 bank3 void display_score()
 {
     *PF0 = 0;
-    *CTRLPF = 2;
     *COLUP0 = WHITE;
-    *COLUP1 = YELLOW;
+    *COLUP1 = WHITE;
+    strobe(WSYNC);
+    strobe(HMOVE);
+    strobe(RESP0);
+    strobe(RESP1);
+    strobe(WSYNC);
+    strobe(HMOVE);
+    asm("pha"); asm("pla");
+    asm("pha"); asm("pla");
+    *HMP1 = 0xF0;
+    *HMP0 = 0x50;
+    strobe(WSYNC);
+    strobe(HMOVE);
+    strobe(WSYNC);
+    *GRP1 = 0x00;
     
     strobe(WSYNC);
+    *GRP0 = 0x04;
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line1_PF1[X];
     X = score_low;
     *PF2 = score_line1_PF2[X];
-    asm("pha"); asm("pla");
+    *GRP0 = 0x0d;
     X = highscore_high;
     *PF1 = score_line1_PF1[X];
+    *COLUPF = YELLOW;
     X = highscore_low;
     *PF2 = score_line1_PF2[X];
+    *GRP1 = 0xae;
     
     strobe(WSYNC);
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line2_PF1[X];
     X = score_low;
     *PF2 = score_line2_PF2[X];
-    asm("pha"); asm("pla");
+    *GRP0 = 0x1d;
+    *GRP1 = 0xad;
     X = highscore_high;
     *PF1 = score_line2_PF1[X];
     X = highscore_low;
+    *COLUPF = YELLOW;
     *PF2 = score_line2_PF2[X];
     
     strobe(WSYNC);
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line3_PF1[X];
     X = score_low;
     *PF2 = score_line3_PF2[X];
-    asm("pha"); asm("pla");
+    *GRP0 = 0x0d;
     X = highscore_high;
     *PF1 = score_line3_PF1[X];
     X = highscore_low;
+    *COLUPF = YELLOW;
     *PF2 = score_line3_PF2[X];
     
     strobe(WSYNC);
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line4_PF1[X];
     X = score_low;
     *PF2 = score_line4_PF2[X];
-    asm("pha"); asm("pla");
+    *GRP1 = 0xae;
     X = highscore_high;
     *PF1 = score_line4_PF1[X];
     X = highscore_low;
+    *COLUPF = YELLOW;
     *PF2 = score_line4_PF2[X];
     
     strobe(WSYNC);
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line5_PF1[X];
     X = score_low;
     *PF2 = score_line5_PF2[X];
-    asm("pha"); asm("pla");
+    *GRP1 = 0xac;
     X = highscore_high;
     *PF1 = score_line5_PF1[X];
     X = highscore_low;
+    *COLUPF = YELLOW;
     *PF2 = score_line5_PF2[X];
     
     strobe(WSYNC);
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line6_PF1[X];
     X = score_low;
     *PF2 = score_line6_PF2[X];
-    asm("pha"); asm("pla");
+    *GRP0 = 0x0c;
+    *GRP1 = 0xcc;
     X = highscore_high;
     *PF1 = score_line6_PF1[X];
+    *COLUPF = YELLOW;
     X = highscore_low;
     *PF2 = score_line6_PF2[X];
     
     strobe(WSYNC);
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line7_PF1[X];
     X = score_low;
     *PF2 = score_line7_PF2[X];
-    asm("pha"); asm("pla");
+    *GRP0 = 0x1e;
+    *GRP1 = 0x00;
     X = highscore_high;
     *PF1 = score_line7_PF1[X];
+    *COLUPF = YELLOW;
     X = highscore_low;
     *PF2 = score_line7_PF2[X];
     
     strobe(WSYNC);
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line8_PF1[X];
     X = score_low;
     *PF2 = score_line8_PF2[X];
-    asm("pha"); asm("pla");
+    *GRP0 = 0x00;
     X = highscore_high;
     *PF1 = score_line8_PF1[X];
     X = highscore_low;
+    *COLUPF = YELLOW;
     *PF2 = score_line8_PF2[X];
     
     strobe(WSYNC);
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line9_PF1[X];
     X = score_low;
     *PF2 = score_line9_PF2[X];
-    asm("pha"); asm("pla");
+    asm("nop");
     X = highscore_high;
     *PF1 = score_line9_PF1[X];
     X = highscore_low;
     *PF2 = score_line9_PF2[X];
+    *COLUPF = YELLOW;
     
     strobe(WSYNC);
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line10_PF1[X];
     X = score_low;
     *PF2 = score_line10_PF2[X];
-    asm("pha"); asm("pla");
+    asm("nop");
     X = highscore_high;
     *PF1 = score_line10_PF1[X];
     X = highscore_low;
     *PF2 = score_line10_PF2[X];
+    *COLUPF = YELLOW;
     
     strobe(WSYNC);
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line11_PF1[X];
     X = score_low;
     *PF2 = score_line11_PF2[X];
-    asm("pha"); asm("pla");
+    asm("nop");
     X = highscore_high;
     *PF1 = score_line11_PF1[X];
     X = highscore_low;
     *PF2 = score_line11_PF2[X];
+    *COLUPF = YELLOW;
     
     strobe(WSYNC);
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line12_PF1[X];
     X = score_low;
     *PF2 = score_line12_PF2[X];
-    asm("pha"); asm("pla");
+    asm("nop");
     X = highscore_high;
     *PF1 = score_line12_PF1[X];
     X = highscore_low;
     *PF2 = score_line12_PF2[X];
+    *COLUPF = YELLOW;
     
     strobe(WSYNC);
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line13_PF1[X];
     X = score_low;
     *PF2 = score_line13_PF2[X];
-    asm("pha"); asm("pla");
+    asm("nop");
     X = highscore_high;
     *PF1 = score_line13_PF1[X];
     X = highscore_low;
     *PF2 = score_line13_PF2[X];
+    *COLUPF = YELLOW;
     
     strobe(WSYNC);
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line14_PF1[X];
     X = score_low;
     *PF2 = score_line14_PF2[X];
-    asm("pha"); asm("pla");
+    asm("nop");
     X = highscore_high;
     *PF1 = score_line14_PF1[X];
     X = highscore_low;
     *PF2 = score_line14_PF2[X];
+    *COLUPF = YELLOW;
     
     strobe(WSYNC);
+    *COLUPF = WHITE;
     X = score_high;
     *PF1 = score_line15_PF1[X];
     X = score_low;
     *PF2 = score_line15_PF2[X];
-    asm("pha"); asm("pla");
+    asm("nop");
     X = highscore_high;
     *PF1 = score_line15_PF1[X];
     X = highscore_low;
     *PF2 = score_line15_PF2[X];
+    *COLUPF = YELLOW;
     
     strobe(WSYNC);
     *CTRLPF = 0;
@@ -770,9 +820,10 @@ bank3 void display_score()
 void bottom()
 {
     strobe(WSYNC);
+    strobe(HMOVE);
 #ifdef PAL
     display_score();
-    for (X = PALBOTTOM - 16; X != 0; X--) strobe(WSYNC);
+    for (X = PALBOTTOM - 20; X != 0; X--) strobe(WSYNC);
 #endif
 
     *VBLANK = 2; // Enable VBLANK again
@@ -807,6 +858,9 @@ void main()
 
         *ENAM0 = 0;
         *ENAM1 = 0;
+        *COLUPF = BROWN;
+        *GRP0 = 0;
+        *GRP1 = 0;
         while (*INTIM);
     }
     strobe(WSYNC);
