@@ -43,6 +43,7 @@ pub struct Variable {
     pub signed: bool,
     pub memory: VariableMemory,
     pub size: usize,
+    pub alignment: usize,
     pub def: VariableDefinition 
 }
 
@@ -303,6 +304,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
     let mut var_const = false;
     let mut signed = true;
     let mut memory = VariableMemory::Zeropage;
+    let mut alignment = 1;
     for pair in pairs {
         match pair.as_rule() {
             Rule::var_type => {
@@ -318,6 +320,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                             var_type = VariableType::Short;
 
                         },
+                        Rule::aligned => alignment = p.into_inner().next().unwrap().as_str().parse::<usize>().unwrap(),
                         _ => unreachable!()
                     }
                 }
@@ -331,23 +334,27 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                         Rule::pointer => var_type = VariableType::CharPtr,
                         Rule::var_const => var_const = true,
                         Rule::id_name => name = p.as_str(),
-                        Rule::int => size = p.as_str().parse::<usize>().unwrap(), 
+                        Rule::int => size = p.as_str().parse::<usize>().unwrap(),
                         Rule::var_def => {
                             let px = p.into_inner().next().unwrap();
                             match px.as_rule() {
                                 Rule::int => def = VariableDefinition::Value(parse_int(px.into_inner().next().unwrap())),
                                 Rule::array_def => {
+                                    let start = px.as_span().start();
                                     if let VariableMemory::ROM(_) = memory {} else {
                                         memory = VariableMemory::ROM(0);
                                     }
                                     if var_type == VariableType::Char {
                                         var_type = VariableType::CharPtr;
                                     } else {
-                                        return Err(syntax_error(state, "Array of short integers are not available", px.as_span().start()));
+                                        return Err(syntax_error(state, "Array of short integers are not available", start));
                                     }
                                     let mut v = Vec::new();
                                     for pxx in px.into_inner() {
                                         v.push(parse_int(pxx.into_inner().next().unwrap()));
+                                    }
+                                    if size != v.len() {
+                                        return Err(syntax_error(state, "Specified array size is different from actual definition", start));
                                     }
                                     def = VariableDefinition::Array(v);
                                     var_const = true;
@@ -366,6 +373,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                         signed,
                         memory,
                         var_const,
+                        alignment,
                         def,
                         var_type, size});
                 }

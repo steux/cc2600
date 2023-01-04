@@ -358,7 +358,7 @@ void init()
     ybird = 100 * 256;
     yspeed = 0;
     score_low = 00;
-    score_high = 99;
+    score_high = 00;
 #ifdef PAL
     difficulty = 8;
 #else
@@ -733,12 +733,12 @@ bank3 void display_score()
     X = highscore_high;
     *PF1 = score_line8_PF1[X];
     X = highscore_low;
-    *PF2 = score_line8_PF2[X];
     strobe(RESP0);
+    *PF2 = score_line8_PF2[X];
     *COLUPF = YELLOW;
-    *GRP0 = 0x00;
+    *HMP0 = 0x80;
     *COLUP0 = YELLOW;
-    *HMP0 = 0x70;
+    *GRP0 = 0;
     
     strobe(WSYNC);
     strobe(HMOVE);
@@ -753,8 +753,8 @@ bank3 void display_score()
     *PF2 = score_line9_PF2[X];
     strobe(RESP1);
     *COLUPF = YELLOW;
+    *HMP1 = 0x50;
     *HMP0 = 0;
-    *HMP1 = 0xF0;
     
     strobe(WSYNC);
     strobe(HMOVE);
