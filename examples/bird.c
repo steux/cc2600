@@ -49,7 +49,7 @@ const unsigned char s1_PF0[24]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x0
 const unsigned char s1_PF1[24]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x03,0x07,0x0e,0x1c,0x38,0x70,0xe0,0xc0,0x80,0x00,0x00,0x00,0x00,0x00};
 const unsigned char s1_PF2[24]={0x00,0x80,0xc0,0xe0,0x70,0x38,0x1c,0x0e,0x07,0x03,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
-char first_time;
+char state;
 unsigned char i, j, k, l;
 unsigned char scroll_sequence;
 unsigned char scroll_counter;
@@ -57,7 +57,7 @@ unsigned char lPFx[12];
 unsigned char rPFx[12];
 unsigned char lPFy[12];
 unsigned char rPFy[12];
-unsigned char left_window, right_window;
+char left_window, right_window;
 unsigned short ybird;
 signed short yspeed;
 unsigned char button_pressed;
@@ -180,10 +180,46 @@ char *tt_ptr;
 #define START2 BEFORE2; LEFT_PLAYFIELD; WAIT2; RIGHT_PLAYFIELD;
 #include "bird_kernel.c"
 #undef bank1
+#undef rainbow
+
+bank1 void set_rainbow1()
+{
+    strobe(WSYNC);
+    strobe(HMOVE);
+    background_ptr1 = rainbow;
+    background_ptr1 += MAX_RAINBOW_OFFSET + RAINBOW_SIZE - 1;
+    background_ptr1 -= (ybird >> 8);
+    background_ptr2 = background_ptr1;
+    strobe(WSYNC);
+    strobe(HMOVE);
+    background_ptr2 += 193;
+    background_ptr1 -= rainbow_offset;
+    background_ptr2 += rainbow_offset;
+    strobe(WSYNC);
+    strobe(HMOVE);
+}
+
+bank2 void set_rainbow2()
+{
+    strobe(WSYNC);
+    strobe(HMOVE);
+    background_ptr1 = rainbow_bank2;
+    background_ptr1 += MAX_RAINBOW_OFFSET + RAINBOW_SIZE - 1;
+    background_ptr1 -= (ybird >> 8);
+    background_ptr2 = background_ptr1;
+    strobe(WSYNC);
+    strobe(HMOVE);
+    background_ptr2 += 193;
+    background_ptr1 -= rainbow_offset;
+    background_ptr2 += rainbow_offset;
+    strobe(WSYNC);
+    strobe(HMOVE);
+}
 
 void init_bird_sprite_pos()
 {
     strobe(WSYNC);
+    strobe(HMOVE);
     *COLUP0 = RED; 
     *COLUP1 = WHITE; 
     *NUSIZ0 = 0x30;
@@ -283,102 +319,118 @@ void load_scroll_sequence()
         rPFx[X] = j;
         rPFy[X] = k;
     }
-    
-    Y = scroll_sequence + 4;
-    if (Y >= 24) Y = Y - 24;
-    if (i == 0) {
-        j = s1_PF1[Y];
-        k = s1_PF2[Y]; 
-    } else if (i == 1) {
-        j = s1_PF0[Y];
-        k = s1_PF1[Y]; 
-    } else if (i == 2) {
-        j = s1_PF0[Y];
-        k = s1_PF2[Y]; 
-    }
 
-    for (X = 0; X != left_window; X++) {
+    if (left_window == -1) {
+        for (X = 0; X != 12; X++) {
+            lPFx[X] = 0;
+            lPFy[X] = 0;
+        }
+    } else {
+        Y = scroll_sequence + 4;
+        if (Y >= 24) Y = Y - 24;
+        if (i == 0) {
+            j = s1_PF1[Y];
+            k = s1_PF2[Y]; 
+        } else if (i == 1) {
+            j = s1_PF0[Y];
+            k = s1_PF1[Y]; 
+        } else if (i == 2) {
+            j = s1_PF0[Y];
+            k = s1_PF2[Y]; 
+        }
+
+        for (X = 0; X != left_window; X++) {
+            lPFx[X] = j;
+            lPFy[X] = k;
+        }
+
+        if (i == 0) {
+            j = s0_PF1[Y];
+            k = s0_PF2[Y]; 
+        } else if (i == 1) {
+            j = s0_PF0[Y];
+            k = s0_PF1[Y]; 
+        } else if (i == 2) {
+            j = s0_PF0[Y];
+            k = s0_PF2[Y]; 
+        }
         lPFx[X] = j;
         lPFy[X] = k;
-    }
+        X++;
 
-    if (i == 0) {
-        j = s0_PF1[Y];
-        k = s0_PF2[Y]; 
-    } else if (i == 1) {
-        j = s0_PF0[Y];
-        k = s0_PF1[Y]; 
-    } else if (i == 2) {
-        j = s0_PF0[Y];
-        k = s0_PF2[Y]; 
-    }
-    lPFx[X] = j;
-    lPFy[X] = k;
-    X++;
+        for (; X != left_window + 4; X++) {
+            lPFx[X] = 0;
+            lPFy[X] = 0;
+        }
 
-    for (; X != left_window + 4; X++) {
-        lPFx[X] = 0;
-        lPFy[X] = 0;
-    }
-
-    if (i == 0) {
-        j = s0_PF1[Y];
-        k = s0_PF2[Y]; 
-    } else if (i == 1) {
-        j = s0_PF0[Y];
-        k = s0_PF1[Y]; 
-    } else if (i == 2) {
-        j = s0_PF0[Y];
-        k = s0_PF2[Y]; 
-    }
-    lPFx[X] = j;
-    lPFy[X] = k;
-    X++;
-
-    if (i == 0) {
-        j = s1_PF1[Y];
-        k = s1_PF2[Y]; 
-    } else if (i == 1) {
-        j = s1_PF0[Y];
-        k = s1_PF1[Y]; 
-    } else if (i == 2) {
-        j = s1_PF0[Y];
-        k = s1_PF2[Y]; 
-    }
-
-    for (; X != 12; X++) {
+        if (i == 0) {
+            j = s0_PF1[Y];
+            k = s0_PF2[Y]; 
+        } else if (i == 1) {
+            j = s0_PF0[Y];
+            k = s0_PF1[Y]; 
+        } else if (i == 2) {
+            j = s0_PF0[Y];
+            k = s0_PF2[Y]; 
+        }
         lPFx[X] = j;
         lPFy[X] = k;
+        X++;
+
+        if (i == 0) {
+            j = s1_PF1[Y];
+            k = s1_PF2[Y]; 
+        } else if (i == 1) {
+            j = s1_PF0[Y];
+            k = s1_PF1[Y]; 
+        } else if (i == 2) {
+            j = s1_PF0[Y];
+            k = s1_PF2[Y]; 
+        }
+
+        for (; X != 12; X++) {
+            lPFx[X] = j;
+            lPFy[X] = k;
+        }
     }
 }
     
 void init()
 {
     init_bird_sprite_pos();
-    first_time = 0;
-    ybird = 100 * 256;
+    state = 0;
+    ybird = 70 * 256;
     yspeed = 0;
     score_low = 00;
     score_high = 00;
+    left_window = 2;
+    right_window = 2;
 #ifdef PAL
     difficulty = 8;
 #else
     difficulty = 10;
 #endif
+    button_pressed = 1;
 }
 
 void gameover()
 {
-    init();
+    button_pressed = 1;
+    state = 3;
 }
 
-void game_logic()
+void next_sequence()
+{
+
+}
+
+void scrolling()
 {
     if (scroll_counter == difficulty) {
         scroll_counter = 0;
         scroll_sequence++;
         if (scroll_sequence == 20) left_window = right_window;
-        if (scroll_sequence == 16) {
+        if (state == 2 && scroll_sequence == 16) {
             score_low++;
             if (score_low == 100) {
                 score_low = 0;
@@ -391,51 +443,41 @@ void game_logic()
             }
         }
         if (scroll_sequence == 24) {
-            right_window = right_window + 1;
-            if (right_window == 8) right_window = 0;
+            if (state == 3) next_sequence();
             scroll_sequence = 0;
         }
     }
     *HMM0 = 0x10;
     if (scroll_counter & 3) *HMM1 = 0x10;
-    yspeed -= 10;
-    if (yspeed >> 8 < 0) bird_type = 0;
+    load_scroll_sequence();
+    scroll_counter++;
+}
+
+void flap()
+{
+    yspeed = 350;
+    if (bird_type == 0) 
+        bird_type = 1;
+    else {
+        bird_type = 0;
+        bird_animation_counter = 5;
+    }
+}
+
+void game_logic()
+{
     if ((*INPT4 & 0x80) != 0) {
         if (button_pressed == 0) {
             button_pressed = 1;
-            yspeed = 350;
-            if (bird_type == 0) 
-                bird_type = 1;
-            else {
-                bird_type = 0;
-                bird_animation_counter = 5;
-            }
+            flap();
         }
     } else button_pressed = 0;
 
-    if (bird_animation_counter != 0) {
-        bird_animation_counter--;
-        if (bird_animation_counter == 0) bird_type = 1;
-    }
-
-    ybird = ybird + yspeed;
-    if (ybird >> 8 < 22) {
-        ybird = 22 * 256;
-        //gameover();
-    }
-    if (ybird >> 8 > 189) {
-        ybird = 189 * 256;
-        //gameover();
-    }
     if ((*CXP0FB & 0x80) != 0) gameover();
     if ((*CXP1FB & 0x80) != 0) gameover();
     if ((*CXBLPF & 0x80) != 0) gameover();
-    strobe(CXCLR);
 
-    load_scroll_sequence();
-    scroll_counter++;
-
-    rainbow_offset++;
+    rainbow_offset = 0;
     if (rainbow_offset == MAX_RAINBOW_OFFSET + 16) rainbow_offset = 0;
 }
 
@@ -547,7 +589,7 @@ void display_happybird()
 {
     strobe(WSYNC);
     strobe(HMOVE);
-    *COLUBK = BLACK;
+    *COLUBK = RED;
     *GRP0 = 0;
     *GRP1 = 0;
     *NUSIZ0 = 0x33;
@@ -905,30 +947,28 @@ void bottom()
 {
     strobe(WSYNC);
     strobe(HMOVE);
+#ifdef PAL
+    /*
     *COLUP0 = WHITE;
     *COLUP1 = WHITE;
     *COLUBK = BLACK;
         
-#ifdef PAL
-    /*
     display_gameover();
     for (X = PALBOTTOM - 16; X != 0; X--) {
         strobe(WSYNC);
         strobe(HMOVE);
     }
-    */
+    *//*
     display_getready();
     for (X = PALBOTTOM - 19; X != 0; X--) {
         strobe(WSYNC);
         strobe(HMOVE);
-    }
-    /*
+    }*/
     display_score();
     for (X = PALBOTTOM - 18; X != 0; X--) {
         strobe(WSYNC);
         strobe(HMOVE);
     }
-    */
 #endif
 
     *VBLANK = 2; // Enable VBLANK again
@@ -940,7 +980,7 @@ void bottom()
 
 void main()
 {
-  first_time = 1;
+  init();
 
   do {
     *VBLANK = 2; // Enable VBLANK
@@ -950,39 +990,127 @@ void main()
     strobe(WSYNC);
     *VSYNC = 0; // Turn VSYNC Off
 
-    if (first_time) {
-        init();
-    } else {
 #ifdef PAL
-        *TIM64T = 49; 
+    *TIM64T = 50; 
 #else
-        *TIM64T = 39;
+    *TIM64T = 39;
 #endif
-        // The game logic
-        game_logic();
-
-        *ENAM0 = 0;
-        *ENAM1 = 0;
-        *COLUPF = BROWN;
-        *GRP0 = 0;
-        *GRP1 = 0;
-        while (*INTIM);
+    // The game logic
+    if (state == 0 || state == 2) {
+        scrolling();
+        yspeed -= 10;
+        if (yspeed >> 8 < 0) bird_type = 0;
+        if (bird_animation_counter != 0) {
+            bird_animation_counter--;
+            if (bird_animation_counter == 0) bird_type = 1;
+        }
+        ybird = ybird + yspeed;
+        if (ybird >> 8 < 22) {
+            ybird = 22 * 256;
+        }
+        if (ybird >> 8 > 189) {
+            ybird = 189 * 256;
+        }
     }
+    
+    if (state == 0) {
+        if (ybird >> 8 < 70) {
+            flap();
+        } 
+        if ((*INPT4 & 0x80) != 0) {
+            if (button_pressed == 0) {
+                button_pressed = 1;
+                ybird = 100 * 256;
+                left_window = -1;
+                right_window = 4;
+                scroll_sequence = 0;
+                state = 1;
+                score_low = 00;
+                score_high = 00;
+                load_scroll_sequence();
+            }
+        } else button_pressed = 0;
+    } else if (state == 1) {
+        *COLUBK = RED;
+        *COLUP0 = WHITE;
+        *COLUP1 = WHITE;
+        if ((*INPT4 & 0x80) != 0) {
+            if (button_pressed == 0) {
+                button_pressed = 1;
+                yspeed = 0;
+                state = 2;
+            }
+        } else button_pressed = 0;
+    } else if (state == 2) {
+        game_logic();
+    } else if (state == 3) {
+        *COLUBK = BLACK;
+        *COLUP0 = WHITE;
+        *COLUP1 = WHITE;
+        if (bird_type == 0) bird_type = 1;
+        else bird_type = 0;
+        if ((*INPT4 & 0x80) != 0) {
+            if (button_pressed == 0) {
+                button_pressed = 1;
+                ybird = 100 * 256;
+                left_window = -1;
+                right_window = 4;
+                scroll_sequence = 0;
+                state = 1;
+                score_low = 00;
+                score_high = 00;
+                load_scroll_sequence();
+            }
+        } else button_pressed = 0;
+    }
+
+    *ENAM0 = 0;
+    *ENAM1 = 0;
+    *GRP0 = 0;
+    *GRP1 = 0;
+    strobe(CXCLR);
+    
+    while (*INTIM);
+
     strobe(WSYNC);
     strobe(HMOVE);
-    Y = KERNAL - 1;
-    i = (KERNAL - 1) / 16; 
-    *COLUBK = YELLOW;
+    *VBLANK = 0;
+    *COLUPF = BROWN;
     *HMM0 = 0x00;
     *HMM1 = 0x00;
-   
+
+    if (state == 2) {
+        strobe(WSYNC);
+        strobe(HMOVE);
+        Y = KERNAL - 4;
+        i = (KERNAL - 4) / 16;
+    } else if (state == 0) {
+        display_happybird();
+        init_bird_sprite_pos(); // 4 lines
+        Y = KERNAL - 34;
+        i = (KERNAL - 34) / 16;
+    } else if (state == 1) {
+        display_getready();
+        init_bird_sprite_pos(); // 4 lines
+        Y = KERNAL - 26;
+        i = (KERNAL - 26) / 16;
+    } else {
+        display_gameover();
+        init_bird_sprite_pos(); // 4 lines
+        Y = KERNAL - 23;
+        i = (KERNAL - 23) / 16;
+    }
+
+    *COLUBK = YELLOW;
     if (bird_type == 0) {
+        set_rainbow1();
         if (scroll_sequence < 12) {
             kernel11();
         } else if (scroll_sequence < 20) {
             kernel21();
         } else kernel31();
     } else {
+        set_rainbow2();
         if (scroll_sequence < 12) {
             kernel12();
         } else if (scroll_sequence < 20) {

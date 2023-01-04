@@ -53,19 +53,7 @@ bank1 void kernel()
 {
     j = YELLOW;
     strobe(WSYNC);
-    // 2 lines
-    background_ptr1 = rainbow;
-    background_ptr1 += MAX_RAINBOW_OFFSET + RAINBOW_SIZE - 1;
-    background_ptr1 -= (ybird >> 8);
-    background_ptr2 = background_ptr1;
-    background_ptr2 += 193;
-    background_ptr1 -= rainbow_offset;
-    background_ptr2 += rainbow_offset;
-
-    // Renable output (disable VBLANK)
-    strobe(WSYNC);
     strobe(HMOVE);
-    *VBLANK = 0;
     START; 
 
     do {
@@ -98,7 +86,7 @@ bank1 void kernel()
     START2
     j = background_ptr2[Y];
     *ENAM0 = 2;
-    // Removed: thakes too much place for a mediocre result
+    // Removed: takes too much place for a mediocre result
 #if 0        
     do {
         strobe(WSYNC);
