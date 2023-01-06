@@ -74,40 +74,26 @@ bank1 void kernel()
 #endif
  
     j = background_ptr2[Y];
-    do {
+    while (Y >= 16) {
         strobe(WSYNC);
         strobe(HMOVE);
         START2
         j = background_ptr2[Y];
-    } while (Y >= 31);
+    }
 
     strobe(WSYNC);
     strobe(HMOVE);
     START2
     j = background_ptr2[Y];
     *ENAM0 = 2;
-    // Removed: takes too much place for a mediocre result
-#if 0        
-    do {
-        strobe(WSYNC);
-        strobe(HMOVE);
-        START2
-        j = background_ptr2[Y];
-    } while (Y >= 12);
-
-    strobe(WSYNC);
-    strobe(HMOVE);
-    START2
-    j = background_ptr2[Y];
-#endif
-     *ENAM1 = 2;
+    strobe(ENAM1);
     
-    do {
+    while (Y > 0) {
         strobe(WSYNC);
         strobe(HMOVE);
         START2
         j = background_ptr2[Y];
-    } while (Y != 0);
+    }
 
     strobe(WSYNC);
     strobe(HMOVE);

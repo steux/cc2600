@@ -221,25 +221,33 @@ void init_bird_sprite_pos()
 {
     strobe(WSYNC);
     strobe(HMOVE);
-    *COLUP0 = RED; 
     *COLUP1 = WHITE; 
     *NUSIZ0 = 0x30;
     *NUSIZ1 = 0x20;
-    asm("pha");
-    asm("pla");
+    if (state == 0) {
+        asm("pha");
+        asm("pla");
+        asm("pha");
+        asm("pla");
+    }
     strobe(RESP0);
     strobe(RESP1);
     strobe(RESBL);
+    *HMP0 = 0x80; 
+    *HMP1 = 0x00; 
     *HMBL = 0x70; 
     strobe(WSYNC);
     strobe(HMOVE);
-    *HMP0 = 0xE0; 
-    *HMP1 = 0x70;
-    *HMBL = 0x40; 
+    *CTRLPF = 0x20;
+    asm("pha");
+    asm("pla");
+    *HMP0 = 0xF0;
+    *HMBL = 0x10;
     strobe(WSYNC);
     strobe(HMOVE);
+    asm("pha");
+    asm("pla");
     *HMP0 = 0x00;
-    *HMP1 = 0x00;
     *HMBL = 0x00;
     strobe(WSYNC);
     strobe(HMOVE);
@@ -460,7 +468,7 @@ void next_sequence()
 
 void scrolling()
 {
-    if (scroll_counter == difficulty) {
+    if (scroll_counter >= difficulty) {
         scroll_counter = 0;
         scroll_sequence++;
         if (scroll_sequence == 20) left_window = right_window;
@@ -980,22 +988,6 @@ void bottom()
     strobe(WSYNC);
     strobe(HMOVE);
 #ifdef PAL
-    /*
-    *COLUP0 = WHITE;
-    *COLUP1 = WHITE;
-    *COLUBK = BLACK;
-        
-    display_gameover();
-    for (X = PALBOTTOM - 16; X != 0; X--) {
-        strobe(WSYNC);
-        strobe(HMOVE);
-    }
-    *//*
-    display_getready();
-    for (X = PALBOTTOM - 19; X != 0; X--) {
-        strobe(WSYNC);
-        strobe(HMOVE);
-    }*/
     display_score();
     for (X = PALBOTTOM - 20; X >= 0; X--) {
         strobe(WSYNC);
@@ -1037,8 +1029,8 @@ void main()
             if (bird_animation_counter == 0) bird_type = 1;
         }
         ybird = ybird + yspeed;
-        if (ybird >> 8 < 22) {
-            ybird = 22 * 256;
+        if (ybird >> 8 < 20) {
+            ybird = 20 * 256;
             if (state == 2) gameover();
         }
         if (ybird >> 8 > 186) {
@@ -1047,21 +1039,21 @@ void main()
     } else if (state == 3) {
         yspeed -= 10;
         ybird = ybird + yspeed;
-        if (ybird >> 8 < 22) {
-            ybird = 22 * 256;
+        if (ybird >> 8 < 20) {
+            ybird = 20 * 256;
             yspeed = 0;
         }
     }
    
     if (state == 0 || state == 1) {
 #ifdef PAL
-        if (*SWCHB & 0x80) {
+        if (*SWCHB & 0x40) {
             difficulty = 4;
         } else {
             difficulty = 8;
         }
 #else
-        if (*SWCHB & 0x80) {
+        if (*SWCHB & 0x40) {
             difficulty = 5;
         } else {
             difficulty = 10;
@@ -1082,6 +1074,8 @@ void main()
         *COLUBK = RED;
         *COLUP0 = WHITE;
         *COLUP1 = WHITE;
+        if (bird_type == 0) bird_type = 1;
+        else bird_type = 0;
         if ((*INPT4 & 0x80) != 0) {
             if (button_pressed == 0) {
                 button_pressed = 1;

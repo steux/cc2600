@@ -124,4 +124,4 @@ strobe(HMOVE);
 START
 *HMP1 = 0;
 *HMBL = 0;
-*CTRLPF = 0x20;
+//*CTRLPF = 0x20;

@@ -124,4 +124,4 @@ strobe(WSYNC);
 strobe(HMOVE);
 START
 *HMP0 = 0;
-*CTRLPF = 0x20;
+//*CTRLPF = 0x20;
