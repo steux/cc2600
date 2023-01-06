@@ -310,6 +310,6 @@ mod tests {
         compile(input.as_bytes(), &mut output, &args).unwrap();
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
-        assert!(result.contains("CPX #0\n\tBEQ .switchnextstatement3\n\tCPX #1\n\tBEQ .switchnextstatement3\n\tJMP .switchnextcase2\n.switchnextstatement3\n\tLDY #0\n.switchnextcase2\n\tCPX #2\n\tBNE .switchnextcase4\n\tLDY #1\n\tJMP .switchend1\n.switchnextcase4\n\tLDY #2\n.switchnextcase5\n.switchend1"));
+        assert!(result.contains("CPX #0\n\tBEQ .switchnextstatement2\n\tCPX #1\n\tBEQ .switchnextstatement2\n\tJMP .switchnextcase3\n.switchnextstatement2\n\tLDY #0\n\tJMP .switchnextstatement4\n.switchnextcase3\n\tCPX #2\n\tBNE .switchnextcase5\n.switchnextstatement4\n\tLDY #1\n\tJMP .switchend1\n\tJMP .switchnextstatement6\n.switchnextcase5\n.switchnextstatement6\n\tLDY #2\n.switchend1"));
     }
 }

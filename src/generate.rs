@@ -6,6 +6,8 @@ use std::io::Write;
 
 use log::debug;
 
+// TODO: add cctmp in use
+
 struct GeneratorState<'a> {
     compiler_state: &'a CompilerState<'a>,
     last_included_line_number: usize,
@@ -1292,10 +1294,12 @@ fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>,
                             },
                             ExprType::A(sign) => *sign,
                             ExprType::Tmp(sign) => *sign,
-                            ExprType::Y => false,
-                            ExprType::X => false,
+                            ExprType::Y => true, // X and Y are unsigned, but for end of loop
+                                                 // optimization, we declare these as signed
+                                                 // (>=0 test is then translated to bpl test)
+                            ExprType::X => true,
                             ExprType::Immediate(v) => {
-                                if *v != 0 {
+                                if (operator == Operation::Neq && *v != 0) || (operator == Operation::Eq && *v == 0) {
                                     gstate.write_asm(&format!("JMP {}", label), 3)?;
                                 }
                                 return Ok(());
@@ -1660,19 +1664,22 @@ fn generate_switch<'a>(expr: &Expr<'a>, cases: &Vec<(Vec<i32>, Vec<StatementLoc<
     }
     gstate.local_label_counter_if += 1;
     let mut switchnextstatement_label = format!(".switchnextstatement{}", gstate.local_label_counter_if);
-    for case in cases {
+    for (case, is_last_element) in cases.iter().enumerate().map(|(i,c)| (c, i == cases.len() - 1)) {
         gstate.local_label_counter_if += 1;
         let switchnextcase_label = format!(".switchnextcase{}", gstate.local_label_counter_if);
+        let mut jmp_to_next_case = false;
         match case.0.len() {
             0 => (),
             1 => {
                 generate_condition_ex(&e, &Operation::Eq, &ExprType::Immediate(case.0[0]), gstate, pos, true, &switchnextcase_label)?;
+                jmp_to_next_case = true;
             },
             _ => {
                 for i in &case.0 {
                     generate_condition_ex(&e, &Operation::Eq, &ExprType::Immediate(*i), gstate, pos, false, &switchnextstatement_label)?;
                 }
                 gstate.write_asm(&format!("JMP {}", switchnextcase_label), 3)?;
+                jmp_to_next_case = true;
             }
         }
         gstate.write_label(&switchnextstatement_label)?;
@@ -1681,10 +1688,14 @@ fn generate_switch<'a>(expr: &Expr<'a>, cases: &Vec<(Vec<i32>, Vec<StatementLoc<
         }
         gstate.local_label_counter_if += 1;
         switchnextstatement_label = format!(".switchnextstatement{}", gstate.local_label_counter_if);
-        gstate.write_asm(&format!("JMP {}", switchnextstatement_label), 3)?;
-        gstate.write_label(&switchnextcase_label)?;
+        // If this is not the last case...
+        if !is_last_element {
+            gstate.write_asm(&format!("JMP {}", switchnextstatement_label), 3)?;
+        }
+        if jmp_to_next_case {
+            gstate.write_label(&switchnextcase_label)?;
+        }
     }
-    gstate.write_label(&switchnextstatement_label)?;
     gstate.write_label(&switchend_label)?;
     gstate.loops.pop();
     Ok(())
