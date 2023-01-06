@@ -2,6 +2,7 @@ use crate::compile::*;
 use crate::generate::ExprType;
 
 use std::io::Write;
+use std::fmt::{self, Debug, Display};
 
 #[derive(Debug, PartialEq)]
 enum AsmMnemonic {
@@ -17,6 +18,12 @@ enum AsmMnemonic {
     DEC, DEX, DEY,
     JMP, JSR, RTS,
     PHA, PLA,
+}
+
+impl fmt::Display for AsmMnemonic {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
 }
 
 #[derive(Debug)]

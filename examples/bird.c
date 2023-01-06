@@ -971,8 +971,6 @@ bank3 void display_score()
     
     strobe(WSYNC);
     strobe(HMOVE);
-    *CTRLPF = 0;
-    *PF0 = 0;
     *PF1 = 0;
     *PF2 = 0;
 }
@@ -999,7 +997,7 @@ void bottom()
         strobe(HMOVE);
     }*/
     display_score();
-    for (X = PALBOTTOM - 18; X != 0; X--) {
+    for (X = PALBOTTOM - 20; X >= 0; X--) {
         strobe(WSYNC);
         strobe(HMOVE);
     }
@@ -1041,6 +1039,7 @@ void main()
         ybird = ybird + yspeed;
         if (ybird >> 8 < 22) {
             ybird = 22 * 256;
+            if (state == 2) gameover();
         }
         if (ybird >> 8 > 186) {
             ybird = 186 * 256;
@@ -1053,7 +1052,23 @@ void main()
             yspeed = 0;
         }
     }
-    
+   
+    if (state == 0 || state == 1) {
+#ifdef PAL
+        if (*SWCHB & 0x80) {
+            difficulty = 4;
+        } else {
+            difficulty = 8;
+        }
+#else
+        if (*SWCHB & 0x80) {
+            difficulty = 5;
+        } else {
+            difficulty = 10;
+        }
+#endif
+    }
+
     if (state == 0) {
         if (ybird >> 8 < 70) {
             flap();
@@ -1074,19 +1089,6 @@ void main()
                 state = 2;
             }
         } else button_pressed = 0;
-#ifdef PAL
-            if (*SWCHB & 0x80) {
-                difficulty = 4;
-            } else {
-                difficulty = 8;
-            }
-#else
-            if (SWCHB & 0x80) {
-                difficulty = 5;
-            } else {
-                difficulty = 10;
-            }
-#endif
     } else if (state == 2) {
         game_logic();
     } else if (state == 3) {
@@ -1121,23 +1123,23 @@ void main()
     if (state == 2) {
         strobe(WSYNC);
         strobe(HMOVE);
-        Y = KERNAL - 4;
-        i = (KERNAL - 4) / 16;
+        Y = KERNAL - 3;
+        i = (KERNAL - 3) / 16;
     } else if (state == 0) {
         display_happybird();
         init_bird_sprite_pos(); // 4 lines
-        Y = KERNAL - 34;
-        i = (KERNAL - 34) / 16;
+        Y = KERNAL - 33;
+        i = (KERNAL - 33) / 16;
     } else if (state == 1) {
         display_getready();
         init_bird_sprite_pos(); // 4 lines
-        Y = KERNAL - 26;
-        i = (KERNAL - 26) / 16;
+        Y = KERNAL - 25;
+        i = (KERNAL - 25) / 16;
     } else {
         display_gameover();
         init_bird_sprite_pos(); // 4 lines
-        Y = KERNAL - 23;
-        i = (KERNAL - 23) / 16;
+        Y = KERNAL - 22;
+        i = (KERNAL - 22) / 16;
     }
 
     *COLUBK = YELLOW;
