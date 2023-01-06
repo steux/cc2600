@@ -229,6 +229,7 @@ void init_bird_sprite_pos()
         asm("pla");
         asm("pha");
         asm("pla");
+        asm("nop");
     }
     strobe(RESP0);
     strobe(RESP1);
@@ -539,14 +540,18 @@ bank1 void display_gameover()
     *NUSIZ1 = 0x33;
     *VDELP0 = 1;
     *VDELP1 = 1;
-    *HMP1 = 0x20;
-    *HMP0 = 0x10;
+    *HMP1 = 0xD0; 
+    *HMP0 = 0xC0;
     strobe(RESP0);
     strobe(RESP1);
     strobe(WSYNC);
     strobe(HMOVE);
-    for (Y = 12; Y != 255; Y--) {
+    asm("pha"); asm("pla");
+    *HMP1 = 0x0;
+    *HMP0 = 0x0;
+    for (Y = 12; Y >= 0; Y--) {
         strobe(WSYNC);
+        strobe(HMOVE);
         i = Y;
         *GRP0 = gameover0[Y];
         *GRP1 = gameover1[Y];
@@ -642,12 +647,16 @@ void display_happybird()
     strobe(RESP1);
     *VDELP0 = 1;
     *VDELP1 = 1;
-    *HMP1 = 0x20;
-    *HMP0 = 0x10;
+    *HMP1 = 0xD0; 
+    *HMP0 = 0xC0;
     strobe(WSYNC);
     strobe(HMOVE);
-    for (Y = 23; Y != 255; Y--) {
+    asm("pha"); asm("pla");
+    *HMP1 = 0x0;
+    *HMP0 = 0x0;
+    for (Y = 23; Y >= 0; Y--) {
         strobe(WSYNC);
+        strobe(HMOVE);
         i = Y;
         *GRP0 = happybird0[Y];
         *GRP1 = happybird1[Y];
@@ -683,19 +692,22 @@ bank2 void display_getready()
     strobe(WSYNC);
     strobe(HMOVE);
     *GRP0 = 0;
-    *GRP1 = 0;
     *NUSIZ0 = 0x33;
     *NUSIZ1 = 0x33;
     *VDELP0 = 1;
     *VDELP1 = 1;
-    *HMP1 = 0x20;
+    *HMP1 = 0xD0; 
+    *HMP0 = 0xC0;
     strobe(RESP0);
     strobe(RESP1);
-    *HMP0 = 0x10;
     strobe(WSYNC);
     strobe(HMOVE);
+    asm("pha"); asm("pla");
+    *HMP1 = 0x0;
+    *HMP0 = 0x0;
     for (Y = 15; Y != 255; Y--) {
         strobe(WSYNC);
+        strobe(HMOVE);
         i = Y;
         *GRP0 = getready0[Y];
         *GRP1 = getready1[Y];
