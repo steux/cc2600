@@ -72,6 +72,7 @@ unsigned char *background_ptr2;
 unsigned char rainbow_offset;
 unsigned char difficulty;
 unsigned char random;
+unsigned char do_display_score;
 
 // TIATracker variables
 // =====================================================================
@@ -519,6 +520,9 @@ void game_logic()
 
     rainbow_offset++;
     if (rainbow_offset == MAX_RAINBOW_OFFSET + 16) rainbow_offset = 0;
+        
+    if (ybird >> 8 < 100) do_display_score = 1;
+    else if (ybird >> 8 > 150) do_display_score = 0;
 }
 
 bank1 void display_gameover()
@@ -1078,6 +1082,7 @@ void main()
             if (button_pressed == 0) {
                 button_pressed = 1;
                 yspeed = 0;
+                do_display_score = 1;
                 state = 2;
             }
         } else button_pressed = 0;
@@ -1118,10 +1123,25 @@ void main()
     *HMM1 = 0x00;
 
     if (state == 2) {
+#ifdef PAL
         Y = KERNAL;
         i = (KERNAL -1) / 16;
         strobe(WSYNC);
         strobe(HMOVE);
+#else
+        if (do_display_score) {
+            i = (KERNAL - 21) / 16;
+            display_score();
+            Y = KERNAL - 21;
+            *COLUPF = BROWN;
+            init_bird_sprite_pos(); // 4 lines
+        } else {
+            Y = KERNAL;
+            i = (KERNAL -1) / 16;
+            strobe(WSYNC);
+            strobe(HMOVE);
+        }
+#endif
     } else if (state == 0) {
         i = (KERNAL - 30) / 16;
         display_happybird();
