@@ -1143,18 +1143,18 @@ void main()
         }
 #endif
     } else if (state == 0) {
-        i = (KERNAL - 30) / 16;
         display_happybird();
+        i = (KERNAL - 30) / 16;
         init_bird_sprite_pos(); // 4 lines
         Y = KERNAL - 30;
     } else if (state == 1) {
-        i = (KERNAL - 22) / 16;
         display_getready();
+        i = (KERNAL - 22) / 16;
         init_bird_sprite_pos(); // 4 lines
         Y = KERNAL - 22;
     } else {
-        i = (KERNAL - 19) / 16;
         display_gameover();
+        i = (KERNAL - 19) / 16;
         init_bird_sprite_pos(); // 4 lines
         Y = KERNAL - 19;
     }
