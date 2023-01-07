@@ -112,9 +112,9 @@ const bank2 unsigned char getready5[16] = { 0x70, 0x78, 0x18, 0x1b, 0x3b, 0x78, 
 
 #define BIRD1
 #define BEFORE X = i;   
-#define WAIT i = Y >> 4; Y--; 
+#define WAIT Y--; i = Y >> 4;  
 #define BEFORE2 X = i; *COLUBK = j;  
-#define WAIT2 i = right_shift4[Y]; Y--; 
+#define WAIT2 Y--; i = right_shift4[Y];  
 
 #define kernel kernel11
 #define LEFT_PLAYFIELD *PF1 = lPFx[X]; *PF2 = lPFy[X]
@@ -199,38 +199,19 @@ const bank2 unsigned char getready5[16] = { 0x70, 0x78, 0x18, 0x1b, 0x3b, 0x78, 
 #undef rainbow
 #undef grass 
 
-bank1 void set_rainbow1()
+void set_rainbow()
 {
-    strobe(WSYNC);
-    strobe(HMOVE);
-    background_ptr1 = rainbow;
+    if (bird_type) {
+        background_ptr1 = rainbow_bank2;
+    } else {
+        background_ptr1 = rainbow;
+    }
     background_ptr1 += MAX_RAINBOW_OFFSET + RAINBOW_SIZE - 1;
     background_ptr1 -= (ybird >> 8);
     background_ptr2 = background_ptr1;
-    strobe(WSYNC);
-    strobe(HMOVE);
     background_ptr2 += 193;
     background_ptr1 -= rainbow_offset;
     background_ptr2 += rainbow_offset;
-    strobe(WSYNC);
-    strobe(HMOVE);
-}
-
-bank2 void set_rainbow2()
-{
-    strobe(WSYNC);
-    strobe(HMOVE);
-    background_ptr1 = rainbow_bank2;
-    background_ptr1 += MAX_RAINBOW_OFFSET + RAINBOW_SIZE - 1;
-    background_ptr1 -= (ybird >> 8);
-    background_ptr2 = background_ptr1;
-    strobe(WSYNC);
-    strobe(HMOVE);
-    background_ptr2 += 193;
-    background_ptr1 -= rainbow_offset;
-    background_ptr2 += rainbow_offset;
-    strobe(WSYNC);
-    strobe(HMOVE);
 }
 
 void init_bird_sprite_pos()
@@ -440,29 +421,6 @@ void init()
     random = 0xaa;
 }
 
-void getready()
-{
-    button_pressed = 1;
-    ybird = 100 * 256;
-    left_window = -1;
-    right_window = 4;
-    scroll_sequence = 0;
-    state = 1;
-    score_low = 00;
-    score_high = 00;
-    load_scroll_sequence();
-}
-
-void gameover()
-{
-    button_pressed = 1;
-    state = 3;
-    yspeed = 0;
-    if (ybird >> 8 > KERNAL - 30) {
-       ybird = (KERNAL - 30) * 256;
-    } 
-}
-
 void rand()
 {
     asm("lda random");
@@ -481,6 +439,29 @@ void next_sequence()
 {
     rand();
     right_window = random & 0x07;
+}
+
+void getready()
+{
+    button_pressed = 1;
+    ybird = 100 * 256;
+    left_window = -1;
+    next_sequence();
+    scroll_sequence = 12;
+    state = 1;
+    score_low = 00;
+    score_high = 00;
+    load_scroll_sequence();
+}
+
+void gameover()
+{
+    button_pressed = 1;
+    state = 3;
+    yspeed = 0;
+    if (ybird >> 8 > KERNAL - 30) {
+       ybird = (KERNAL - 30) * 256;
+    } 
 }
 
 void scrolling()
@@ -536,7 +517,7 @@ void game_logic()
     if ((*CXP1FB & 0x80) != 0) gameover();
     if ((*CXBLPF & 0x80) != 0) gameover();
 
-    rainbow_offset = 0;
+    rainbow_offset++;
     if (rainbow_offset == MAX_RAINBOW_OFFSET + 16) rainbow_offset = 0;
 }
 
@@ -610,7 +591,7 @@ void display_flappybird()
     *HMP0 = 0x10;
     strobe(WSYNC);
     strobe(HMOVE);
-    for (Y = 15; Y != 255; Y--) {
+    for (Y = 15; Y >= 0; Y--) {
         strobe(WSYNC);
         i = Y;
         *GRP0 = flappybird0[Y];
@@ -707,7 +688,7 @@ bank2 void display_getready()
     asm("pha"); asm("pla");
     *HMP1 = 0x0;
     *HMP0 = 0x0;
-    for (Y = 15; Y != 255; Y--) {
+    for (Y = 15; Y >= 0; Y--) {
         strobe(WSYNC);
         strobe(HMOVE);
         i = Y;
@@ -1119,8 +1100,13 @@ void main()
     *ENAM1 = 0;
     *GRP0 = 0;
     *GRP1 = 0;
+    *PF0 = 0;
+    *PF1 = 0;
+    *PF2 = 0;
     strobe(CXCLR);
     if (!(*SWCHB & 0x01)) init(); 
+        
+    set_rainbow();
     
     while (*INTIM);
 
@@ -1132,37 +1118,35 @@ void main()
     *HMM1 = 0x00;
 
     if (state == 2) {
+        Y = KERNAL;
+        i = (KERNAL -1) / 16;
         strobe(WSYNC);
         strobe(HMOVE);
-        Y = KERNAL - 3;
-        i = (KERNAL - 3) / 16;
     } else if (state == 0) {
+        i = (KERNAL - 30) / 16;
         display_happybird();
         init_bird_sprite_pos(); // 4 lines
-        Y = KERNAL - 33;
-        i = (KERNAL - 33) / 16;
+        Y = KERNAL - 30;
     } else if (state == 1) {
+        i = (KERNAL - 22) / 16;
         display_getready();
         init_bird_sprite_pos(); // 4 lines
-        Y = KERNAL - 25;
-        i = (KERNAL - 25) / 16;
+        Y = KERNAL - 22;
     } else {
+        i = (KERNAL - 19) / 16;
         display_gameover();
         init_bird_sprite_pos(); // 4 lines
-        Y = KERNAL - 22;
-        i = (KERNAL - 22) / 16;
+        Y = KERNAL - 19;
     }
 
     *COLUBK = YELLOW;
     if (bird_type == 0) {
-        set_rainbow1();
         if (scroll_sequence < 12) {
             kernel11();
         } else if (scroll_sequence < 20) {
             kernel21();
         } else kernel31();
     } else {
-        set_rainbow2();
         if (scroll_sequence < 12) {
             kernel12();
         } else if (scroll_sequence < 20) {
