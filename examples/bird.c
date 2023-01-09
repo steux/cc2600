@@ -69,10 +69,13 @@ unsigned char highscore_low;
 unsigned char highscore_high;
 unsigned char *background_ptr1;
 unsigned char *background_ptr2;
+unsigned char *grass1;
+unsigned char *grass2;
 unsigned char rainbow_offset;
 unsigned char difficulty;
 unsigned char random;
 unsigned char do_display_score;
+unsigned char counter;
 
 // TIATracker variables
 // =====================================================================
@@ -110,6 +113,8 @@ const bank2 unsigned char getready5[16] = { 0x70, 0x78, 0x18, 0x1b, 0x3b, 0x78, 
 
 #define SPRITE_HEIGHT 16 
 #define RAINBOW_SIZE 16
+
+#define FIRST_TIME
 
 #define BIRD1
 #define BEFORE X = i;   
@@ -157,10 +162,14 @@ const bank2 unsigned char getready5[16] = { 0x70, 0x78, 0x18, 0x1b, 0x3b, 0x78, 
 #undef RIGHT_PLAYFIELD
 
 #undef BIRD1
+#define FIRST_TIME
+
 #define bank1 bank2
 #define right_shift4 right_shift4_bank2
 #define rainbow rainbow_bank2
-#define grass grass_bank2
+#define grass_style1 grass_style1_bank2
+#define grass_style2 grass_style2_bank2
+#define grass_style3 grass_style3_bank2
 #undef WAIT2
 #define WAIT2 i = right_shift4[Y]; Y--; 
 
@@ -198,14 +207,43 @@ const bank2 unsigned char getready5[16] = { 0x70, 0x78, 0x18, 0x1b, 0x3b, 0x78, 
 #include "bird_kernel.c"
 #undef bank1
 #undef rainbow
-#undef grass 
+#undef grass_style1 
+#undef grass_style2 
+#undef grass_style3 
 
-void set_rainbow()
+void set_rainbow_and_grass()
 {
+    i = (counter >> 2) & 3;
     if (bird_type) {
         background_ptr1 = rainbow_bank2;
+        if (i == 0) {
+            grass1 = grass_style1_bank2;
+            grass2 = grass_style2_bank2;
+        } else if (i == 1) {
+            grass1 = grass_style2_bank2;
+            grass2 = grass_style1_bank2;
+        } else if (i == 2) {
+            grass1 = grass_style3_bank2;
+            grass2 = grass_style2_bank2;
+        } else {
+            grass1 = grass_style2_bank2;
+            grass2 = grass_style3_bank2;
+        }
     } else {
         background_ptr1 = rainbow;
+        if (i == 0) {
+            grass1 = grass_style1;
+            grass2 = grass_style2;
+        } else if (i == 1) {
+            grass1 = grass_style2;
+            grass2 = grass_style1;
+        } else if (i == 2) {
+            grass1 = grass_style3;
+            grass2 = grass_style2;
+        } else {
+            grass1 = grass_style2;
+            grass2 = grass_style3;
+        }
     }
     background_ptr1 += MAX_RAINBOW_OFFSET + RAINBOW_SIZE - 1;
     background_ptr1 -= (ybird >> 8);
@@ -490,8 +528,8 @@ void scrolling()
     }
     load_scroll_sequence();
     scroll_counter++;
-    if (scroll_counter & 3) *HMM1 = 0xE0;
-    *HMM0 = 0xE0;
+    if (scroll_sequence & 3) *HMM1 = 0x10;
+    *HMM0 = 0x10;
 }
 
 void flap()
@@ -569,7 +607,7 @@ bank1 void display_gameover()
 }
 
 #ifdef FLAPPYBIRD
-const unsigned char flappybird0[16] = { 0x00, 0x00, 0x00, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xf6, 0xf6, 0xf6, 0xc6, 0xf6, 0xf6, 0x76 };
+const aligned(128) unsigned char flappybird0[16] = { 0x00, 0x00, 0x00, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xc6, 0xf6, 0xf6, 0xf6, 0xc6, 0xf6, 0xf6, 0x76 };
 const unsigned char flappybird1[16] = { 0x03, 0x03, 0x03, 0x3b, 0x7b, 0xda, 0xda, 0xda, 0xda, 0xda, 0xda, 0x7b, 0x3b, 0x00, 0x00, 0x00 };
 const unsigned char flappybird2[16] = { 0x18, 0x18, 0x18, 0x9c, 0xde, 0xd6, 0xd6, 0xd6, 0xd6, 0xd6, 0xd6, 0xde, 0x9c, 0x00, 0x00, 0x00 };
 const unsigned char flappybird3[16] = { 0x30, 0x38, 0x18, 0x3b, 0x7b, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0x03, 0x03, 0x03 };
@@ -1018,8 +1056,6 @@ void main()
 #else
     *TIM64T = 39;
 #endif
-    *HMM0 = 0xD0;
-    *HMM1 = 0xD0;
     
     // The game logic
     if (state == 0 || state == 2) {
@@ -1111,8 +1147,8 @@ void main()
     strobe(CXCLR);
     if (!(*SWCHB & 0x01)) init(); 
         
-    set_rainbow();
-    
+    set_rainbow_and_grass();
+    counter++; 
     while (*INTIM);
 
     strobe(WSYNC);
@@ -1143,10 +1179,17 @@ void main()
         }
 #endif
     } else if (state == 0) {
+#ifdef FLAPPYBIRD
+        display_flappybird();
+        i = (KERNAL - 22) / 16;
+        init_bird_sprite_pos(); // 4 lines
+        Y = KERNAL - 22;
+#else
         display_happybird();
         i = (KERNAL - 38) / 16;
         init_bird_sprite_pos(); // 4 lines
         Y = KERNAL - 38;
+#endif
     } else if (state == 1) {
         display_getready();
         i = (KERNAL - 22) / 16;
