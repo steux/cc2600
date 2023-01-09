@@ -31,7 +31,7 @@ const unsigned char GREY = 0x04;
 const unsigned char LGREEN = 0xcc;
 const unsigned char GREEN = 0xc6;
 const unsigned char DGREEN = 0xc2;
-const unsigned char BROWN = 0xF0;
+const unsigned char BROWN = 0x10;
 #endif
 
 #define KERNAL 192
@@ -79,6 +79,7 @@ unsigned char game_mode;
 unsigned char random;
 unsigned char do_display_score;
 unsigned char counter;
+unsigned char blinking_if_high_score;
 
 // TIATracker variables
 // =====================================================================
@@ -492,13 +493,10 @@ void init()
     score_high = 00;
     left_window = 2;
     right_window = 2;
-#ifdef PAL
     difficulty = 8;
-#else
-    difficulty = 10;
-#endif
     button_pressed = 1;
     random = 0xaa;
+    blinking_if_high_score = BROWN;
 }
 
 void rand()
@@ -519,6 +517,12 @@ void next_sequence()
 {
     rand();
     right_window = random & 0x07;
+    /* Test for difficulty
+    if (right_window == 7)
+        right_window = 0;
+    else 
+        right_window = 7;
+        */
 }
 
 void getready()
@@ -532,6 +536,7 @@ void getready()
     score_low = 00;
     score_high = 00;
     load_scroll_sequence();
+    blinking_if_high_score = BROWN;
 }
 
 void gameover()
@@ -560,6 +565,7 @@ void scrolling()
             if (score_high > highscore_high || (score_high == highscore_high && score_low > highscore_low)) {
                 highscore_high = score_high;
                 highscore_low = score_low;
+                blinking_if_high_score = 0;
             }
         }
         if (scroll_sequence == 24) {
@@ -575,7 +581,7 @@ void scrolling()
 
 void flap()
 {
-    yspeed = 350;
+    yspeed = 420;
     if (bird_type == 0) 
         bird_type = 1;
     else {
@@ -1154,7 +1160,7 @@ void main()
     // The game logic
     if (state == 0 || state == 2) {
         scrolling();
-        yspeed -= 10;
+        yspeed -= 15;
         if (yspeed >> 8 < 0) bird_type = 0;
         if (bird_animation_counter != 0) {
             bird_animation_counter--;
@@ -1178,7 +1184,6 @@ void main()
     }
    
     if (state == 0 || state == 1) {
-#ifdef PAL
         if (*SWCHB & 0x40) {
             game_mode = 1;
             difficulty = 4;
@@ -1186,15 +1191,6 @@ void main()
             game_mode = 0;
             difficulty = 8;
         }
-#else
-        if (*SWCHB & 0x40) {
-            game_mode = 1;
-            difficulty = 5;
-        } else {
-            game_mode = 0;
-            difficulty = 10;
-        }
-#endif
     }
 
     if (state == 0) {
@@ -1236,6 +1232,22 @@ void main()
         } else button_pressed = 0;
     }
 
+    if (blinking_if_high_score != BROWN) {
+#ifdef PAL
+        if (counter & 16) {
+            blinking_if_high_score = 0x20 + (counter & 0x0f);
+        } else {
+            blinking_if_high_score = 0x2f - (counter & 0x0f);
+        }
+#else
+        if (counter & 16) {
+            blinking_if_high_score = 0x10 + (counter & 0x0f);
+        } else {
+            blinking_if_high_score = 0x1f - (counter & 0x0f);
+        }
+#endif
+    }
+
     *ENAM0 = 0;
     *ENAM1 = 0;
     *GRP0 = 0;
@@ -1253,7 +1265,7 @@ void main()
     strobe(WSYNC);
     strobe(HMOVE);
     *VBLANK = 0;
-    *COLUPF = BROWN;
+    *COLUPF = blinking_if_high_score;
     *HMM0 = 0x00;
     *HMM1 = 0x00;
 
@@ -1268,7 +1280,7 @@ void main()
             i = (KERNAL - 21) / 16;
             display_score();
             Y = KERNAL - 21;
-            *COLUPF = BROWN;
+            *COLUPF = blinking_if_high_score;
             init_bird_sprite_pos(); // 4 lines
         } else {
             Y = KERNAL;

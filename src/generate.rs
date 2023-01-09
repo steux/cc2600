@@ -501,10 +501,42 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
     }
 }
 
-fn generate_arithm<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>, gstate: &mut GeneratorState<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
+fn generate_arithm<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>, gstate: &mut GeneratorState<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
 {
     let mut acc_in_use = gstate.acc_in_use;
-    debug!("Arithm: {:?},{:?},{:?}", left, op, right);    
+    debug!("Arithm: {:?},{:?},{:?}", l, op, r);    
+    let left;
+    let right;
+    let right2;
+
+    match op {
+        Operation::Sub(_) | Operation::Div(_) => {
+            left = l; right = r;
+        },
+        _ => {
+            match r {
+                ExprType::A(_) => {
+                    left = r; right = l;
+                },
+                _ => {
+                    left = l; right = r;
+                }
+            }
+        }
+    }
+
+    let x;
+    right2 = match right {
+        ExprType::A(s) => {
+            gstate.write_asm("STA cctmp", 3)?;
+            x = ExprType::Tmp(*s);
+            &x
+        },
+        _ => {
+            right
+        }
+    };
+
     match left {
         ExprType::Immediate(l) => {
             match right {
@@ -607,7 +639,7 @@ fn generate_arithm<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>
         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
     };
     let signed;
-    match right {
+    match right2 {
         ExprType::Immediate(v) => {
             let vx = match high_byte {
                 false => v & 0xff,
