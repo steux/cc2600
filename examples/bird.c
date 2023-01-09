@@ -75,6 +75,7 @@ unsigned char *grass1;
 unsigned char *grass2;
 unsigned char rainbow_offset;
 unsigned char difficulty;
+unsigned char game_mode;
 unsigned char random;
 unsigned char do_display_score;
 unsigned char counter;
@@ -729,16 +730,14 @@ void display_happybird()
     strobe(WSYNC);
     strobe(HMOVE);
     *COLUBK = RED;
-    *GRP0 = 0;
-    *GRP1 = 0;
+    *VDELP0 = 1;
+    *VDELP1 = 1;
     *NUSIZ0 = 0x33;
     *NUSIZ1 = 0x33;
     *COLUP0 = WHITE;
     *COLUP1 = WHITE;
     strobe(RESP0);
     strobe(RESP1);
-    *VDELP0 = 1;
-    *VDELP1 = 1;
     *HMP1 = 0xD0; 
     *HMP0 = 0xC0;
     strobe(WSYNC);
@@ -772,40 +771,75 @@ void display_happybird()
 }
 #endif
 
-bank2 void display_getready()
+const bank2 aligned(128) unsigned char normal0[7] = { 0x24, 0x25, 0x2d, 0x2d, 0x34, 0x34, 0x24 };
+const bank2 unsigned char normal1[7] = { 0x92, 0x52, 0x52, 0x52, 0x8b, 0x00, 0x00 };
+const bank2 unsigned char normal2[7] = { 0xa6, 0xaa, 0xaa, 0xaa, 0xc6, 0x00, 0x00 };
+const bank2 unsigned char normal3[7] = { 0x8a, 0x8a, 0x8a, 0x8a, 0x8f, 0x80, 0x80 };
+const bank2 unsigned char normal4[7] = { 0x91, 0xaa, 0xaa, 0xaa, 0x11, 0x00, 0x00 };
+const bank2 unsigned char normal5[7] = { 0x98, 0xa0, 0xb8, 0xa8, 0x90, 0x80, 0x80 };
+
+const bank2 unsigned char pro0[7] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+const bank2 unsigned char pro1[7] = { 0x21, 0x21, 0x39, 0x25, 0x24, 0x24, 0x38 };
+const bank2 unsigned char pro2[7] = { 0x10, 0x28, 0x28, 0x28, 0x90, 0x00, 0x00 };
+const bank2 unsigned char pro3[7] = { 0xa9, 0xaa, 0xaa, 0xaa, 0xf1, 0x00, 0x00 };
+const bank2 unsigned char pro4[7] = { 0x19, 0xaa, 0xab, 0xaa, 0x19, 0x08, 0x08 };
+const bank2 unsigned char pro5[7] = { 0x80, 0x00, 0x80, 0x80, 0x00, 0x00, 0x00 };
+
+bank2 void display_mode()
 {
     strobe(WSYNC);
     strobe(HMOVE);
     *GRP0 = 0;
+    *GRP1 = 0;
     *NUSIZ0 = 0x33;
     *NUSIZ1 = 0x33;
     *VDELP0 = 1;
     *VDELP1 = 1;
     *HMP1 = 0xD0; 
-    *HMP0 = 0xC0;
     strobe(RESP0);
     strobe(RESP1);
+    *HMP0 = 0xC0;
     strobe(WSYNC);
     strobe(HMOVE);
     asm("pha"); asm("pla");
     *HMP1 = 0x0;
     *HMP0 = 0x0;
-    for (Y = 15; Y >= 0; Y--) {
-        strobe(WSYNC);
-        strobe(HMOVE);
-        i = Y;
-        *GRP0 = getready0[Y];
-        *GRP1 = getready1[Y];
-        *GRP0 = getready2[Y];
-        X = getready4[Y];
-        j = getready5[Y];
-        asm("lda getready3,Y");
-        Y = j;
-        asm("sta GRP1");
-        *GRP0 = X;
-        *GRP1 = Y;
-        strobe(GRP0);
-        Y = i;
+    if (game_mode == 0) {
+        for (Y = 6; Y >= 0; Y--) {
+            strobe(WSYNC);
+            strobe(HMOVE);
+            i = Y;
+            *GRP0 = normal0[Y];
+            *GRP1 = normal1[Y];
+            *GRP0 = normal2[Y];
+            X = normal4[Y];
+            j = normal5[Y];
+            asm("lda normal3,Y");
+            Y = j;
+            asm("sta GRP1");
+            *GRP0 = X;
+            *GRP1 = Y;
+            strobe(GRP0);
+            Y = i;
+        }
+    } else {
+        for (Y = 6; Y >= 0; Y--) {
+            strobe(WSYNC);
+            strobe(HMOVE);
+            i = Y;
+            *GRP0 = pro0[Y];
+            *GRP1 = pro1[Y];
+            *GRP0 = pro2[Y];
+            X = pro4[Y];
+            j = pro5[Y];
+            asm("lda pro3,Y");
+            Y = j;
+            asm("sta GRP1");
+            *GRP0 = X;
+            *GRP1 = Y;
+            strobe(GRP0);
+            Y = i;
+        }
     }
     strobe(WSYNC);
     strobe(HMOVE);
@@ -1146,14 +1180,18 @@ void main()
     if (state == 0 || state == 1) {
 #ifdef PAL
         if (*SWCHB & 0x40) {
+            game_mode = 1;
             difficulty = 4;
         } else {
+            game_mode = 0;
             difficulty = 8;
         }
 #else
         if (*SWCHB & 0x40) {
+            game_mode = 1;
             difficulty = 5;
         } else {
+            game_mode = 0;
             difficulty = 10;
         }
 #endif
@@ -1247,16 +1285,18 @@ void main()
         Y = KERNAL - 22;
 #else
         display_happybird();
-        i = (KERNAL - 38) / 16;
+        display_mode();
+        i = (KERNAL - 48) / 16;
         init_bird_sprite_pos(); // 4 lines
-        Y = KERNAL - 38;
+        Y = KERNAL - 48;
 #endif
     } else if (state == 1) {
         i = 1;
         display_gameover();
-        i = (KERNAL - 22) / 16;
+        display_mode();
+        i = (KERNAL - 32) / 16;
         init_bird_sprite_pos(); // 4 lines
-        Y = KERNAL - 22;
+        Y = KERNAL - 32;
     } else {
         i = 0;
         display_gameover();
