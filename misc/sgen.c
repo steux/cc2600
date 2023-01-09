@@ -62,7 +62,7 @@ int main()
                     if (c == colup0 || c == c0) {
                         c0 = c;
                         if (lc0 == -1) { lc0 = x; xc0 = 1; }
-                        if (xc0 == 8) {
+                        if (xc0 == 9) {
                             fprintf(stderr, "Too long color0 pattern on line %d\n", lnb);
                             return -1;
                         }
@@ -70,7 +70,7 @@ int main()
                     } else if (c == colup1 || c == c1) {
                         c1 = c;
                         if (lc1 == -1) { lc1 = x; xc1 = 1; }
-                        if (xc1 == 8) {
+                        if (xc1 == 9) {
                             fprintf(stderr, "Too long color1 pattern on line %d\n", lnb);
                             return -1;
                         }
@@ -78,16 +78,16 @@ int main()
                     } else if (c0 == -1) {
                         c0 = c;
                         if (lc0 == -1) { lc0 = x; xc0 = 1; }
-                        if (xc0 == 8) {
-                            fprintf(stderr, "Too long color0 pattern on line %d\n", lnb);
+                        if (xc0 == 9) {
+                            fprintf(stderr, "... Too long color0 pattern on line %d\n", lnb);
                             return -1;
                         }
                         c0x |= 1;
                     } else if (c1 == -1) {
                         c1 = c;
                         if (lc1 == -1) { lc1 = x; xc1 = 1; }
-                        if (xc1 == 8) {
-                            fprintf(stderr, "Too long color1 pattern on line %d\n", lnb);
+                        if (xc1 == 9) {
+                            fprintf(stderr, "... Too long color1 pattern on line %d\n", lnb);
                             return -1;
                         }
                         c1x |= 1;

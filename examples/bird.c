@@ -1172,6 +1172,15 @@ void bottom()
     for (X = OVERSCAN - 4; X != 0; X--) strobe(WSYNC);
 }
 
+void display_arrow()
+{
+#undef START
+#define START asm("pha"); asm("pla");
+    *NUSIZ0 = 0x10;
+    *NUSIZ1 = 0x00;
+    //#include "arrow.c"
+}
+
 void main()
 {
   init();
@@ -1330,18 +1339,25 @@ void main()
         Y = KERNAL - 22;
 #else
         display_happybird();
+        strobe(WSYNC);
+        strobe(HMOVE);
+        *COLUBK = BLUE;
         display_mode();
-        i = (KERNAL - 48) / 16;
         init_bird_sprite_pos(); // 4 lines
-        Y = KERNAL - 48;
+        //display_arrow();
+        i = (KERNAL - 49) / 16;
+        Y = KERNAL - 49;
 #endif
     } else if (state == 1) {
         i = 1;
         display_gameover();
+        strobe(WSYNC);
+        strobe(HMOVE);
+        *COLUBK = BLUE;
         display_mode();
-        i = (KERNAL - 32) / 16;
+        i = (KERNAL - 33) / 16;
         init_bird_sprite_pos(); // 4 lines
-        Y = KERNAL - 32;
+        Y = KERNAL - 33;
     } else {
 #ifdef PAL
         i = 0;
