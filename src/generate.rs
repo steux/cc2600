@@ -529,6 +529,7 @@ fn generate_arithm<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>, gstat
     right2 = match right {
         ExprType::A(s) => {
             gstate.write_asm("STA cctmp", 3)?;
+            acc_in_use = false;
             x = ExprType::Tmp(*s);
             &x
         },
@@ -1283,7 +1284,7 @@ fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>,
             Operation::Gt => Operation::Lte,
             Operation::Gte => Operation::Lt,
             Operation::Lt => Operation::Gte,
-            Operation::Lte => Operation::Lt,
+            Operation::Lte => Operation::Gt,
             _ => unreachable!()
         }
     } else { *op };
@@ -1314,31 +1315,13 @@ fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>,
                         return Ok(());
                     },
                     _ => {
-                        let signed = match left {
-                            ExprType::Absolute(varname, _eight_bits, _offset) => {
-                                gstate.compiler_state.get_variable(varname).signed
-                            },
-                            ExprType::AbsoluteX(varname) => {
-                                gstate.compiler_state.get_variable(varname).signed
-                            },
-                            ExprType::AbsoluteY(varname) => {
-                                gstate.compiler_state.get_variable(varname).signed
-                            },
-                            ExprType::A(sign) => *sign,
-                            ExprType::Tmp(sign) => *sign,
-                            ExprType::Y => true, // X and Y are unsigned, but for end of loop
-                                                 // optimization, we declare these as signed
-                                                 // (>=0 test is then translated to bpl test)
-                            ExprType::X => true,
-                            ExprType::Immediate(v) => {
-                                if (operator == Operation::Neq && *v != 0) || (operator == Operation::Eq && *v == 0) {
-                                    gstate.write_asm(&format!("JMP {}", label), 3)?;
-                                }
-                                return Ok(());
-                            },
-                            _ => unreachable!()
-                        };
-                        return generate_branch_instruction(&operator, signed, gstate, label);
+                        if let ExprType::Immediate(v) = left {
+                            if (operator == Operation::Neq && *v != 0) || (operator == Operation::Eq && *v == 0) {
+                                gstate.write_asm(&format!("JMP {}", label), 3)?;
+                            }
+                            return Ok(());
+                        }
+                        return generate_branch_instruction(&operator, true, gstate, label);
                     } 
                 }
             } 

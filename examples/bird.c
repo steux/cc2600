@@ -74,6 +74,7 @@ unsigned char *background_ptr2;
 unsigned char *grass1;
 unsigned char *grass2;
 unsigned char rainbow_offset;
+unsigned char rainbow_sequence;
 unsigned char difficulty;
 unsigned char game_mode;
 unsigned char random;
@@ -537,6 +538,8 @@ void getready()
     score_high = 00;
     load_scroll_sequence();
     blinking_if_high_score = BROWN;
+    rainbow_offset = 0;
+    rainbow_sequence = 0;
 }
 
 void gameover()
@@ -544,9 +547,36 @@ void gameover()
     button_pressed = 1;
     state = 3;
     yspeed = 0;
+#ifdef PAL 
     if (ybird >> 8 > KERNAL - 30) {
-       ybird = (KERNAL - 30) * 256;
+       ybird = (KERNAL - 60) * 256;
     } 
+#else
+    if (ybird >> 8 > KERNAL - 60) {
+       ybird = (KERNAL - 60) * 256;
+    }
+#endif 
+}
+
+void increment_score()
+{
+    score_low++;
+    if (rainbow_sequence == 1 && rainbow_offset < 16) {
+        rainbow_offset++;
+    }
+
+    if (score_low == 100) {
+        score_low = 0;
+        score_high++;
+        rainbow_sequence++;
+        if (rainbow_sequence == 5) rainbow_sequence = 0;
+        if (score_high == 100) score_high = 0;
+    }
+    if (score_high > highscore_high || (score_high == highscore_high && score_low > highscore_low)) {
+        highscore_high = score_high;
+        highscore_low = score_low;
+        blinking_if_high_score = 0;
+    }
 }
 
 void scrolling()
@@ -556,17 +586,7 @@ void scrolling()
         scroll_sequence++;
         if (scroll_sequence == 20) left_window = right_window;
         if (state == 2 && scroll_sequence == 12 && left_window != -1) {
-            score_low++;
-            if (score_low == 100) {
-                score_low = 0;
-                score_high++;
-                if (score_high == 100) score_high = 0;
-            }
-            if (score_high > highscore_high || (score_high == highscore_high && score_low > highscore_low)) {
-                highscore_high = score_high;
-                highscore_low = score_low;
-                blinking_if_high_score = 0;
-            }
+            increment_score();
         }
         if (scroll_sequence == 24) {
             if (state == 2) next_sequence();
@@ -603,11 +623,22 @@ void game_logic()
     if ((*CXP1FB & 0x80) != 0) gameover();
     if ((*CXBLPF & 0x80) != 0) gameover();
 
-    rainbow_offset++;
-    if (rainbow_offset == MAX_RAINBOW_OFFSET + 16) rainbow_offset = 0;
-        
     if (ybird >> 8 < 100) do_display_score = 1;
     else if (ybird >> 8 > 150) do_display_score = 0;
+            
+    if (rainbow_sequence == 2) {
+        rainbow_offset++;
+        if (rainbow_offset == MAX_RAINBOW_OFFSET + 16) rainbow_offset = 0;
+    } else if (rainbow_sequence == 3) {
+        if (counter & 16) {
+            rainbow_offset = 16 + (counter & 0x0f);
+        } else {
+            rainbow_offset = 24 - (counter & 0x0f);
+        }
+    } else if (rainbow_sequence == 4) {
+        rainbow_offset--;
+        if (rainbow_offset <= 0) rainbow_offset = MAX_RAINBOW_OFFSET + 15;
+    }
 }
 
 bank1 void display_gameover()
@@ -615,14 +646,15 @@ bank1 void display_gameover()
     strobe(WSYNC);
     strobe(HMOVE);
     *GRP1 = 0;
+    *GRP0 = 0;
     *NUSIZ0 = 0x33;
     *NUSIZ1 = 0x33;
     *VDELP0 = 1;
     *VDELP1 = 1;
     *HMP1 = 0xD0; 
-    *HMP0 = 0xC0;
     strobe(RESP0);
     strobe(RESP1);
+    *HMP0 = 0xC0;
     strobe(WSYNC);
     strobe(HMOVE);
     asm("pha"); asm("pla");
@@ -1118,6 +1150,7 @@ bank3 void display_score()
     strobe(HMOVE);
     *PF1 = 0;
     *PF2 = 0;
+    *COLUPF = BROWN;
 }
 
 void bottom()
@@ -1267,7 +1300,7 @@ void main()
     *VBLANK = 0;
     *COLUPF = blinking_if_high_score;
     *HMM0 = 0x00;
-    *HMM1 = 0x00;
+    strobe(HMM1);
 
     if (state == 2) {
 #ifdef PAL
@@ -1310,11 +1343,22 @@ void main()
         init_bird_sprite_pos(); // 4 lines
         Y = KERNAL - 32;
     } else {
+#ifdef PAL
         i = 0;
         display_gameover();
         i = (KERNAL - 19) / 16;
         init_bird_sprite_pos(); // 4 lines
         Y = KERNAL - 19;
+#else
+        display_score();
+        i = 0;
+        *COLUP0 = WHITE;
+        *COLUP1 = WHITE;
+        display_gameover();
+        i = (KERNAL - 40) / 16;
+        init_bird_sprite_pos(); // 4 lines
+        Y = KERNAL - 40;
+#endif
     }
 
     *COLUBK = YELLOW;
