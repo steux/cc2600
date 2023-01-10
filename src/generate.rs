@@ -62,6 +62,7 @@ pub enum ExprType<'a> {
     AbsoluteX(&'a str),
     AbsoluteY(&'a str),
     A(bool), X, Y,
+    Label(&'a str),
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -173,7 +174,8 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                     }
                     Ok(ExprType::X)
                 },
-                ExprType::Nothing => unreachable!()
+                ExprType::Nothing => unreachable!(),
+                ExprType::Label(_) => unreachable!(),
             }
         },
         ExprType::Y => {
@@ -240,7 +242,8 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                     gstate.flags = FlagsState::Y;
                     Ok(ExprType::Y)
                 },
-                ExprType::Nothing => unreachable!()
+                ExprType::Nothing => unreachable!(),
+                ExprType::Label(_) => unreachable!(),
             }
         },
         _ => {

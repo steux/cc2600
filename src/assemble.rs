@@ -35,7 +35,47 @@ struct AsmInstruction<'a> {
 
 impl<'a> AsmInstruction<'a> {
     fn to_dasm(&self, compiler_state: &'a CompilerState<'a>) -> String {
-        "".to_string()
+        let mut s = self.mnemonic.to_string();
+        if self.operand != ExprType::Nothing { 
+            s += " ";
+            match self.operand {
+                ExprType::Absolute(variable, eight_bits, offset) => {
+                    let v = compiler_state.get_variable(variable);
+                    match v.var_type {
+                        VariableType::Char => if offset > 0 {
+                            s += &format!("{}+{}", variable, offset);
+                        } else {
+                            s += &format!("{}", variable);
+                        },
+                        VariableType::Short => if self.high_byte {
+                            s += &format!("{} + 1", variable);
+                        } else {
+                            s += &format!("{}", variable);
+                        },
+                        VariableType::CharPtr => if v.var_type == VariableType::CharPtr && !eight_bits && v.var_const {
+                            if self.high_byte {
+                                s += &format!("#>{}", variable);
+                            } else {
+                                s += &format!("#<{}", variable);
+                            }
+                        } else {
+                            if self.high_byte && eight_bits {
+                                s += "#0";
+                            } else {
+                                let off = if self.high_byte { offset + 1 } else { offset };
+                                if off > 0 {
+                                    s += &format!("{}+{}", variable, off);
+                                } else {
+                                    s += &format!("{}", variable);
+                                }
+                            }
+                        },
+                    }
+                },
+                _ => unreachable!()
+            }
+        }
+        s
     }
     fn cycles(&self, compiler_state: &'a CompilerState<'a>) -> u8 {
         0
@@ -47,7 +87,8 @@ impl<'a> AsmInstruction<'a> {
 enum AsmLine<'a> {
     Label(String),
     Instruction(AsmInstruction<'a>),
-    Inline(String)
+    Inline(String),
+    Comment(String)
 }
 
 impl<'a> AsmLine<'a> {
@@ -62,7 +103,10 @@ impl<'a> AsmLine<'a> {
                 s += writer.write(format!("\t{:23}\t; {} cycles\n", inst.to_dasm(compiler_state), inst.cycles(compiler_state)).as_bytes())?;
             },
             AsmLine::Inline(inst) => {
-                s += writer.write(format!("\t{}\n", inst).as_bytes())?;
+                s += writer.write(inst.as_bytes())?;
+            },
+            AsmLine::Comment(comment) => {
+                s += writer.write(&format!(";{}", comment).as_bytes())?;
             },
         }
         Ok(s)

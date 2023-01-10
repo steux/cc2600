@@ -298,6 +298,7 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
         .parse(pairs)
 }
 
+// TODO: Exclude already defined variables
 fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(), Error>
 {
     let mut var_type = VariableType::Char;
@@ -554,6 +555,7 @@ fn compile_block<'a>(state: &CompilerState<'a>, p: Pair<'a, Rule>) -> Result<Sta
     })
 }
 
+// TODO: Accept undefined functions
 fn compile_func_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<(), Error>
 {
     let mut inline = false;
