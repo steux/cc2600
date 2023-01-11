@@ -121,12 +121,17 @@ pub enum Statement<'a> {
     Continue,
     Return,
     Asm(&'a str),
-    Strobe(Expr<'a>)
+    Strobe(Expr<'a>),
+    Load(Expr<'a>),
+    Store(Expr<'a>),
+    CSleep(i32),
+    Goto(&'a str),
 }
 
 #[derive(Debug, Clone)]
 pub struct StatementLoc<'a> {
     pub pos: usize,
+    pub label: Option<String>,
     pub statement: Statement<'a>
 }
 
@@ -388,15 +393,31 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
     Ok(())
 }
 
-fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
+fn compile_statement<'a>(state: &CompilerState<'a>, p: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
 {
-    debug!("Compile statement: {:?}", pair);
+    let mut inner = p.into_inner();
+    let pair = inner.next().unwrap();
+    debug!("Compile statement: {:?}\ninner:{:?}", pair, inner);
+    let pos = pair.as_span().start();
+    match pair.as_rule() {
+        Rule::label => {
+            let statement = compile_statement_ex(state, inner.next().unwrap())?;
+            Ok(StatementLoc { pos, label: Some(pair.into_inner().next().unwrap().as_str().to_string()), statement: statement.statement })
+        },
+        _ => {
+            compile_statement_ex(state, pair)
+        }
+    }
+}
+
+fn compile_statement_ex<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
+{
     let pos = pair.as_span().start();
     match pair.as_rule() {
         Rule::expr => {
             let expr = parse_expr(state, pair.into_inner())?;
             Ok(StatementLoc {
-                pos, statement: Statement::Expression(expr)
+                pos, label: None, statement: Statement::Expression(expr)
             })
         },
         Rule::block => {
@@ -411,9 +432,9 @@ fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Res
             };
             let condition = parse_expr(state, p.next().unwrap().into_inner())?;
             let update = parse_expr(state, p.next().unwrap().into_inner())?;
-            let body = compile_statement(state, p.next().unwrap().into_inner().next().unwrap())?;
+            let body = compile_statement(state, p.next().unwrap())?;
             Ok(StatementLoc {
-                pos, statement: Statement::For {
+                pos, label: None, statement: Statement::For {
                     init, condition, update, body: Box::new(body) 
                 }
             })
@@ -421,23 +442,23 @@ fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Res
         Rule::if_statement => {
             let mut p = pair.into_inner();
             let condition = parse_expr(state, p.next().unwrap().into_inner())?;
-            let body = compile_statement(state, p.next().unwrap().into_inner().next().unwrap())?;
+            let body = compile_statement(state, p.next().unwrap())?;
             let else_body = match p.next() {
                 None => None,
-                Some(px) => Some(Box::new(compile_statement(state, px.into_inner().next().unwrap())?)),
+                Some(px) => Some(Box::new(compile_statement(state, px)?)),
             };
             Ok(StatementLoc {
-                pos, statement: Statement::If {
+                pos, label: None, statement: Statement::If {
                     condition, body: Box::new(body), else_body 
                 }
             })
         },
         Rule::do_while => {
             let mut p = pair.into_inner();
-            let body = compile_statement(state, p.next().unwrap().into_inner().next().unwrap())?;
+            let body = compile_statement(state, p.next().unwrap())?;
             let condition = parse_expr(state, p.next().unwrap().into_inner())?;
             Ok(StatementLoc {
-                pos, statement: Statement::DoWhile {
+                pos, label: None, statement: Statement::DoWhile {
                     body: Box::new(body), condition  
                 }
             })
@@ -445,9 +466,9 @@ fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Res
         Rule::while_do => {
             let mut p = pair.into_inner();
             let condition = parse_expr(state, p.next().unwrap().into_inner())?;
-            let body = compile_statement(state, p.next().unwrap().into_inner().next().unwrap())?;
+            let body = compile_statement(state, p.next().unwrap())?;
             Ok(StatementLoc {
-                pos, statement: Statement::While {
+                pos, label: None, statement: Statement::While {
                     condition, body: Box::new(body) 
                 }
             })
@@ -470,7 +491,7 @@ fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Res
                         case_set.0.push(parse_int(i.into_inner().next().unwrap()));
                     },
                     Rule::statement => {
-                        case_set.1.push(compile_statement(state, i.into_inner().next().unwrap())?);
+                        case_set.1.push(compile_statement(state, i)?);
                         last_was_a_statement = true;
                     },
                     Rule::default_case => {
@@ -480,7 +501,7 @@ fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Res
                         for j in d {
                             match j.as_rule() {
                                 Rule::statement => {
-                                    default_set.1.push(compile_statement(state, j.into_inner().next().unwrap())?);
+                                    default_set.1.push(compile_statement(state, j)?);
                                 },
                                 _ => unreachable!()
                             }
@@ -491,41 +512,65 @@ fn compile_statement<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Res
                 }
             }
             Ok(StatementLoc {
-                pos, statement: Statement::Switch {
+                pos, label: None, statement: Statement::Switch {
                     expr, cases 
                 }
             })
         },
         Rule::break_statement => {
             Ok(StatementLoc {
-                pos, statement: Statement::Break
+                pos, label: None, statement: Statement::Break
             })
         },
         Rule::continue_statement => {
             Ok(StatementLoc {
-                pos, statement: Statement::Continue
+                pos, label: None, statement: Statement::Continue
             })
         },
         Rule::return_statement => {
             Ok(StatementLoc {
-                pos, statement: Statement::Return
+                pos, label: None, statement: Statement::Return
             })
         },
         Rule::asm_statement => {
             let s = pair.into_inner().next().unwrap().into_inner().next().unwrap().as_str();
             Ok(StatementLoc {
-                pos, statement: Statement::Asm(s)
+                pos, label: None, statement: Statement::Asm(s)
             })
         },
         Rule::strobe_statement => {
             let s = parse_expr(state, pair.into_inner())?;
             Ok(StatementLoc {
-                pos, statement: Statement::Strobe(s)
+                pos, label: None, statement: Statement::Strobe(s)
+            })
+        },
+        Rule::load_statement => {
+            let s = parse_expr(state, pair.into_inner())?;
+            Ok(StatementLoc {
+                pos, label: None, statement: Statement::Load(s)
+            })
+        },
+        Rule::store_statement => {
+            let s = parse_expr(state, pair.into_inner())?;
+            Ok(StatementLoc {
+                pos, label: None, statement: Statement::Store(s)
+            })
+        },
+        Rule::csleep_statement => {
+            let s = parse_int(pair.into_inner().next().unwrap());
+            Ok(StatementLoc {
+                pos, label: None, statement: Statement::CSleep(s)
+            })
+        },
+        Rule::goto_statement => {
+            let s = pair.into_inner().next().unwrap().as_str();
+            Ok(StatementLoc {
+                pos, label: None, statement: Statement::Goto(s)
             })
         },
         Rule::nothing => {
             Ok(StatementLoc {
-                pos, statement: Statement::Expression(Expr::Nothing)
+                pos, label: None, statement: Statement::Expression(Expr::Nothing)
             })
         },
         _ => {
@@ -542,7 +587,7 @@ fn compile_block<'a>(state: &CompilerState<'a>, p: Pair<'a, Rule>) -> Result<Sta
     for pair in p.into_inner() {
         match pair.as_rule() {
             Rule::statement => {
-                statements.push(compile_statement(state, pair.into_inner().next().unwrap())?)
+                statements.push(compile_statement(state, pair)?)
             },
             _ => {
                 debug!("What's this ? {:?}", pair);
@@ -551,7 +596,7 @@ fn compile_block<'a>(state: &CompilerState<'a>, p: Pair<'a, Rule>) -> Result<Sta
         }
     }
     Ok(StatementLoc {
-        pos, statement: Statement::Block(statements) 
+        pos, label: None, statement: Statement::Block(statements) 
     })
 }
 

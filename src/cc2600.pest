@@ -20,14 +20,15 @@ var_def = { int | array_def }
 array_def = { "{" ~ (int ~ ",")* ~ int ~ "}" }
 pointer = { "*" }
 
-func_decl = { inline? ~ bank? ~ "void" ~ id_name ~ "(" ~ ("void")? ~ ")" ~ block }
+func_decl = { inline? ~ bank? ~ "void" ~ id_name ~ "(" ~ ("void")? ~ ")" ~ (";" | block) }
 inline = { "inline" }
 bank = ${ "bank" ~ bank_number }
 bank_number = { ASCII_NONZERO_DIGIT }
 
 block = { "{" ~ statement* ~ "}" }
-statement = {
-      block
+label = { id_name ~ ":" }
+statement = { label? ~
+    ( block
     | do_while
     | while_do
     | for_loop
@@ -40,7 +41,11 @@ statement = {
     | nothing ~ ";"
     | asm_statement
     | strobe_statement
-    }
+    | load_statement
+    | store_statement
+    | csleep_statement
+    | goto_statement
+    ) }
 do_while = { "do" ~ statement ~ "while" ~ "(" ~ expr ~ ")" ~ ";" }
 while_do = { "while" ~ "(" ~ expr ~ ")"~ statement }
 for_loop = { "for" ~ "(" ~ (expr | nothing) ~ ";" ~ (expr | nothing) ~ ";" ~ (expr | nothing) ~ ")" ~ statement }
@@ -50,7 +55,12 @@ break_statement = { "break" ~ ";" }
 continue_statement = { "continue" ~ ";"}
 return_statement = { "return" ~ ";"}
 asm_statement = { "asm" ~ "(" ~ quoted_string ~ ")" ~ ";"}
+load_statement = { "load" ~ "(" ~ expr ~ ")" ~ ";"}
+store_statement = { "strobe" ~ "(" ~ expr ~ ")" ~ ";"}
 strobe_statement = { "strobe" ~ "(" ~ expr ~ ")" ~ ";"}
+csleep_statement = { "csleep" ~ "(" ~ int ~ ")" ~ ";"}
+goto_statement = { "goto" ~ id_name ~ ";"}
+
 nothing = { "" }
 
 cases = { ("case" ~ int ~ ":" ~ ((!"default" ~ statement)*))* ~ default_case? }

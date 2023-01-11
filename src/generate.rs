@@ -1784,7 +1784,13 @@ fn generate_asm_statement<'a>(s: &'a str, gstate: &mut GeneratorState<'a>) -> Re
     Ok(())
 }
 
-fn generate_strobe_statement<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
+fn generate_goto_statement<'a>(s: &'a str, gstate: &mut GeneratorState<'a>) -> Result<(), Error>
+{
+    gstate.write(&format!("\tJMP .{}\n", s))?;
+    Ok(())
+}
+
+fn generate_store_statement<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
 {
     match expr {
         Expr::Identifier((name, _)) => {
@@ -1823,6 +1829,11 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
     gstate.purge_deferred_plusplus()?;
     
     gstate.acc_in_use = false;
+   
+    if let Some(label) = &code.label {
+        gstate.write_label(&format!(".{}", label))?;
+    }
+
     // Generate different kind of statements
     match &code.statement {
         Statement::Expression(expr) => { 
@@ -1855,7 +1866,11 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
         Statement::Continue => { generate_continue(gstate, code.pos)?; }
         Statement::Return => { generate_return(gstate)?; }
         Statement::Asm(s) => { generate_asm_statement(s, gstate)?; }
-        Statement::Strobe(s) => { generate_strobe_statement(s, gstate, code.pos)?; }
+        Statement::Strobe(s) => { generate_store_statement(s, gstate, code.pos)?; }
+        Statement::Store(s) => { generate_store_statement(s, gstate, code.pos)?; }
+        Statement::Load(_) => { return Err(Error::Unimplemented { feature: "Load intrinsics not implemented" }); }
+        Statement::CSleep(_) => { return Err(Error::Unimplemented { feature: "csleep intrinsics not implemented" }); }
+        Statement::Goto(s) => { generate_goto_statement(s, gstate)?; }
     }
     
     gstate.purge_deferred_plusplus()?;
