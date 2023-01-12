@@ -388,7 +388,38 @@ pub fn process<I: BufRead, O: Write>(
                     }
                     context.undefine(expr);
                     regex = context.build_regex();
+
                 } 
+            } else if substr.starts_with("#define") {
+                if state == State::Active {
+                    let mut parts = substr.splitn(2, "//").next().unwrap().splitn(2, " ");
+                    parts.next().unwrap();
+                    let maybe_expr = parts.next().map(|s| s.trim()).and_then(|s| {
+                        if s.is_empty() {
+                            None
+                        } else {
+                            Some(s)
+                        }
+                    });
+                    let expr = maybe_expr.ok_or_else(|| Error::Syntax {
+                        filename: filename.clone(), included_in: included_in.clone(), line,
+                        msg: "Expected macro after `#define`".to_string() })?;
+                    let mut p = expr.splitn(2, " ");
+                    let mcro = p.next().unwrap();
+                    if context.get_macro(mcro).is_some() {
+                        return Err(Error::Syntax {
+                            filename: filename.clone(), included_in: included_in.clone(), line,
+                            msg: format!("Macro {} already defined", mcro)});
+                    }
+                    let value;
+                    {
+                        let mut replacer = context.replacer();
+                        let buf = p.next().or_else(|| Some("")).unwrap();
+                        value = regex.replace_all(&buf, replacer.by_ref());
+                    }
+                    context.define(mcro, value);
+                    regex = context.build_regex();
+                }
             } else { 
                 let substr;
                 let new_line;
@@ -459,22 +490,6 @@ pub fn process<I: BufRead, O: Write>(
                                 context.includes_stack.pop();
                                 context.current_filename = filename.clone();
                                 lines.append(&mut mapped_lines);
-                            } },
-                        "#define" => {
-                            if state == State::Active {
-                                let expr = maybe_expr.ok_or_else(|| Error::Syntax {
-                                    filename: filename.clone(), included_in: included_in.clone(), line,
-                                    msg: "Expected macro after `#define`".to_string() })?;
-                                let mut p = expr.splitn(2, " ");
-                                let mcro = p.next().unwrap();
-                                let value = p.next().or_else(|| Some("")).unwrap();
-                                if context.get_macro(mcro).is_some() {
-                                    return Err(Error::Syntax {
-                                        filename: filename.clone(), included_in: included_in.clone(), line,
-                                        msg: format!("Macro {} already defined", mcro)});
-                                }
-                                context.define(mcro, value);
-                                regex = context.build_regex();
                             } },
                         "#if" => {
                             let expr = maybe_expr.ok_or_else(|| Error::Syntax {
@@ -987,6 +1002,16 @@ mod tests {
             foo bar", &mut context);
         assert_eq!(result.err().unwrap().to_string(), 
             "Compiler error: This is an error on line 1 of string".to_string()
+            );
+    }
+    
+    #[test]
+    fn redefine() {
+        let mut context = Context::new("string");
+        context.current_filename = "string".to_string();
+        let result = process_str("#define foobar\n#define foobar", &mut context);
+        assert_eq!(result.err().unwrap().to_string(), 
+            "Syntax error: Macro foobar already defined on line 2 of string".to_string()
             );
     }
 }
