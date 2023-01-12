@@ -33,6 +33,7 @@ use std::path::Path;
 use log::debug;
 
 use regex::{Captures, Regex, Replacer};
+use std::borrow::Cow;
 
 /// The context for preprocessing a file.
 ///
@@ -50,7 +51,8 @@ pub struct Context {
     current_filename: String,
     includes_stack: Vec<(String, u32)>,
     pub include_directories: Vec<String>,
-    defs: BTreeMap<String, String>,
+    defs: BTreeMap<String, (Regex, String)>,
+    define_regex: Regex,
 }
 
 impl Context {
@@ -61,6 +63,7 @@ impl Context {
             includes_stack: Vec::<(String, u32)>::new(),
             include_directories: Vec::<String>::new(),
             defs: BTreeMap::new(),
+            define_regex: Regex::new(r"([a-zA-Z_][a-zA-Z0-9_]*)(?:\(((?:(?:[a-zA-Z_][a-zA-Z0-9_]*)\s*,\s*)*(?:(?:[a-zA-Z_][a-zA-Z0-9_]*)))\))?\s*(.*)").unwrap()
         }
     }
     /// Defines a macro within a context. As this function returns &mut Self, it can be chained
@@ -72,7 +75,14 @@ impl Context {
     /// assert_eq!(cpp::Context::new("string").define("foo", "bar").define("quaz", "quux").get_macro("foo").unwrap(), "bar");
     /// ```
     pub fn define<N: Into<String>, V: Into<String>>(&mut self, name: N, value: V) -> &mut Self {
-        self.defs.insert(name.into(), value.into());
+        let n = name.into();
+        let regex = Regex::new(&format!("\\b{}\\b", &n)).unwrap();
+        self.defs.insert(n, (regex, value.into()));
+        self
+    }
+    /// ```
+    pub fn define_ex<N: Into<String>>(&mut self, name: N, value: (Regex, String)) -> &mut Self {
+        self.defs.insert(name.into(), value);
         self
     }
     /// 
@@ -81,30 +91,21 @@ impl Context {
         self
     }
     /// Gets a macro that may or may not be defined from a context.
-    pub fn get_macro<N: Into<String>>(&self, name: N) -> Option<&String> {
+    pub fn get_macro<N: Into<String>>(&self, name: N) -> Option<&(Regex, String)> {
         self.defs.get(&name.into())
     }
-    fn build_regex(&self) -> Regex {
-        if self.defs.is_empty() {
-            Regex::new("$_").expect("Regex should be valid")
-        } else {
-            let pat: String = self
-                .defs
-                .keys()
-                .flat_map(|k| vec!["|", &k])
-                .skip(1)
-                .collect();
-            Regex::new(&format!("\\b(?:{})\\b", pat)).expect("Regex should be valid")
+
+    pub fn replace_all(&self, s: &str) -> String {
+        let mut res = String::from(s);
+        for (_, value) in &self.defs {
+            let x = value.0.replace_all(&res, &value.1);
+            if let Cow::Owned(z) = x {
+                res = z.to_string();
+            }
         }
+        res
     }
-    fn replacer<'a>(&'a self) -> impl Replacer + 'a {
-        move |captures: &Captures| {
-            self.defs
-                .get(captures.get(0).expect("At least one capture").as_str())
-                .expect("Found def for match")
-                .clone()
-        }
-    }
+
     fn skip_whitespace(&self, expr: &mut &str) {
         *expr = expr.trim_start();
     }
@@ -260,7 +261,6 @@ pub fn process<I: BufRead, O: Write>(
     let filename = context.current_filename.clone();
     let filename_rc = std::rc::Rc::<String>::new(filename.clone());
     let mut in_multiline_comments = false;
-    let mut regex = context.build_regex();
 
     let (included_in, included_in_rc) = match context.includes_stack.last() {
         Some(s) => (Some(s.clone()), Some((std::rc::Rc::<String>::new(s.0.clone()), s.1.clone()))),
@@ -387,8 +387,6 @@ pub fn process<I: BufRead, O: Write>(
                             msg: format!("Macro {} is not defined", expr)});
                     }
                     context.undefine(expr);
-                    regex = context.build_regex();
-
                 } 
             } else if substr.starts_with("#define") {
                 if state == State::Active {
@@ -404,30 +402,36 @@ pub fn process<I: BufRead, O: Write>(
                     let expr = maybe_expr.ok_or_else(|| Error::Syntax {
                         filename: filename.clone(), included_in: included_in.clone(), line,
                         msg: "Expected macro after `#define`".to_string() })?;
-                    let mut p = expr.splitn(2, " ");
-                    let mcro = p.next().unwrap();
+                    debug!("expr: {:?}", expr);
+                    
+                    let caps = context.define_regex.captures(expr).unwrap();
+                    debug!("caps: {:?}", caps);
+                    let mcro = &caps[1];
                     if context.get_macro(mcro).is_some() {
                         return Err(Error::Syntax {
                             filename: filename.clone(), included_in: included_in.clone(), line,
                             msg: format!("Macro {} already defined", mcro)});
                     }
-                    let value;
-                    {
-                        let mut replacer = context.replacer();
-                        let buf = p.next().or_else(|| Some("")).unwrap();
-                        value = regex.replace_all(&buf, replacer.by_ref());
+                    let buf = &caps[3];
+                    let mut value = context.replace_all(buf);
+                    if caps.get(2).is_none() {
+                        context.define(mcro, value);
+                    } else {
+                        let mut rex = format!("{}\\(", mcro);
+                        for v in caps.get(2).unwrap().as_str().split(",") {
+                            value = value.replace(v, &format!("${}",v));
+                            rex += &format!("(?P<{}>[^,]*),", v);
+                        }
+                        rex = rex.strip_suffix(",").unwrap().to_string();
+                        rex += "\\)";
+                        debug!("regex:{}", &rex);
+                        let regex = Regex::new(&rex).unwrap();
+                        context.define_ex(mcro, (regex, value));
                     }
-                    context.define(mcro, value);
-                    regex = context.build_regex();
                 }
             } else { 
-                let substr;
-                let new_line;
-                {
-                    let mut replacer = context.replacer();
-                    new_line = regex.replace_all(&uncommented_buf, replacer.by_ref());
-                    substr = new_line.trim();
-                }
+                let new_line = context.replace_all(&uncommented_buf);
+                let substr = new_line.trim();
                 if substr.starts_with("#") {
                     let mut parts = substr.splitn(2, "//").next().unwrap().splitn(2, " ");
                     let name = parts.next().unwrap();
@@ -1012,6 +1016,17 @@ mod tests {
         let result = process_str("#define foobar\n#define foobar", &mut context);
         assert_eq!(result.err().unwrap().to_string(), 
             "Syntax error: Macro foobar already defined on line 2 of string".to_string()
+            );
+    }
+    
+    #[test]
+    fn define_args() {
+        let mut context = Context::new("string");
+        context.current_filename = "string".to_string();
+        let result = process_str("#define add(a,b) a+b\nadd(1,2)", &mut context);
+        println!("{:?}", result);
+        assert_eq!(result.unwrap(), 
+            "1+2".to_string()
             );
     }
 }
