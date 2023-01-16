@@ -54,7 +54,7 @@ impl AsmLine {
                 s += writer.write(&format!("\t{} {:19}\t; {} cycles\n", inst.mnemonic.to_string(), &inst.dasm_operand, inst.cycles).as_bytes())?;
             },
             AsmLine::Inline(inst) => {
-                s += writer.write(inst.as_bytes())?;
+                s += writer.write(&format!("\t{}\n", inst).as_bytes())?;
             },
             AsmLine::Comment(comment) => {
                 s += writer.write(&format!(";{}", comment).as_bytes())?;
@@ -74,8 +74,17 @@ impl AssemblyCode {
             code: Vec::<AsmLine>::new()
         }
     }
-    pub fn append(&mut self, inst: AsmInstruction) -> () {
+    pub fn append_asm(&mut self, inst: AsmInstruction) -> () {
         self.code.push(AsmLine::Instruction(inst));
+    }
+    pub fn append_inline(&mut self, s: String) -> () {
+        self.code.push(AsmLine::Inline(s));
+    }
+    pub fn append_label(&mut self, s: String) -> () {
+        self.code.push(AsmLine::Label(s));
+    }
+    pub fn append_comment(&mut self, s: String) -> () {
+        self.code.push(AsmLine::Comment(s));
     }
     fn write(&self, writer: &mut dyn Write) -> Result<usize, std::io::Error> {
         let mut s = 0;

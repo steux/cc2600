@@ -24,10 +24,8 @@ pub enum ExprType<'a> {
 enum FlagsState<'a> {
     Unknown,
     X, Y,
-    Zero, Positive, Negative,
+    Zero, 
     Absolute(&'a str, bool, u16),
-    AbsoluteX(&'a str),
-    AbsoluteY(&'a str),
 }
 
 struct GeneratorState<'a> {
@@ -50,8 +48,13 @@ struct GeneratorState<'a> {
     current_function: Option<String>,
 }
 
-impl<'a> GeneratorState<'a> {
-    fn asm(&mut self, mnemonic: AsmMnemonic, operand: &'a ExprType<'a>, high_byte: bool, pos: usize) -> Result<bool, Error>
+impl<'a, 'b> GeneratorState<'a> {
+    fn sasm(&mut self, mnemonic: AsmMnemonic) -> Result<bool, Error>
+    {
+        self.asm(mnemonic, &ExprType::Nothing, 0, false)
+    }
+
+    fn asm(&mut self, mnemonic: AsmMnemonic, operand: &ExprType<'b>, pos: usize, high_byte: bool) -> Result<bool, Error>
     {
         let dasm_operand: String;
         let signed;
@@ -60,6 +63,7 @@ impl<'a> GeneratorState<'a> {
         let mut cycles = match mnemonic {
             PHA | PLA => 3,
             INC | DEC => 4,
+            RTS => 6,
             _ => 2 
         };
 
@@ -80,8 +84,18 @@ impl<'a> GeneratorState<'a> {
                 },
                 ExprType::Immediate(v) => {
                     nb_bytes = 2;
-                    signed = if *v < 0 { true } else { false };
-                    dasm_operand = format!("#{}", *v);
+                    let vx = match high_byte {
+                        false => v & 0xff,
+                        true => (v >> 8) & 0xff,
+                    };
+                    signed = false;
+                    dasm_operand = format!("#{}", vx);
+                },
+                ExprType::Tmp(s) => {
+                    dasm_operand = "cctmp".to_string();
+                    cycles += 1;
+                    nb_bytes = 2;
+                    signed = *s;
                 },
                 ExprType::Absolute(variable, eight_bits, off) => {
                     let v = self.compiler_state.get_variable(variable);
@@ -94,34 +108,45 @@ impl<'a> GeneratorState<'a> {
                     } else { *off };
                     match v.var_type {
                         VariableType::Char => {
-                            if offset > 0 {
-                                dasm_operand = format!("{}+{}", variable, offset);
-                            } else {
-                                dasm_operand = format!("{}", variable);
-                            }
-                            if v.memory == VariableMemory::Zeropage {
-                                cycles += 1;
+                            if high_byte {
+                                dasm_operand = "#0".to_string();
                                 nb_bytes = 2;
                             } else {
-                                cycles += 2;
-                                nb_bytes = 3;
+                                if offset > 0 {
+                                    dasm_operand = format!("{}+{}", variable, offset);
+                                } else {
+                                    dasm_operand = format!("{}", variable);
+                                }
+                                if v.memory == VariableMemory::Zeropage {
+                                    cycles += 1;
+                                    nb_bytes = 2;
+                                } else {
+                                    cycles += 2;
+                                    nb_bytes = 3;
+                                }
                             }
                         },
                         VariableType::Short => {
-                            let off = if high_byte { offset + 1 } else { offset };
-                            if off > 0 {
-                                dasm_operand = format!("{}+{}", variable, off);
-                            } else {
-                                dasm_operand = format!("{}", variable);
-                            }
-                            if v.memory == VariableMemory::Zeropage {
-                                cycles += 1;
+                            if *eight_bits && high_byte {
+                                dasm_operand = "#0".to_string();
                                 nb_bytes = 2;
                             } else {
-                                cycles += 2;
-                                nb_bytes = 3;
+                                let off = if high_byte { offset + 1 } else { offset };
+                                if off > 0 {
+                                    dasm_operand = format!("{}+{}", variable, off);
+                                } else {
+                                    dasm_operand = format!("{}", variable);
+                                }
+                                if v.memory == VariableMemory::Zeropage {
+                                    cycles += 1;
+                                    nb_bytes = 2;
+                                } else {
+                                    cycles += 2;
+                                    nb_bytes = 3;
+                                }
                             }
-                        },
+                        }
+                        ,
                         VariableType::CharPtr => if v.var_type == VariableType::CharPtr && !*eight_bits && v.var_const {
                             if high_byte {
                                 dasm_operand = format!("#>{}", variable);
@@ -223,11 +248,11 @@ impl<'a> GeneratorState<'a> {
                     } else {
                         dasm_operand = format!("{},X", variable);
                     }
+                    cycles += 2;
                     if v.memory == VariableMemory::Zeropage {
-                        cycles += 2;
                         nb_bytes = 2;
                     } else {
-                        cycles += 3;
+                        if mnemonic == STA { cycles += 1; }
                         nb_bytes = 3;
                     }
                     match mnemonic {
@@ -246,8 +271,10 @@ impl<'a> GeneratorState<'a> {
         }
         
         let mut s = mnemonic.to_string();
-        s += " ";
-        s += &dasm_operand;
+        if dasm_operand.len() > 0 {
+            s += " ";
+            s += &dasm_operand;
+        }
         self.write_asm(&s, cycles)?;
 
         if let Some(f) = &self.current_function {
@@ -255,10 +282,38 @@ impl<'a> GeneratorState<'a> {
             let instruction = AsmInstruction {
                 mnemonic, dasm_operand, cycles, nb_bytes 
             };
-            code.append(instruction);
+            code.append_asm(instruction);
         }
         Ok(signed)
     }
+
+    fn inline(&mut self, s: &str) -> Result<(), Error> {
+        if let Some(f) = &self.current_function {
+            let code : &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
+            code.append_inline(s.to_string());
+        }
+        self.write(&format!("\t{s}\n"))?;
+        Ok(()) 
+    } 
+
+    fn comment(&mut self, s: &str) -> Result<(), Error> {
+        if let Some(f) = &self.current_function {
+            let code : &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
+            code.append_comment(s.trim().to_string());
+        }
+        self.write(";")?;
+        self.write(s)?;
+        Ok(()) 
+    } 
+
+    fn label(&mut self, l: &str) -> Result<(), Error> {
+        if let Some(f) = &self.current_function {
+            let code : &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
+            code.append_label(l.to_string());
+        }
+        self.write_label(l)?;
+        Ok(()) 
+    } 
 
     fn write(&mut self, s: &str) -> Result<usize, std::io::Error> {
         self.writer.write(s.as_bytes())
@@ -323,49 +378,33 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
     match left {
         ExprType::X => {
             match right {
-                ExprType::Immediate(v) => {
-                    gstate.write_asm(&format!("LDX #{}", v), 2)?;
+                ExprType::Immediate(_) | ExprType::Tmp(_) | ExprType::AbsoluteY(_) => {
+                    gstate.asm(LDX, right, pos, high_byte)?;
                     gstate.flags = FlagsState::X; 
                     Ok(ExprType::X) 
                 },
-                ExprType::Tmp(_) => {
-                    gstate.write_asm("LDX cctmp", 3)?;
-                    gstate.flags = FlagsState::X;
-                    Ok(ExprType::X)
-                },
-                ExprType::Absolute(name, eight_bits, offset) => {
-                    let v = gstate.compiler_state.get_variable(name);
+                ExprType::Absolute(_, eight_bits, _) => {
                     if !eight_bits {
                         return Err(syntax_error(gstate.compiler_state, "Can't assign 16 bits data to X", pos));
                     }
-                    if *offset > 0 {
-                        gstate.write_asm(&format!("LDX {}+{}", name, offset), if v.memory == VariableMemory::Zeropage {3} else {4})?;
-                    } else {
-                        gstate.write_asm(&format!("LDX {}", name), if v.memory == VariableMemory::Zeropage {3} else {4})?;
-                    }
+                    gstate.asm(LDX, right, pos, high_byte)?;
                     gstate.flags = FlagsState::X;
                     Ok(ExprType::X)
                 },
-                ExprType::AbsoluteX(name) => {
-                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                    gstate.write_asm(&format!("LDA {},X", name), 4)?;
-                    gstate.write_asm(&"TAX", 2)?;
+                ExprType::AbsoluteX(_) => {
+                    if gstate.acc_in_use { gstate.sasm(PHA)?; }
+                    gstate.asm(LDA, right, pos, high_byte)?;
+                    gstate.sasm(TAX)?;
                     if gstate.acc_in_use { 
-                        gstate.write_asm("PLA", 3)?;
+                        gstate.sasm(PLA)?;
                         gstate.flags = FlagsState::Unknown;
                     } else {
                         gstate.flags = FlagsState::X;
                     }
                     Ok(ExprType::X)
                 },
-                ExprType::AbsoluteY(name) => {
-                    // TODO; Check if the target variable is a pointer (indirect adressing)
-                    gstate.write_asm(&format!("LDX {},Y", name), 4)?;
-                    gstate.flags = FlagsState::X;
-                    Ok(ExprType::X)
-                },
                 ExprType::A(_) => {
-                    gstate.write_asm(&"TAX", 2)?;
+                    gstate.sasm(TAX)?;
                     gstate.flags = FlagsState::X;
                     gstate.acc_in_use = false;
                     Ok(ExprType::X)
@@ -374,11 +413,13 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                     Ok(ExprType::X)
                 },
                 ExprType::Y => {
-                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                    gstate.write_asm(&"TYA", 2)?;
-                    gstate.write_asm(&"TAX", 2)?;
+                    if gstate.acc_in_use { gstate.sasm(PHA)?; }
+                    gstate.sasm(TYA)?;
+                    gstate.sasm(TAX)?;
+                    //gstate.sasm(TYA)?;
+                    //gstate.sasm(TAX)?;
                     if gstate.acc_in_use { 
-                        gstate.write_asm("PLA", 3)?;
+                        gstate.sasm(PLA)?;
                         gstate.flags = FlagsState::Unknown;
                     } else {
                         gstate.flags = FlagsState::X;
@@ -391,40 +432,25 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
         },
         ExprType::Y => {
             match right {
-                ExprType::Immediate(v) => {
-                    gstate.write_asm(&format!("LDY #{}", v), 2)?;
+                ExprType::Immediate(_) | ExprType::Tmp(_) | ExprType::AbsoluteX(_) => {
+                    gstate.asm(LDY, right, pos, high_byte)?;
                     gstate.flags = FlagsState::Y; 
                     Ok(ExprType::Y) 
                 },
-                ExprType::Tmp(_) => {
-                    gstate.write_asm("LDY cctmp", 3)?;
-                    gstate.flags = FlagsState::Y;
-                    Ok(ExprType::Y)
-                },
-                ExprType::Absolute(name, eight_bits, offset) => {
-                    let v = gstate.compiler_state.get_variable(name);
+                ExprType::Absolute(_, eight_bits, _) => {
                     if !eight_bits {
                         return Err(syntax_error(gstate.compiler_state, "Can't assign 16 bits data to Y", pos));
                     }
-                    if *offset > 0 {
-                        gstate.write_asm(&format!("LDY {}+{}", name, offset), if v.memory == VariableMemory::Zeropage {3} else {4})?;
-                    } else {
-                        gstate.write_asm(&format!("LDY {}", name), if v.memory == VariableMemory::Zeropage {3} else {4})?;
-                    }
+                    gstate.asm(LDY, right, pos, high_byte)?;
                     gstate.flags = FlagsState::Y;
                     Ok(ExprType::Y)
                 },
-                ExprType::AbsoluteX(name) => {
-                    gstate.write_asm(&format!("LDY {},X", name), 4)?;
-                    gstate.flags = FlagsState::Y;
-                    Ok(ExprType::Y)
-                },
-                ExprType::AbsoluteY(name) => {
-                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                    gstate.write_asm(&format!("LDA {},X", name), 4)?;
-                    gstate.write_asm(&"TAY", 2)?;
+                ExprType::AbsoluteY(_) => {
+                    if gstate.acc_in_use { gstate.sasm(PHA)?; }
+                    gstate.asm(LDA, right, pos, high_byte)?;
+                    gstate.sasm(TAY)?;
                     if gstate.acc_in_use { 
-                        gstate.write_asm("PLA", 3)?;
+                        gstate.sasm(PLA)?;
                         gstate.flags = FlagsState::Unknown;
                     } else {
                         gstate.flags = FlagsState::Y;
@@ -432,17 +458,17 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                     Ok(ExprType::Y)
                 },
                 ExprType::A(_)=> {
-                    gstate.write_asm(&"TAY", 2)?;
+                    gstate.sasm(TAY)?;
                     gstate.acc_in_use = false;
                     gstate.flags = FlagsState::Y;
                     Ok(ExprType::Y)
                 },
                 ExprType::X => {
-                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                    gstate.write_asm(&"TXA", 2)?;
-                    gstate.write_asm(&"TAY", 2)?;
+                    if gstate.acc_in_use { gstate.sasm(PHA)?; }
+                    gstate.sasm(TXA)?;
+                    gstate.sasm(TAY)?;
                     if gstate.acc_in_use { 
-                        gstate.write_asm("PLA", 3)?;
+                        gstate.sasm(PLA)?;
                         gstate.flags = FlagsState::Unknown;
                     } else {
                         gstate.flags = FlagsState::Y;
@@ -461,21 +487,15 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
             match right {
                 ExprType::X => {
                     match left {
-                        ExprType::Absolute(variable, eight_bits, offset) => {
-                            let v = gstate.compiler_state.get_variable(variable);
-                            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            if *offset > 0 {
-                                gstate.write_asm(&format!("STX {}+{}", variable, offset), cycles)?;
-                            } else {
-                                gstate.write_asm(&format!("STX {}", variable), cycles)?;
-                            }
+                        ExprType::Absolute(_, eight_bits, offset) => {
+                            gstate.asm(STX, left, pos, high_byte)?;
                             if !eight_bits {
                                 if *offset == 0 {
-                                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                                    gstate.write_asm("LDA #0", 2)?;
-                                    gstate.write_asm(&format!("STA {}+1", variable), cycles)?;
+                                    if gstate.acc_in_use { gstate.sasm(PHA)?; }
+                                    gstate.asm(LDA, &ExprType::Immediate(0), pos, false)?;
+                                    gstate.asm(STA, left, pos, true)?;
                                     if gstate.acc_in_use { 
-                                        gstate.write_asm("PLA", 3)?;
+                                        gstate.sasm(PLA)?;
                                         gstate.flags = FlagsState::Unknown;
                                     } else {
                                         gstate.flags = FlagsState::Zero;
@@ -486,14 +506,12 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                             }
                             Ok(ExprType::X)
                         },
-                        ExprType::AbsoluteX(variable) => {
-                            let v = gstate.compiler_state.get_variable(variable);
-                            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                            gstate.write_asm(&"TXA", 2)?;
-                            gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
+                        ExprType::AbsoluteX(_) => {
+                            if gstate.acc_in_use { gstate.sasm(PHA)?; }
+                            gstate.sasm(TXA)?;
+                            gstate.asm(STA, left, pos, high_byte)?;
                             if gstate.acc_in_use {
-                                gstate.write_asm("PLA", 3)?;
+                                gstate.sasm(PLA)?;
                                 gstate.flags = FlagsState::Unknown;
                             } else {
                                 gstate.flags = FlagsState::X;
@@ -503,13 +521,13 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                         ExprType::AbsoluteY(variable) => {
                             let v = gstate.compiler_state.get_variable(variable);
                             if v.memory == VariableMemory::Zeropage {
-                                gstate.write_asm(&format!("STX {},Y", variable), 4)?;
+                                gstate.asm(STX, left, pos, high_byte)?;
                             } else {
-                                if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                                gstate.write_asm(&"TXA", 2)?;
-                                gstate.write_asm(&format!("STA {},Y", variable), 5)?;
+                                if gstate.acc_in_use { gstate.sasm(PHA)?; }
+                                gstate.sasm(TXA)?;
+                                gstate.asm(STA, left, pos, high_byte)?;
                                 if gstate.acc_in_use {
-                                    gstate.write_asm("PLA", 3)?;
+                                    gstate.sasm(PLA)?;
                                     gstate.flags = FlagsState::Unknown;
                                 } else {
                                     gstate.flags = FlagsState::X;
@@ -521,7 +539,7 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                             if gstate.acc_in_use {
                                 return Err(syntax_error(gstate.compiler_state, "Code too complex for the compiler", pos))
                             }
-                            gstate.write_asm(&"TXA", 2)?;
+                            gstate.sasm(TXA)?;
                             gstate.acc_in_use = true;
                             return Ok(ExprType::A(false));
                         },
@@ -530,21 +548,15 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                 },
                 ExprType::Y => {
                     match left {
-                        ExprType::Absolute(variable, eight_bits, offset) => {
-                            let v = gstate.compiler_state.get_variable(variable);
-                            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            if *offset > 0 {
-                                gstate.write_asm(&format!("STY {}+{}", variable, offset), cycles)?;
-                            } else {
-                                gstate.write_asm(&format!("STY {}", variable), cycles)?;
-                            }
+                        ExprType::Absolute(_, eight_bits, offset) => {
+                            gstate.asm(STY, left, pos, high_byte)?;
                             if !eight_bits {
                                 if *offset == 0 {
-                                    if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                                    gstate.write_asm("LDA #0", 2)?;
-                                    gstate.write_asm(&format!("STA {}+1", variable), cycles)?;
+                                    if gstate.acc_in_use { gstate.sasm(PHA)?; }
+                                    gstate.asm(LDA, &ExprType::Immediate(0), pos, false)?;
+                                    gstate.asm(STA, left, pos, true)?;
                                     if gstate.acc_in_use { 
-                                        gstate.write_asm("PLA", 3)?;
+                                        gstate.sasm(PLA)?;
                                         gstate.flags = FlagsState::Unknown;
                                     } else {
                                         gstate.flags = FlagsState::Zero;
@@ -555,14 +567,12 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                             }
                             Ok(ExprType::Y)
                         },
-                        ExprType::AbsoluteY(variable) => {
-                            let v = gstate.compiler_state.get_variable(variable);
-                            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                            gstate.write_asm(&"TYA", 2)?;
-                            gstate.write_asm(&format!("STA {},Y", variable), cycles + 1)?;
+                        ExprType::AbsoluteY(_) => {
+                            if gstate.acc_in_use { gstate.sasm(PHA)?; }
+                            gstate.sasm(TYA)?;
+                            gstate.asm(STA, left, pos, high_byte)?;
                             if gstate.acc_in_use {
-                                gstate.write_asm("PLA", 3)?;
+                                gstate.sasm(PLA)?;
                                 gstate.flags = FlagsState::Unknown;
                             } else {
                                 gstate.flags = FlagsState::Y;
@@ -572,13 +582,13 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                         ExprType::AbsoluteX(variable) => {
                             let v = gstate.compiler_state.get_variable(variable);
                             if v.memory == VariableMemory::Zeropage {
-                                gstate.write_asm(&format!("STY {},X", variable), 4)?;
+                                gstate.asm(STY, left, pos, high_byte)?;
                             } else {
-                                if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                                gstate.write_asm(&"TYA", 2)?;
-                                gstate.write_asm(&format!("STA {},X", variable), 5)?;
+                                if gstate.acc_in_use { gstate.sasm(PHA)?; }
+                                gstate.sasm(TYA)?;
+                                gstate.asm(STA, left, pos, high_byte)?;
                                 if gstate.acc_in_use {
-                                    gstate.write_asm("PLA", 3)?;
+                                    gstate.sasm(PLA)?;
                                     gstate.flags = FlagsState::Unknown;
                                 } else {
                                     gstate.flags = FlagsState::Y;
@@ -590,7 +600,7 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                             if gstate.acc_in_use {
                                 return Err(syntax_error(gstate.compiler_state, "Code too complex for the compiler", pos))
                             }
-                            gstate.write_asm(&"TYA", 2)?;
+                            gstate.sasm(TYA)?;
                             gstate.acc_in_use = true;
                             return Ok(ExprType::A(false));
                         },
@@ -601,70 +611,9 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                     let mut acc_in_use = gstate.acc_in_use;
                     let signed;
                     match right {
-                        ExprType::Absolute(variable, eight_bits, offset) => {
-                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                            let v = gstate.compiler_state.get_variable(variable);
-                            signed = v.signed;
-                            if v.var_type == VariableType::CharPtr && !eight_bits && v.var_const {
-                                if high_byte {
-                                    gstate.write_asm(&format!("LDA #>{}", variable), 2)?;
-                                } else {
-                                    gstate.write_asm(&format!("LDA #<{}", variable), 2)?;
-                                }
-                                gstate.flags = FlagsState::Unknown;
-                            } else {
-                                let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                                if high_byte && *eight_bits {
-                                    gstate.write_asm("LDA #0", 2)?;
-                                    gstate.flags = FlagsState::Zero;
-                                } else {
-                                    let off = if high_byte { *offset + 1 } else { *offset };
-                                    if off > 0 {
-                                        gstate.write_asm(&format!("LDA {}+{}", variable, off), cycles)?;
-                                    } else {
-                                        gstate.write_asm(&format!("LDA {}", variable), cycles)?;
-                                    }
-                                    gstate.flags = FlagsState::Absolute(variable, *eight_bits, off);
-                                }
-                            }
-                        },
-                        ExprType::AbsoluteX(variable) => {
-                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                            let v = gstate.compiler_state.get_variable(variable);
-                            signed = v.signed;
-                            gstate.write_asm(&format!("LDA {},X", variable), 4)?;
-                            gstate.flags = FlagsState::AbsoluteX(variable);
-                        },
-                        ExprType::AbsoluteY(variable) => {
-                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                            let v = gstate.compiler_state.get_variable(variable);
-                            signed = v.signed;
-                            if v.var_type == VariableType::CharPtr && !v.var_const {
-                                if v.size == 1 {
-                                    gstate.write_asm(&format!("LDA ({}),Y", variable), 5)?;
-                                } else {
-                                    return Err(syntax_error(gstate.compiler_state, "X-Indirect adressing mode not available with Y register", pos));
-                                }
-                            } else {
-                                gstate.write_asm(&format!("LDA {},Y", variable), 4)?;
-                            }
-                            gstate.flags = FlagsState::AbsoluteY(variable);
-                        },
-                        ExprType::Immediate(v) => {
-                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                            let vx = match high_byte {
-                                false => v & 0xff,
-                                true => (v >> 8) & 0xff,
-                            };
-                            signed = false;
-                            gstate.write_asm(&format!("LDA #{}", vx), 2)?;
-                            gstate.flags = if vx > 0 { FlagsState::Positive } else if vx < 0 { FlagsState::Negative } else { FlagsState::Zero };
-                        },
-                        ExprType::Tmp(s) => {
-                            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                            signed = *s;
-                            gstate.write_asm("LDA cctmp", 3)?;
-                            gstate.flags = FlagsState::Unknown;
+                        ExprType::Absolute(_, _, _) | ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) | ExprType::Immediate(_) | ExprType::Tmp(_) => {
+                            if gstate.acc_in_use { gstate.sasm(PHA)?; }
+                            signed = gstate.asm(LDA, right, pos, high_byte)?;
                         },
                         ExprType::A(s) => {
                             signed = *s;
@@ -674,23 +623,8 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                         _ => unreachable!()
                     };
                     match left {
-                        ExprType::Absolute(variable, _eight_bits, offset) => {
-                            let v = gstate.compiler_state.get_variable(variable);
-                            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            let off = if high_byte { *offset + 1 } else { *offset };
-                            if off > 0 {
-                                gstate.write_asm(&format!("STA {}+{}", variable, off), cycles)?;
-                            } else {
-                                gstate.write_asm(&format!("STA {}", variable), cycles)?;
-                            }
-                        },
-                        ExprType::AbsoluteX(variable) => {
-                            let v = gstate.compiler_state.get_variable(variable);
-                            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                            gstate.write_asm(&format!("STA {},X", variable), cycles + 1)?;
-                        },
-                        ExprType::AbsoluteY(variable) => {
-                            gstate.write_asm(&format!("STA {},Y", variable), 5)?;
+                        ExprType::Absolute(_, _, _) | ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) => {
+                            gstate.asm(STA, left, pos, high_byte)?;
                         },
                         ExprType::A(_) => {
                             if acc_in_use {
@@ -705,7 +639,7 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                         _ => return Err(syntax_error(gstate.compiler_state, "Bad left value in assignement", pos)),
                     };
                     if acc_in_use {
-                        gstate.write_asm("PLA", 3)?;
+                        gstate.sasm(PLA)?;
                         gstate.flags = FlagsState::Unknown;
                     }
                     Ok(*left)
@@ -742,7 +676,7 @@ fn generate_arithm<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>, gstat
     let x;
     right2 = match right {
         ExprType::A(s) => {
-            gstate.write_asm("STA cctmp", 3)?;
+            gstate.asm(STA, &ExprType::Tmp(*s), pos, false)?;
             acc_in_use = false;
             x = ExprType::Tmp(*s);
             &x
@@ -768,61 +702,25 @@ fn generate_arithm<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>, gstat
                     } 
                 },
                 _ => {
-                    if acc_in_use { gstate.write_asm("PHA", 3)?; }
-                    if high_byte {
-                        gstate.write_asm(&format!("LDA #{}", (l >> 8) & 0xff), 2)?
-                    } else {
-                        gstate.write_asm(&format!("LDA #{}", l & 0xff), 2)?
-                    }
+                    if acc_in_use { gstate.sasm(PHA)?; }
+                    gstate.asm(LDA, left, pos, high_byte)?;
                 }
             };
         },
-        ExprType::Absolute(varname, eight_bits, offset) => {
-            if acc_in_use { gstate.write_asm("PHA", 3)?; }
-            let v = gstate.compiler_state.get_variable(varname);
-            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-            if high_byte && *eight_bits {
-                gstate.write_asm("LDA #0", 2)?;
-            } else {
-                let off = if high_byte { *offset + 1 } else { *offset };
-                if off > 0 {
-                    gstate.write_asm(&format!("LDA {}+{}", varname, off), cycles)?;
-                } else {
-                    gstate.write_asm(&format!("LDA {}", varname), cycles)?;
-                }
-            }
-        },
-        ExprType::AbsoluteX(varname) => {
-            if acc_in_use { gstate.write_asm("PHA", 3)?; }
-            gstate.write_asm(&format!("LDA {},X", varname), 4)?;
-        },
-        ExprType::AbsoluteY(variable) => {
-            if acc_in_use { gstate.write_asm("PHA", 3)?; }
-            let v = gstate.compiler_state.get_variable(variable);
-            if v.var_type == VariableType::CharPtr && !v.var_const {
-                if v.size == 1 {
-                    gstate.write_asm(&format!("LDA ({}),Y", variable), 5)?;
-                } else {
-                    return Err(syntax_error(gstate.compiler_state, "X-Indirect adressing mode not available with Y register", pos));
-                }
-            } else {
-                gstate.write_asm(&format!("LDA {},Y", variable), 4)?;
-            }
+        ExprType::Absolute(_, _, _) | ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) | ExprType::Tmp(_) => {
+            if acc_in_use { gstate.sasm(PHA)?; }
+            gstate.asm(LDA, left, pos, high_byte)?;
         },
         ExprType::X => {
-            if acc_in_use { gstate.write_asm("PHA", 3)?; }
-            gstate.write_asm("TXA", 2)?;
+            if acc_in_use { gstate.sasm(PHA)?; }
+            gstate.sasm(TXA)?;
         },
         ExprType::Y => {
-            if acc_in_use { gstate.write_asm("PHA", 3)?; }
-            gstate.write_asm("TYA", 2)?;
+            if acc_in_use { gstate.sasm(PHA)?; }
+            gstate.sasm(TYA)?;
         },
         ExprType::A(_) => {
             acc_in_use = false;
-        },
-        ExprType::Tmp(_) => {
-            if acc_in_use { gstate.write_asm("PHA", 3)?; }
-            gstate.write_asm("LDA cctmp", 3)?;
         },
         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
     }
@@ -830,24 +728,24 @@ fn generate_arithm<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>, gstat
     let operation = match op {
         Operation::Add(_) => {
             if !high_byte {
-                gstate.write_asm("CLC", 2)?;
+                gstate.sasm(CLC)?;
             }
-            "ADC"
+            ADC
         },
         Operation::Sub(_) => {
             if !high_byte {
-                gstate.write_asm("SEC", 2)?;
+                gstate.sasm(SEC)?;
             }
-            "SBC"
+            SBC
         },
         Operation::And(_) => {
-            "AND"
+            AND
         },
         Operation::Or(_) => {
-            "ORA"
+            ORA
         },
         Operation::Xor(_) => {
-            "EOR"
+            EOR
         },
         Operation::Mul(_) => { return Err(syntax_error(gstate.compiler_state, "Operation not possible. 6502 doesn't implement a multiplier.", pos)) },
         Operation::Div(_) => { return Err(syntax_error(gstate.compiler_state, "Operation not possible. 6502 doesn't implement a divider.", pos)) },
@@ -855,67 +753,29 @@ fn generate_arithm<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>, gstat
     };
     let signed;
     match right2 {
-        ExprType::Immediate(v) => {
-            let vx = match high_byte {
-                false => v & 0xff,
-                true => (v >> 8) & 0xff,
-            };
-            gstate.write_asm(&format!("{} #{}", operation, vx), 2)?;
-            signed = if *v < 0 { true } else { false };
-        },
-        ExprType::Absolute(varname, eight_bits, offset) => {
-            let v = gstate.compiler_state.get_variable(varname);
-            signed = v.signed; 
-            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-            if high_byte && *eight_bits {
-                gstate.write_asm(&format!("{} #0", operation), 2)?;
-            } else {
-                let off = if high_byte { *offset + 1 } else { *offset };
-                if off > 0 {
-                    gstate.write_asm(&format!("{} {}+{}", operation, varname, off), cycles)?;
-                } else {
-                    gstate.write_asm(&format!("{} {}", operation, varname), cycles)?;
-                }
-            }
-        },
-        ExprType::AbsoluteX(varname) => {
-            let v = gstate.compiler_state.get_variable(varname);
-            signed = v.signed; 
-            gstate.write_asm(&format!("{} {},X", operation, varname), 4)?;
-        },
-        ExprType::AbsoluteY(varname) => {
-            let v = gstate.compiler_state.get_variable(varname);
-            signed = v.signed; 
-            if v.var_type == VariableType::CharPtr && !v.var_const {
-                if v.size == 1 {
-                    gstate.write_asm(&format!("{} ({}),Y", operation, varname), 5)?;
-                } else {
-                    return Err(syntax_error(gstate.compiler_state, "X-Indirect adressing mode not available with Y register", pos));
-                }
-            } else {
-                gstate.write_asm(&format!("{} {},Y", operation, varname), 4)?;
-            }
+        ExprType::Immediate(_) | ExprType::Absolute(_, _, _) | ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) => {
+            signed = gstate.asm(operation, right2, pos, high_byte)?;
         },
         ExprType::X => {
             signed = false;
-            gstate.write_asm("STX cctmp", 3)?;
-            gstate.write_asm(&format!("{} cctmp", operation), 4)?;
+            gstate.asm(STX, &ExprType::Tmp(false), pos, high_byte)?;
+            gstate.asm(operation, &ExprType::Tmp(false), pos, high_byte)?;
         },
         ExprType::Y => {
             signed = false;
-            gstate.write_asm("STY cctmp", 3)?;
-            gstate.write_asm(&format!("{} cctmp", operation), 4)?;
+            gstate.asm(STX, &ExprType::Tmp(false), pos, high_byte)?;
+            gstate.asm(operation, &ExprType::Tmp(false), pos, high_byte)?;
         },
         ExprType::Tmp(s) => {
+            gstate.asm(operation, right2, pos, high_byte)?;
             signed = *s;
-            gstate.write_asm(&format!("{} cctmp", operation), 4)?;
         },
         _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
     };
     gstate.flags = FlagsState::Unknown;
     if acc_in_use {
-        gstate.write_asm("STA cctmp", 3)?;
-        gstate.write_asm("PLA", 3)?;
+        gstate.asm(STA, &ExprType::Tmp(false), pos, high_byte)?;
+        gstate.sasm(PLA)?;
         Ok(ExprType::Tmp(signed))
     } else {
         Ok(ExprType::A(signed))
@@ -929,8 +789,6 @@ fn generate_shift<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>,
     match left {
         ExprType::Absolute(varname, _eight_bits, offset) => {
             let v = gstate.compiler_state.get_variable(varname);
-            signed = v.signed; 
-            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
             if (v.var_type == VariableType::Short || v.var_type == VariableType::CharPtr) && *op == Operation::Brs(false) {
                 // Special shift 8 case for extracting higher byte
                 match right {
@@ -944,54 +802,42 @@ fn generate_shift<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>,
                     _ => return Err(syntax_error(gstate.compiler_state, "Incorrect right value for right shift operation on short (constant 8 only supported)", pos))
                 };
             } else {
-                if acc_in_use { gstate.write_asm("PHA", 3)?; }
-                if *offset > 0 {
-                    gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
-                } else {
-                    gstate.write_asm(&format!("LDA {}", varname), cycles)?;
-                }
+                if acc_in_use { gstate.sasm(PHA)?; }
+                signed = gstate.asm(LDA, left, pos, false)?;
             }
         },
-        ExprType::AbsoluteX(varname) => {
-            if acc_in_use { gstate.write_asm("PHA", 3)?; }
-            let v = gstate.compiler_state.get_variable(varname);
-            signed = v.signed; 
-            gstate.write_asm(&format!("LDA {},X", varname), 4)?;
-        },
-        ExprType::AbsoluteY(varname) => {
-            if acc_in_use { gstate.write_asm("PHA", 3)?; }
-            let v = gstate.compiler_state.get_variable(varname);
-            signed = v.signed; 
-            gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
+        ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) => {
+            if acc_in_use { gstate.sasm(PHA)?; }
+            signed = gstate.asm(LDA, left, pos, false)?;
         },
         ExprType::X => {
-            if acc_in_use { gstate.write_asm("PHA", 3)?; }
+            if acc_in_use { gstate.sasm(PHA)?; }
             signed = false;
-            gstate.write_asm("TXA", 2)?;
+            gstate.sasm(TXA)?;
         },
         ExprType::Y => {
-            if acc_in_use { gstate.write_asm("PHA", 3)?; }
+            if acc_in_use { gstate.sasm(PHA)?; }
             signed = false;
-            gstate.write_asm("TYA", 2)?;
+            gstate.sasm(TYA)?;
         },
         ExprType::A(s) => { 
             acc_in_use = false;
             signed = *s; 
         },
         ExprType::Tmp(s) => {
-            if acc_in_use { gstate.write_asm("PHA", 3)?; }
+            if acc_in_use { gstate.sasm(PHA)?; }
             signed = *s;
-            gstate.write_asm("LDA cctmp", 3)?;
+            gstate.asm(LDA, left, pos, false)?;
         },
         _ => return Err(syntax_error(gstate.compiler_state, "Bad left value for shift operation", pos))
     }
     gstate.acc_in_use = true;
     let operation = match op {
         Operation::Brs(_) => {
-            "LSR"
+            LSR
         },
         Operation::Bls(_) => {
-            "ASL"
+            ASL
         },
         _ => unreachable!(),
     };
@@ -999,7 +845,7 @@ fn generate_shift<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>,
         ExprType::Immediate(v) => {
             if *v >= 0 && *v <= 8 {
                 for _ in 0..*v {
-                    gstate.write_asm(&format!("{}", operation), 2)?;
+                    gstate.sasm(operation)?;
                 }
             } else {
                 return Err(syntax_error(gstate.compiler_state, "Negative shift operation not allowed", pos));
@@ -1009,8 +855,8 @@ fn generate_shift<'a>(left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>,
     };
     gstate.flags = FlagsState::Unknown;
     if acc_in_use {
-        gstate.write_asm("STA cctmp", 3)?;
-        gstate.write_asm("PLA", 3)?;
+        gstate.asm(STA, &ExprType::Tmp(signed), pos, false)?;
+        gstate.sasm(PLA)?;
         Ok(ExprType::Tmp(signed))
     } else {
         Ok(ExprType::A(signed))
@@ -1023,21 +869,21 @@ fn generate_ternary<'a>(condition: &Expr<'a>, alternatives: &Expr<'a>, gstate: &
         Expr::BinOp {lhs, op, rhs} => {
             if *op == Operation::TernaryCond2 {
                 if gstate.acc_in_use {
-                    gstate.write_asm("PHA", 3)?; 
+                    gstate.sasm(PHA)?; 
                     gstate.local_label_counter_if += 1;
                     let ifend_label = format!(".ifend{}", gstate.local_label_counter_if);
                     let else_label = format!(".else{}", gstate.local_label_counter_if);
                     generate_condition(condition, gstate, pos, true, &else_label)?;
                     let left = generate_expr(lhs, gstate, pos, false)?;
                     let la = generate_assign(&ExprType::A(false), &left, gstate, pos, false)?;
-                    gstate.write_asm(&format!("JMP {}", ifend_label), 3)?;
-                    gstate.write_label(&else_label)?;
+                    gstate.asm(JMP, &ExprType::Label(&ifend_label), pos, false)?;
+                    gstate.label(&else_label)?;
                     gstate.acc_in_use = false;
                     let right = generate_expr(rhs, gstate, pos, false)?;
                     let ra = generate_assign(&ExprType::A(false), &right, gstate, pos, false)?;
-                    gstate.write_label(&ifend_label)?;
-                    gstate.write_asm("STA cctmp", 3)?;
-                    gstate.write_asm("PLA", 3)?;
+                    gstate.label(&ifend_label)?;
+                    gstate.asm(STA, &ExprType::Tmp(false), pos, false)?;
+                    gstate.sasm(PLA)?;
                     if la != ra {
                         return Err(syntax_error(gstate.compiler_state, "Different alternative types in ?: expression", pos))
                     }
@@ -1049,12 +895,12 @@ fn generate_ternary<'a>(condition: &Expr<'a>, alternatives: &Expr<'a>, gstate: &
                     generate_condition(condition, gstate, pos, true, &else_label)?;
                     let left = generate_expr(lhs, gstate, pos, false)?;
                     let la = generate_assign(&ExprType::A(false), &left, gstate, pos, false)?;
-                    gstate.write_asm(&format!("JMP {}", ifend_label), 3)?;
-                    gstate.write_label(&else_label)?;
+                    gstate.asm(JMP, &ExprType::Label(&ifend_label), pos, false)?;
+                    gstate.label(&else_label)?;
                     gstate.acc_in_use = false;
                     let right = generate_expr(rhs, gstate, pos, false)?;
                     let ra = generate_assign(&ExprType::A(false), &right, gstate, pos, false)?;
-                    gstate.write_label(&ifend_label)?;
+                    gstate.label(&ifend_label)?;
                     gstate.acc_in_use = true;
                     if la != ra {
                         return Err(syntax_error(gstate.compiler_state, "Different alternative types in ?: expression", pos))
@@ -1079,19 +925,19 @@ fn generate_function_call<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, 
                         None => Err(syntax_error(gstate.compiler_state, "Unknown function identifier", pos)),
                         Some(f) => {
                             let acc_in_use = gstate.acc_in_use;
-                            if acc_in_use { gstate.write_asm("PHA", 3)?; }
+                            if acc_in_use { gstate.sasm(PHA)?; }
                             
                             if f.bank == gstate.current_bank {
-                                gstate.write_asm(&format!("JSR {}", *var), 6)?;
+                                gstate.asm(JSR, &ExprType::Label(*var), pos, false)?;
                             } else {
                                 if gstate.current_bank == 0 {
                                     // Generate bankswitching call
-                                    gstate.write_asm(&format!("JSR Call{}", *var), 6)?;
+                                    gstate.asm(JSR, &ExprType::Label(&format!("Call{}", *var)), pos, false)?;
                                 } else {
                                     return Err(syntax_error(gstate.compiler_state, "Banked code can only be called from bank 0 or same bank", pos))
                                 }
                             } 
-                            if acc_in_use { gstate.write_asm("PLA", 3)?; }
+                            if acc_in_use { gstate.sasm(PLA)?; }
                             gstate.flags = FlagsState::Unknown;
                             Ok(())
                         }
@@ -1106,53 +952,34 @@ fn generate_function_call<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, 
 
 fn generate_plusplus<'a>(expr_type: &ExprType<'a>, gstate: &mut GeneratorState<'a>, pos: usize, plusplus: bool) -> Result<ExprType<'a>, Error>
 {
+    let operation = if plusplus { INC } else { DEC };
     match expr_type {
         ExprType::X => {
             if plusplus {
-                gstate.write_asm("INX", 2)?;
+                gstate.sasm(INX)?;
             } else {
-                gstate.write_asm("DEX", 2)?;
+                gstate.sasm(DEX)?;
             }
             gstate.flags = FlagsState::X;
             Ok(ExprType::X)
         },
         ExprType::Y => {
             if plusplus {
-                gstate.write_asm("INY", 2)?;
+                gstate.sasm(INY)?;
             } else {
-                gstate.write_asm("DEY", 2)?;
+                gstate.sasm(DEY)?;
             }
             gstate.flags = FlagsState::Y;
             Ok(ExprType::Y)
         },
         ExprType::Absolute(variable, eight_bits, offset) => {
-            let v = gstate.compiler_state.get_variable(variable);
-            let cycles = if v.memory == VariableMemory::Zeropage { 5 } else { 6 };
-            if *offset > 0 {
-                if plusplus {
-                    gstate.write_asm(&format!("INC {}+{}", variable, offset), cycles)?;
-                } else {
-                    gstate.write_asm(&format!("DEC {}+{}", variable, offset), cycles)?;
-                }
-            } else {
-                if plusplus {
-                    gstate.write_asm(&format!("INC {}", variable), cycles)?;
-                } else {
-                    gstate.write_asm(&format!("DEC {}", variable), cycles)?;
-                }
-            }
+            gstate.asm(operation, expr_type, pos, false)?;
             gstate.flags = FlagsState::Absolute(variable, *eight_bits, *offset);
             Ok(ExprType::Absolute(variable, *eight_bits, *offset))
         },
         ExprType::AbsoluteX(variable) => {
-            let v = gstate.compiler_state.get_variable(variable);
-            let cycles = if v.memory == VariableMemory::Zeropage { 6 } else { 7 };
-            if plusplus {
-                gstate.write_asm(&format!("INC {}", variable), cycles)?;
-            } else {
-                gstate.write_asm(&format!("DEC {}", variable), cycles)?;
-            }
-            gstate.flags = FlagsState::AbsoluteX(variable);
+            gstate.asm(operation, expr_type, pos, false)?;
+            gstate.flags = FlagsState::Unknown;
             Ok(ExprType::AbsoluteX(variable))
         },
         _ => {
@@ -1180,29 +1007,29 @@ fn generate_neg<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize
 fn generate_expr_cond<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<ExprType<'a>, Error>
 {
     if gstate.acc_in_use {
-        gstate.write_asm("PHA", 3)?; 
+        gstate.sasm(PHA)?; 
         gstate.local_label_counter_if += 1;
         let ifend_label = format!(".ifend{}", gstate.local_label_counter_if);
         let else_label = format!(".else{}", gstate.local_label_counter_if);
         generate_condition(expr, gstate, pos, false, &else_label)?;
-        gstate.write_asm("LDA #0", 2)?;
-        gstate.write_asm(&format!("JMP {}", ifend_label), 3)?;
-        gstate.write_label(&else_label)?;
-        gstate.write_asm("LDA #1", 2)?;
-        gstate.write_label(&ifend_label)?;
-        gstate.write_asm("STA cctmp", 3)?;
-        gstate.write_asm("PLA", 3)?;
+        gstate.asm(LDA, &ExprType::Immediate(0), pos, false)?;
+        gstate.asm(JMP, &ExprType::Label(&ifend_label), pos, false)?;
+        gstate.label(&else_label)?;
+        gstate.asm(LDA, &ExprType::Immediate(1), pos, false)?;
+        gstate.label(&ifend_label)?;
+        gstate.asm(STA, &ExprType::Tmp(false), pos, false)?;
+        gstate.sasm(PLA)?;
         Ok(ExprType::Tmp(false))
     } else {
         gstate.local_label_counter_if += 1;
         let ifend_label = format!(".ifend{}", gstate.local_label_counter_if);
         let else_label = format!(".else{}", gstate.local_label_counter_if);
         generate_condition(expr, gstate, pos, false, &else_label)?;
-        gstate.write_asm("LDA #0", 2)?;
-        gstate.write_asm(&format!("JMP {}", ifend_label), 3)?;
-        gstate.write_label(&else_label)?;
-        gstate.write_asm("LDA #1", 2)?;
-        gstate.write_label(&ifend_label)?;
+        gstate.asm(LDA, &ExprType::Immediate(0), pos, false)?;
+        gstate.asm(JMP, &ExprType::Label(&ifend_label), pos, false)?;
+        gstate.label(&else_label)?;
+        gstate.asm(LDA, &ExprType::Immediate(1), pos, false)?;
+        gstate.label(&ifend_label)?;
         gstate.acc_in_use = true;
         Ok(ExprType::A(false))
     }
@@ -1218,29 +1045,29 @@ fn generate_not<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize
         },
         _ => {
             if gstate.acc_in_use {
-                gstate.write_asm("PHA", 3)?; 
+                gstate.sasm(PHA)?; 
                 gstate.local_label_counter_if += 1;
                 let ifend_label = format!(".ifend{}", gstate.local_label_counter_if);
                 let else_label = format!(".else{}", gstate.local_label_counter_if);
                 generate_condition(expr, gstate, pos, false, &else_label)?;
-                gstate.write_asm("LDA #1", 2)?;
-                gstate.write_asm(&format!("JMP {}", ifend_label), 3)?;
-                gstate.write_label(&else_label)?;
-                gstate.write_asm("LDA #0", 2)?;
-                gstate.write_label(&ifend_label)?;
-                gstate.write_asm("STA cctmp", 3)?;
-                gstate.write_asm("PLA", 3)?;
+                gstate.asm(LDA, &ExprType::Immediate(1), pos, false)?;
+                gstate.asm(JMP, &ExprType::Label(&ifend_label), pos, false)?;
+                gstate.label(&else_label)?;
+                gstate.asm(LDA, &ExprType::Immediate(0), pos, false)?;
+                gstate.label(&ifend_label)?;
+                gstate.asm(STA, &ExprType::Tmp(false), pos, false)?;
+                gstate.sasm(PLA)?;
                 Ok(ExprType::Tmp(false))
             } else {
                 gstate.local_label_counter_if += 1;
                 let ifend_label = format!(".ifend{}", gstate.local_label_counter_if);
                 let else_label = format!(".else{}", gstate.local_label_counter_if);
                 generate_condition(expr, gstate, pos, false, &else_label)?;
-                gstate.write_asm("LDA #1", 2)?;
-                gstate.write_asm(&format!("JMP {}", ifend_label), 3)?;
-                gstate.write_label(&else_label)?;
-                gstate.write_asm("LDA #0", 2)?;
-                gstate.write_label(&ifend_label)?;
+                gstate.asm(LDA, &ExprType::Immediate(1), pos, false)?;
+                gstate.asm(JMP, &ExprType::Label(&ifend_label), pos, false)?;
+                gstate.label(&else_label)?;
+                gstate.asm(LDA, &ExprType::Immediate(0), pos, false)?;
+                gstate.label(&ifend_label)?;
                 gstate.acc_in_use = true;
                 Ok(ExprType::A(false))
             }
@@ -1408,8 +1235,6 @@ fn flags_ok(flags: &FlagsState, expr_type: &ExprType) -> bool
         FlagsState::X => *expr_type == ExprType::X,
         FlagsState::Y => *expr_type == ExprType::Y,
         FlagsState::Absolute(var, eight_bits, offset) => *expr_type == ExprType::Absolute(*var, *eight_bits, *offset),
-        FlagsState::AbsoluteX(var) => *expr_type == ExprType::AbsoluteX(var),
-        FlagsState::AbsoluteY(var) => *expr_type == ExprType::AbsoluteY(var),
         _ => false
     }
 }
@@ -1419,48 +1244,48 @@ fn generate_branch_instruction<'a>(op: &Operation, signed: bool, gstate: &mut Ge
     // Branch instruction
     match op {
         Operation::Neq => {
-            gstate.write_asm(&format!("BNE {}", label), 2)?;
+            gstate.asm(BNE, &ExprType::Label(label), 0, false)?;
             return Ok(());
         },
         Operation::Eq => {
-            gstate.write_asm(&format!("BEQ {}", label), 2)?;
+            gstate.asm(BEQ, &ExprType::Label(label), 0, false)?;
             return Ok(());
         },
         Operation::Lt => {
             if signed {
-                gstate.write_asm(&format!("BMI {}", label), 2)?;
+                gstate.asm(BMI, &ExprType::Label(label), 0, false)?;
             } else {
-                gstate.write_asm(&format!("BCC {}", label), 2)?;
+                gstate.asm(BCC, &ExprType::Label(label), 0, false)?;
             } 
             Ok(())
         },
         Operation::Gt => {
             let label_here = format!(".ifhere{}", gstate.local_label_counter_if);
             if signed {
-                gstate.write_asm(&format!("BEQ {}", label_here), 2)?;
-                gstate.write_asm(&format!("BPL {}", label), 2)?;
+                gstate.asm(BEQ, &ExprType::Label(&label_here), 0, false)?;
+                gstate.asm(BPL, &ExprType::Label(&label), 0, false)?;
             } else {
-                gstate.write_asm(&format!("BEQ {}", label_here), 2)?;
-                gstate.write_asm(&format!("BCS {}", label), 2)?;
+                gstate.asm(BEQ, &ExprType::Label(&label_here), 0, false)?;
+                gstate.asm(BCS, &ExprType::Label(&label), 0, false)?;
             }
-            gstate.write_label(&label_here)?;
+            gstate.label(&label_here)?;
             Ok(())
         },
         Operation::Lte => {
             if signed {
-                gstate.write_asm(&format!("BMI {}", label), 2)?;
-                gstate.write_asm(&format!("BEQ {}", label), 2)?;
+                gstate.asm(BMI, &ExprType::Label(&label), 0, false)?;
+                gstate.asm(BEQ, &ExprType::Label(&label), 0, false)?;
             } else {
-                gstate.write_asm(&format!("BCC {}", label), 2)?;
-                gstate.write_asm(&format!("BEQ {}", label), 2)?;
+                gstate.asm(BCC, &ExprType::Label(&label), 0, false)?;
+                gstate.asm(BEQ, &ExprType::Label(&label), 0, false)?;
             } 
             Ok(())
         },
         Operation::Gte => {
             if signed {
-                gstate.write_asm(&format!("BPL {}", label), 2)?;
+                gstate.asm(BPL, &ExprType::Label(&label), 0, false)?;
             } else {
-                gstate.write_asm(&format!("BCS {}", label), 2)?;
+                gstate.asm(BCS, &ExprType::Label(&label), 0, false)?;
             } 
             Ok(())
         },
@@ -1521,17 +1346,17 @@ fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>,
             if flags_ok(&gstate.flags, &left) {
                 match operator {
                     Operation::Neq => {
-                        gstate.write_asm(&format!("BNE {}", label), 2)?;
+                        gstate.asm(BNE, &ExprType::Label(label), pos, false)?;
                         return Ok(());
                     },
                     Operation::Eq => {
-                        gstate.write_asm(&format!("BEQ {}", label), 2)?;
+                        gstate.asm(BEQ, &ExprType::Label(label), pos, false)?;
                         return Ok(());
                     },
                     _ => {
                         if let ExprType::Immediate(v) = left {
                             if (operator == Operation::Neq && *v != 0) || (operator == Operation::Eq && *v == 0) {
-                                gstate.write_asm(&format!("JMP {}", label), 3)?;
+                                gstate.asm(JMP, &ExprType::Label(label), pos, false)?;
                             }
                             return Ok(());
                         }
@@ -1546,33 +1371,17 @@ fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>,
     let signed;
     let cmp;
     match left {
-        ExprType::Absolute(varname, eight_bits, offset) => {
-            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-            let v = gstate.compiler_state.get_variable(varname);
+        ExprType::Absolute(_, eight_bits, _) => {
+            if gstate.acc_in_use { gstate.sasm(PHA)?; }
             if !eight_bits {
                 return Err(syntax_error(gstate.compiler_state, "Comparision is not implemented on 16 bits data", pos));
             }
-            signed = v.signed;
-            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-            if *offset > 0 {
-                gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
-            } else {
-                gstate.write_asm(&format!("LDA {}", varname), cycles)?;
-            }
+            signed = gstate.asm(LDA, left, pos, false)?;
             cmp = true;
         },
-        ExprType::AbsoluteX(varname) => {
-            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-            let v = gstate.compiler_state.get_variable(varname);
-            signed = v.signed;
-            gstate.write_asm(&format!("LDA {},X", varname), 4)?;
-            cmp = true;
-        },
-        ExprType::AbsoluteY(varname) => {
-            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-            let v = gstate.compiler_state.get_variable(varname);
-            signed = v.signed;
-            gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
+        ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_)=> {
+            if gstate.acc_in_use { gstate.sasm(PHA)?; }
+            signed = gstate.asm(LDA, left, pos, false)?;
             cmp = true;
         },
         ExprType::A(sign) => {
@@ -1581,66 +1390,62 @@ fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>,
             gstate.acc_in_use = false;
         },
         ExprType::Tmp(sign) => {
-            if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
+            if gstate.acc_in_use { gstate.sasm(PHA)?; }
             signed = *sign;
-            gstate.write_asm("LDA cctmp", 3)?;
+            gstate.asm(LDA, left, pos, false)?;
             cmp = true;
         },
         ExprType::Y => {
             signed = false;
             match right {
-                ExprType::Immediate(v) => {
-                    gstate.write_asm(&format!("CPY #{}", v), 2)?;
+                ExprType::Immediate(_) => {
+                    gstate.asm(CPY, right, pos, false)?;
                     cmp = false;
                 },
-                ExprType::Absolute(varname, eight_bits, offset) => {
-                    let v = gstate.compiler_state.get_variable(varname);
+                ExprType::Absolute(_, eight_bits, _) => {
                     if !eight_bits {
                         return Err(syntax_error(gstate.compiler_state, "Comparision is not implemented on 16 bits data", pos));
                     }
-                    let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                    if *offset > 0 {
-                        gstate.write_asm(&format!("CPY {}+{}", varname, offset), cycles)?;
-                    } else {
-                        gstate.write_asm(&format!("CPY {}", varname), cycles)?;
-                    }
+                    gstate.asm(CPY, right, pos, false)?;
                     cmp = false;
                 },
-                ExprType::A(_) => {
-                    gstate.write_asm("STA cctmp", 3)?;
-                    gstate.write_asm("CPY cctmp", 3)?;
+                ExprType::A(s) => {
+                    gstate.asm(STA, &ExprType::Tmp(*s), pos, false)?;
+                    gstate.asm(CPY, &ExprType::Tmp(*s), pos, false)?;
                     cmp = false;
                     gstate.acc_in_use = false;
-                }
+                },
+                ExprType::Tmp(_) => {
+                    gstate.asm(CPY, right, pos, false)?;
+                    cmp = false;
+                },
                 _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
             } 
         },
         ExprType::X => {
             signed = false;
             match right {
-                ExprType::Immediate(v) => {
-                    gstate.write_asm(&format!("CPX #{}", v), 2)?;
+                ExprType::Immediate(_) => {
+                    gstate.asm(CPX, right, pos, false)?;
                     cmp = false;
                 },
-                ExprType::Absolute(varname, eight_bits, offset) => {
-                    let v = gstate.compiler_state.get_variable(varname);
+                ExprType::Absolute(_, eight_bits, _) => {
                     if !eight_bits {
                         return Err(syntax_error(gstate.compiler_state, "Comparision is not implemented on 16 bits data", pos));
                     }
-                    let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                    if *offset > 0 {
-                        gstate.write_asm(&format!("CPX {}+{}", varname, offset), cycles)?;
-                    } else {
-                        gstate.write_asm(&format!("CPX {}", varname), cycles)?;
-                    }
+                    gstate.asm(CPX, right, pos, false)?;
                     cmp = false;
                 },
-                ExprType::A(_) => {
-                    gstate.write_asm(&format!("STA cctmp"), 3)?;
-                    gstate.write_asm(&format!("CPX cctmp"), 3)?;
+                ExprType::A(s) => {
+                    gstate.asm(STA, &ExprType::Tmp(*s), pos, false)?;
+                    gstate.asm(CPX, &ExprType::Tmp(*s), pos, false)?;
                     cmp = false;
                     gstate.acc_in_use = false;
-                }
+                },
+                ExprType::Tmp(_) => {
+                    gstate.asm(CPX, right, pos, false)?;
+                    cmp = false;
+                },
                 _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
             } 
         },
@@ -1649,31 +1454,25 @@ fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>,
 
     if cmp {
         match right {
-            ExprType::Immediate(v) => {
-                gstate.write_asm(&format!("CMP #{}", v), 2)?;
+            ExprType::Immediate(_) => {
+                gstate.asm(CMP, right, pos, false)?;
             },
-            ExprType::Absolute(name, eight_bits, offset) => {
-                let v = gstate.compiler_state.get_variable(name);
+            ExprType::Absolute(_, eight_bits, _) => {
                 if !eight_bits {
                     return Err(syntax_error(gstate.compiler_state, "Comparision is not implemented on 16 bits data", pos));
                 }
-                let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                if *offset > 0 {
-                    gstate.write_asm(&format!("CMP {}+{}", name, offset), cycles)?;
-                } else {
-                    gstate.write_asm(&format!("CMP {}", name), cycles)?;
-                }
+                gstate.asm(CMP, right, pos, false)?;
             },
-            ExprType::AbsoluteX(name) => {
-                gstate.write_asm(&format!("CMP {},X", name), 4)?;
+            ExprType::AbsoluteX(_) => {
+                gstate.asm(CMP, right, pos, false)?;
             },
-            ExprType::AbsoluteY(name) => {
-                gstate.write_asm(&format!("CMP {},Y", name), 4)?;
+            ExprType::AbsoluteY(_) => {
+                gstate.asm(CMP, right, pos, false)?;
             },
             _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
         } 
         if gstate.acc_in_use { 
-            gstate.write_asm("PLA", 3)?; 
+            gstate.sasm(PLA)?; 
         }
     }
 
@@ -1701,7 +1500,7 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                         gstate.local_label_counter_if += 1;
                         generate_condition(lhs, gstate, pos, true, &ifstart_label)?;
                         generate_condition(rhs, gstate, pos, false, label)?;
-                        gstate.write_label(&ifstart_label)?;
+                        gstate.label(&ifstart_label)?;
                         return Ok(());
                     }
                 },
@@ -1711,7 +1510,7 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                         gstate.local_label_counter_if += 1;
                         generate_condition(lhs, gstate, pos, false, &ifstart_label)?;
                         generate_condition(rhs, gstate, pos, true, label)?;
-                        gstate.write_label(&ifstart_label)?;
+                        gstate.label(&ifstart_label)?;
                         return Ok(());
                     } else {
                         generate_condition(lhs, gstate, pos, false, label)?;
@@ -1735,9 +1534,9 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
     let expr = generate_expr(condition, gstate, pos, false)?;
     if flags_ok(&gstate.flags, &expr) {
         if negate {
-            gstate.write_asm(&format!("BEQ {}", label), 2)?;
+            gstate.asm(BEQ, &ExprType::Label(&label), pos, false)?;
         } else {
-            gstate.write_asm(&format!("BNE {}", label), 2)?;
+            gstate.asm(BNE, &ExprType::Label(&label), pos, false)?;
         }
         Ok(())
     } else {
@@ -1746,37 +1545,26 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
             ExprType::Immediate(v) => {
                 if v != 0 {
                     if !negate {
-                        gstate.write_asm(&format!("JMP {}", label), 3)?;
+                        gstate.asm(JMP, &ExprType::Label(&label), pos, false)?;
                     }
                 } else {
                     if negate {
-                        gstate.write_asm(&format!("JMP {}", label), 3)?;
+                        gstate.asm(JMP, &ExprType::Label(&label), pos, false)?;
                     }
                 }
                 return Ok(());
             },
-            ExprType::Absolute(varname, eight_bits, offset) => {
-                if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                let v = gstate.compiler_state.get_variable(varname);
+            ExprType::Absolute(_, eight_bits, _) => {
+                if gstate.acc_in_use { gstate.sasm(PHA)?; }
                 if !eight_bits {
                     return Err(syntax_error(gstate.compiler_state, "Comparision is not implemented on 16 bits data", pos));
                 }
-                let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
-                if offset > 0 {
-                    gstate.write_asm(&format!("LDA {}+{}", varname, offset), cycles)?;
-                } else {
-                    gstate.write_asm(&format!("LDA {}", varname), cycles)?;
-                }
+                gstate.asm(LDA, &expr, pos, false)?;
                 cmp = true;
             },
-            ExprType::AbsoluteX(varname) => {
-                if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                gstate.write_asm(&format!("LDA {},X", varname), 4)?;
-                cmp = true;
-            },
-            ExprType::AbsoluteY(varname) => {
-                if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                gstate.write_asm(&format!("LDA {},Y", varname), 4)?;
+            ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) => {
+                if gstate.acc_in_use { gstate.sasm(PHA)?; }
+                gstate.asm(LDA, &expr, pos, false)?;
                 cmp = true;
             },
             ExprType::A(_) => {
@@ -1784,31 +1572,31 @@ fn generate_condition<'a>(condition: &Expr<'a>, gstate: &mut GeneratorState<'a>,
                 gstate.acc_in_use = false;
             },
             ExprType::Y => {
-                gstate.write_asm("CPY #0", 2)?;
+                gstate.asm(CPY, &ExprType::Immediate(0), pos, false)?;
                 cmp = false;
             },
             ExprType::X => {
-                gstate.write_asm("CPX #0", 2)?;
+                gstate.asm(CPX, &ExprType::Immediate(0), pos, false)?;
                 cmp = false;
             }
             ExprType::Tmp(_) => {
-                if gstate.acc_in_use { gstate.write_asm("PHA", 3)?; }
-                gstate.write_asm("LDA cctmp", 3)?;
+                if gstate.acc_in_use { gstate.sasm(PHA)?; }
+                gstate.asm(LDA, &expr, pos, false)?;
                 cmp = true;
             },
             _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
         }
 
         if cmp {
-            gstate.write_asm("CMP #0", 2)?;
+            gstate.asm(CMP, &ExprType::Immediate(0), pos, false)?;
             if gstate.acc_in_use { 
-                gstate.write_asm("PLA", 3)?; 
+                gstate.sasm(PLA)?; 
             }
         }
         if negate {
-            gstate.write_asm(&format!("BEQ {}", label), 2)?;
+            gstate.asm(BEQ, &ExprType::Label(label), 0, false)?;
         } else {
-            gstate.write_asm(&format!("BNE {}", label), 2)?;
+            gstate.asm(BNE, &ExprType::Label(label), 0, false)?;
         }
         Ok(())
     }
@@ -1823,13 +1611,13 @@ fn generate_for_loop<'a>(init: &Expr<'a>, condition: &Expr<'a>, update: &Expr<'a
     generate_expr(init, gstate, pos, false)?;
     gstate.loops.push((forupdate_label.clone(), forend_label.clone()));
     generate_condition(condition, gstate, pos, true, &forend_label)?;
-    gstate.write_label(&for_label)?;
+    gstate.label(&for_label)?;
     generate_statement(body, gstate)?;
-    gstate.write_label(&forupdate_label)?;
+    gstate.label(&forupdate_label)?;
     generate_expr(update, gstate, pos, false)?;
     gstate.purge_deferred_plusplus()?;
     generate_condition(condition, gstate, pos, false, &for_label)?;
-    gstate.write_label(&forend_label)?;
+    gstate.label(&forend_label)?;
     gstate.loops.pop();
     Ok(())
 }
@@ -1862,7 +1650,7 @@ fn generate_if<'a>(condition: &Expr<'a>, body: &StatementLoc<'a>, else_body: Opt
                 _ => {
                     generate_condition(condition, gstate, pos, true, &ifend_label)?;
                     generate_statement(body, gstate)?;
-                    gstate.write_label(&ifend_label)?;
+                    gstate.label(&ifend_label)?;
                 }
 
             }
@@ -1872,11 +1660,11 @@ fn generate_if<'a>(condition: &Expr<'a>, body: &StatementLoc<'a>, else_body: Opt
             generate_condition(condition, gstate, pos, true, &else_label)?;
             let saved_flags = gstate.flags;
             generate_statement(body, gstate)?;
-            gstate.write_asm(&format!("JMP {}", ifend_label), 3)?;
-            gstate.write_label(&else_label)?;
+            gstate.asm(JMP, &ExprType::Label(&ifend_label), 0, false)?;
+            gstate.label(&else_label)?;
             gstate.flags = saved_flags;
             generate_statement(else_statement, gstate)?;
-            gstate.write_label(&ifend_label)?;
+            gstate.label(&ifend_label)?;
         }
     };
     Ok(())
@@ -1907,11 +1695,11 @@ fn generate_switch<'a>(expr: &Expr<'a>, cases: &Vec<(Vec<i32>, Vec<StatementLoc<
                 for i in &case.0 {
                     generate_condition_ex(&e, &Operation::Eq, &ExprType::Immediate(*i), gstate, pos, false, &switchnextstatement_label)?;
                 }
-                gstate.write_asm(&format!("JMP {}", switchnextcase_label), 3)?;
+                gstate.asm(JMP, &ExprType::Label(&switchnextcase_label), 0, false)?;
                 jmp_to_next_case = true;
             }
         }
-        gstate.write_label(&switchnextstatement_label)?;
+        gstate.label(&switchnextstatement_label)?;
         for code in &case.1 {
             generate_statement(code, gstate)?;
         }
@@ -1919,13 +1707,13 @@ fn generate_switch<'a>(expr: &Expr<'a>, cases: &Vec<(Vec<i32>, Vec<StatementLoc<
         switchnextstatement_label = format!(".switchnextstatement{}", gstate.local_label_counter_if);
         // If this is not the last case...
         if !is_last_element {
-            gstate.write_asm(&format!("JMP {}", switchnextstatement_label), 3)?;
+            gstate.asm(JMP, &ExprType::Label(&switchnextstatement_label), 0, false)?;
         }
         if jmp_to_next_case {
-            gstate.write_label(&switchnextcase_label)?;
+            gstate.label(&switchnextcase_label)?;
         }
     }
-    gstate.write_label(&switchend_label)?;
+    gstate.label(&switchend_label)?;
     gstate.loops.pop();
     Ok(())
 }
@@ -1936,11 +1724,11 @@ fn generate_while<'a>(condition: &Expr<'a>, body: &StatementLoc<'a>, gstate: &mu
     let while_label = format!(".while{}", gstate.local_label_counter_while);
     let whileend_label = format!(".whileend{}", gstate.local_label_counter_while);
     gstate.loops.push((while_label.clone(), whileend_label.clone()));
-    gstate.write_label(&while_label)?;
+    gstate.label(&while_label)?;
     generate_condition(condition, gstate, pos, true, &whileend_label)?;
     generate_statement(body, gstate)?;
-    gstate.write_asm(&format!("JMP {}", while_label), 3)?;
-    gstate.write_label(&whileend_label)?;
+    gstate.asm(JMP, &ExprType::Label(&while_label), pos, false)?;
+    gstate.label(&whileend_label)?;
     gstate.loops.pop();
     Ok(())
 }
@@ -1952,22 +1740,25 @@ fn generate_do_while<'a>(body: &StatementLoc<'a>, condition: &Expr<'a>, gstate: 
     let dowhilecondition_label = format!(".dowhilecondition{}", gstate.local_label_counter_while);
     let dowhileend_label = format!(".dowhileend{}", gstate.local_label_counter_while);
     gstate.loops.push((dowhilecondition_label.clone(), dowhileend_label.clone()));
-    gstate.write_label(&dowhile_label)?;
+    gstate.label(&dowhile_label)?;
     generate_statement(body, gstate)?;
-    gstate.write_label(&dowhilecondition_label)?;
+    gstate.label(&dowhilecondition_label)?;
     generate_condition(condition, gstate, pos, false, &dowhile_label)?;
-    gstate.write_label(&dowhileend_label)?;
+    gstate.label(&dowhileend_label)?;
     gstate.loops.pop();
     Ok(())
 }
 
 fn generate_break<'a>(gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
 {
-    let brk_label = match gstate.loops.last() {
-        None => return Err(syntax_error(gstate.compiler_state, "Break statement outside loop", pos)),
-        Some((_, bl)) => bl,
-    };
-    gstate.write_asm(&format!("JMP {}", brk_label), 3)?;
+    let brk_label;
+    {
+        brk_label = match gstate.loops.last() {
+            None => return Err(syntax_error(gstate.compiler_state, "Break statement outside loop", pos)),
+            Some((_, bl)) => bl.clone(),
+        };
+    }
+    gstate.asm(JMP, &ExprType::Label(&brk_label), pos, false)?;
     Ok(())
 }
 
@@ -1977,27 +1768,27 @@ fn generate_continue<'a>(gstate: &mut GeneratorState<'a>, pos: usize) -> Result<
         None => return Err(syntax_error(gstate.compiler_state, "Continue statement outside loop", pos)),
         Some((cl, _)) => if cl == "" {
             return Err(syntax_error(gstate.compiler_state, "Continue statement outside loop", pos));
-        } else {cl}
+        } else {cl.clone()}
     };
-    gstate.write_asm(&format!("JMP {}", cont_label), 3)?;
+    gstate.asm(JMP, &ExprType::Label(&cont_label), pos, false)?;
     Ok(())
 }
 
 fn generate_return<'a>(gstate: &mut GeneratorState<'a>) -> Result<(), Error>
 {
-    gstate.write_asm("RTS", 6)?;
+    gstate.sasm(RTS)?; 
     Ok(())
 }
 
 fn generate_asm_statement<'a>(s: &'a str, gstate: &mut GeneratorState<'a>) -> Result<(), Error>
 {
-    gstate.write(&format!("\t{s}\n"))?;
+    gstate.inline(s)?;
     Ok(())
 }
 
 fn generate_goto_statement<'a>(s: &'a str, gstate: &mut GeneratorState<'a>) -> Result<(), Error>
 {
-    gstate.write(&format!("\tJMP .{}\n", s))?;
+    gstate.asm(JMP, &ExprType::Label(&format!(".{}", s)), 0, false)?;
     Ok(())
 }
 
@@ -2006,10 +1797,9 @@ fn generate_store_statement<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>
     match expr {
         Expr::Identifier((name, _)) => {
             let v = gstate.compiler_state.get_variable(name);
-            let cycles = if v.memory == VariableMemory::Zeropage { 3 } else { 4 };
             match v.var_type {
                 VariableType::CharPtr => {
-                    gstate.write_asm(&format!("STA {}", name), cycles)?;
+                    gstate.asm(STA, &ExprType::Absolute(name, true, 0), pos, false)?;
                     Ok(())
                 },
                 _ => Err(syntax_error(gstate.compiler_state, "Strobe only works on memory pointers", pos)),
@@ -2032,8 +1822,7 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
         };
         // debug!("{:?}, {}, {}", line_to_be_written, gstate.last_included_position, gstate.last_included_line_number);
         if let Some(l) = line_to_be_written {
-            gstate.write(";")?;
-            gstate.write(&l)?; // Should include the '\n'
+            gstate.comment(&l)?; // Should include the '\n'
         }
     }
 
@@ -2042,7 +1831,7 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
     gstate.acc_in_use = false;
    
     if let Some(label) = &code.label {
-        gstate.write_label(&format!(".{}", label))?;
+        gstate.label(&format!(".{}", label))?;
     }
 
     // Generate different kind of statements
@@ -2243,7 +2032,7 @@ Powerup
                 gstate.functions_code.insert(f.0.clone(), AssemblyCode::new());
                 gstate.current_function = Some(f.0.clone());
                 generate_statement(&f.1.code, &mut gstate)?;
-                gstate.write_asm("RTS", 6)?;
+                generate_return(&mut gstate)?;
                 gstate.current_function = None;
             }
         }
