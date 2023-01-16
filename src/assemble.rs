@@ -43,7 +43,7 @@ enum AsmLine {
 }
 
 impl AsmLine {
-    fn write(&self, writer: &mut dyn Write) -> Result<usize, std::io::Error> {
+    fn write(&self, writer: &mut dyn Write, cycles: bool) -> Result<usize, std::io::Error> {
         let mut s = 0;
         match self {
             AsmLine::Label(string) => { 
@@ -51,7 +51,19 @@ impl AsmLine {
                 s += writer.write("\n".as_bytes())?;
             },
             AsmLine::Instruction(inst) => {
-                s += writer.write(&format!("\t{} {:19}\t; {} cycles\n", inst.mnemonic.to_string(), &inst.dasm_operand, inst.cycles).as_bytes())?;
+                if cycles {
+                    if inst.dasm_operand.len() > 0 {
+                        s += writer.write(&format!("\t{} {:19}\t; {}\n", inst.mnemonic.to_string(), &inst.dasm_operand, inst.cycles).as_bytes())?;
+                    } else {
+                        s += writer.write(&format!("\t{:23}\t; {}\n", inst.mnemonic.to_string(), inst.cycles).as_bytes())?;
+                    }
+                } else {
+                    if inst.dasm_operand.len() > 0 {
+                        s += writer.write(&format!("\t{} {}\n", inst.mnemonic.to_string(), &inst.dasm_operand).as_bytes())?;
+                    } else {
+                        s += writer.write(&format!("\t{}\n", inst.mnemonic.to_string()).as_bytes())?;
+                    }
+                }
             },
             AsmLine::Inline(inst) => {
                 s += writer.write(&format!("\t{}\n", inst).as_bytes())?;
@@ -86,10 +98,10 @@ impl AssemblyCode {
     pub fn append_comment(&mut self, s: String) -> () {
         self.code.push(AsmLine::Comment(s));
     }
-    pub fn write(&self, writer: &mut dyn Write) -> Result<usize, std::io::Error> {
+    pub fn write(&self, writer: &mut dyn Write, cycles: bool) -> Result<usize, std::io::Error> {
         let mut s = 0;
         for i in &self.code {
-            s += i.write(writer)?;
+            s += i.write(writer, cycles)?;
         }
         Ok(s)
     } 

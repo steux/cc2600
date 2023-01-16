@@ -292,7 +292,6 @@ impl<'a, 'b> GeneratorState<'a> {
             let code : &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
             code.append_inline(s.to_string());
         }
-        //self.write(&format!("\t{s}\n"))?;
         Ok(()) 
     } 
 
@@ -315,7 +314,7 @@ impl<'a, 'b> GeneratorState<'a> {
     fn write_function(&mut self, f: &str) -> Result<usize, std::io::Error>
     {
         let code: &AssemblyCode = self.functions_code.get(f).unwrap();
-        code.write(self.writer)
+        code.write(self.writer, self.insert_code)
     }
 
     fn write(&mut self, s: &str) -> Result<usize, std::io::Error> {
