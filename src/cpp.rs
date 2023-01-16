@@ -32,7 +32,7 @@ use std::path::Path;
 
 use log::debug;
 
-use regex::{Captures, Regex, Replacer};
+use regex::Regex;
 use std::borrow::Cow;
 
 /// The context for preprocessing a file.
@@ -101,6 +101,7 @@ impl Context {
             let x = value.0.replace_all(&res, &value.1);
             if let Cow::Owned(z) = x {
                 res = z.to_string();
+            } else {
             }
         }
         res

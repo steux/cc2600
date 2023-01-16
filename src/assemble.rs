@@ -1,11 +1,8 @@
-use crate::compile::*;
-use crate::generate::ExprType;
-
 use std::io::Write;
-use std::fmt::{self, Debug, Display};
+use std::fmt::{self, Debug};
 
-#[derive(Debug, PartialEq)]
-enum AsmMnemonic {
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum AsmMnemonic {
     LDA, LDX, LDY,
     STA, STX, STY,
     TAX, TAY, TXA, TYA,
@@ -27,72 +24,26 @@ impl fmt::Display for AsmMnemonic {
 }
 
 #[derive(Debug)]
-struct AsmInstruction<'a> {
-    mnemonic: AsmMnemonic,
-    operand: ExprType<'a>,
-    high_byte: bool,
+struct AsmInstruction {
+    pub mnemonic: AsmMnemonic,
+    pub dasm: String,
+    pub cycles: u32,
+    pub nb_bytes: u32
 }
 
-impl<'a> AsmInstruction<'a> {
-    fn to_dasm(&self, compiler_state: &'a CompilerState<'a>) -> String {
-        let mut s = self.mnemonic.to_string();
-        if self.operand != ExprType::Nothing { 
-            s += " ";
-            match self.operand {
-                ExprType::Absolute(variable, eight_bits, offset) => {
-                    let v = compiler_state.get_variable(variable);
-                    match v.var_type {
-                        VariableType::Char => if offset > 0 {
-                            s += &format!("{}+{}", variable, offset);
-                        } else {
-                            s += &format!("{}", variable);
-                        },
-                        VariableType::Short => if self.high_byte {
-                            s += &format!("{} + 1", variable);
-                        } else {
-                            s += &format!("{}", variable);
-                        },
-                        VariableType::CharPtr => if v.var_type == VariableType::CharPtr && !eight_bits && v.var_const {
-                            if self.high_byte {
-                                s += &format!("#>{}", variable);
-                            } else {
-                                s += &format!("#<{}", variable);
-                            }
-                        } else {
-                            if self.high_byte && eight_bits {
-                                s += "#0";
-                            } else {
-                                let off = if self.high_byte { offset + 1 } else { offset };
-                                if off > 0 {
-                                    s += &format!("{}+{}", variable, off);
-                                } else {
-                                    s += &format!("{}", variable);
-                                }
-                            }
-                        },
-                    }
-                },
-                _ => unreachable!()
-            }
-        }
-        s
-    }
-    fn cycles(&self, compiler_state: &'a CompilerState<'a>) -> u8 {
-        0
-    }
+impl AsmInstruction {
 }
-
 
 #[derive(Debug)]
-enum AsmLine<'a> {
+enum AsmLine {
     Label(String),
-    Instruction(AsmInstruction<'a>),
+    Instruction(AsmInstruction),
     Inline(String),
     Comment(String)
 }
 
-impl<'a> AsmLine<'a> {
-    fn write(&self, compiler_state: &'a CompilerState<'a>, writer: &'a mut dyn Write) -> Result<usize, std::io::Error> {
+impl AsmLine {
+    fn write(&self, writer: &mut dyn Write) -> Result<usize, std::io::Error> {
         let mut s = 0;
         match self {
             AsmLine::Label(string) => { 
@@ -100,7 +51,7 @@ impl<'a> AsmLine<'a> {
                 s += writer.write("\n".as_bytes())?;
             },
             AsmLine::Instruction(inst) => {
-                s += writer.write(format!("\t{:23}\t; {} cycles\n", inst.to_dasm(compiler_state), inst.cycles(compiler_state)).as_bytes())?;
+                s += writer.write(&format!("\t{} {:19}\t; {} cycles\n", inst.mnemonic.to_string(), &inst.dasm, inst.cycles).as_bytes())?;
             },
             AsmLine::Inline(inst) => {
                 s += writer.write(inst.as_bytes())?;
@@ -113,22 +64,20 @@ impl<'a> AsmLine<'a> {
     }
 }
 
-pub struct Assembly<'a> {
-    compiler_state: &'a CompilerState<'a>,
-    code: Vec<AsmLine<'a>>
+pub struct Assembly {
+    code: Vec<AsmLine>
 }
 
-impl<'a> Assembly<'a> {
-    fn new(compiler_state: &'a CompilerState<'a>) -> Assembly<'a> {
+impl Assembly {
+    fn new() -> Assembly {
         Assembly {
-            compiler_state,
-            code: Vec::<AsmLine<'a>>::new()
+            code: Vec::<AsmLine>::new()
         }
     }
-    fn write(&self, writer: &'a mut dyn Write) -> Result<usize, std::io::Error> {
+    fn write(&self, writer: &mut dyn Write) -> Result<usize, std::io::Error> {
         let mut s = 0;
         for i in &self.code {
-            s += i.write(self.compiler_state, writer)?;
+            s += i.write(writer)?;
         }
         Ok(s)
     } 

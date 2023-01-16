@@ -8,16 +8,18 @@ the other way round...
 
 - Produces DASM compatible code
 - Native Atari F4, F6 and F8 bankswitching schemes support
-- Superchip (128 additional RAM) support
+- Superchip (128 bytes of additional RAM!) support
 - Uses only 1 byte of RAM
-- load/store/strobe intrinsics allow the sriting of efficient kernels.
-- X and Y registers are directly accessible, just like if they ware declared as unsigned char global variables.
+- load/store/strobe intrinsics allow the writing of efficient kernels.
+- X and Y registers are directly usable, just like if they ware declared as unsigned char global variables.
 - All C constructs are implemented (for, if, while, goto, etc).
+- Clean bootstrap/bankswitching code is automatically generated
 
 ## Known limitations
 
 - The only data types supported are char (8-bit), short (8-bit) and char pointers (16-bits), and one dimensional arrays of chars.
-- Only global variables are supported, not local variables (no use of stack)
+- Only global variables are supported, not local variables (no use of stack. It's so slow on 6502 and so dangerous due
+    to the lack of RAM that it'd be a bad idea anyway)
 - Functions can't have arguments and return values (no use of stack). Everything must go through global variables.
 - Array subscripts are limited to constants, X and Y.
 - 16-bits arithmetics is severly constrained

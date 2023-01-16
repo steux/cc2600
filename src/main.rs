@@ -14,8 +14,6 @@ extern crate pest_derive;
 
 use clap::Parser as ClapParser;
 
-// TODO: Add goto statement support
-
 /// Subset of C compiler for the Atari 2600
 #[derive(ClapParser, Debug)]
 #[command(author, version, about, long_about = None)]

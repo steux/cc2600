@@ -254,6 +254,12 @@ const bank1 unsigned char getready5[16] = { 0x70, 0x78, 0x18, 0x1b, 0x3b, 0x78, 
 #undef grass_style2 
 #undef grass_style3 
 
+#undef kernel
+#undef START
+#undef START2
+#undef LEFT_PLAYFIELD
+#undef RIGHT_PLAYFIELD
+
 void set_rainbow_and_grass()
 {
     i = (counter >> 2) & 3;
@@ -1174,11 +1180,11 @@ void bottom()
 
 void display_arrow()
 {
-#undef START
 #define START asm("pha"); asm("pla");
     *NUSIZ0 = 0x10;
     *NUSIZ1 = 0x00;
     //#include "arrow.c"
+#undef START
 }
 
 void main()
