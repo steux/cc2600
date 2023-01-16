@@ -57,7 +57,7 @@ impl AsmLine {
                 s += writer.write(&format!("\t{}\n", inst).as_bytes())?;
             },
             AsmLine::Comment(comment) => {
-                s += writer.write(&format!(";{}", comment).as_bytes())?;
+                s += writer.write(&format!(";{}\n", comment).as_bytes())?;
             },
         }
         Ok(s)
@@ -86,7 +86,7 @@ impl AssemblyCode {
     pub fn append_comment(&mut self, s: String) -> () {
         self.code.push(AsmLine::Comment(s));
     }
-    fn write(&self, writer: &mut dyn Write) -> Result<usize, std::io::Error> {
+    pub fn write(&self, writer: &mut dyn Write) -> Result<usize, std::io::Error> {
         let mut s = 0;
         for i in &self.code {
             s += i.write(writer)?;

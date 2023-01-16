@@ -275,7 +275,7 @@ impl<'a, 'b> GeneratorState<'a> {
             s += " ";
             s += &dasm_operand;
         }
-        self.write_asm(&s, cycles)?;
+        //self.write_asm(&s, cycles)?;
 
         if let Some(f) = &self.current_function {
             let code : &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
@@ -292,17 +292,15 @@ impl<'a, 'b> GeneratorState<'a> {
             let code : &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
             code.append_inline(s.to_string());
         }
-        self.write(&format!("\t{s}\n"))?;
+        //self.write(&format!("\t{s}\n"))?;
         Ok(()) 
     } 
 
     fn comment(&mut self, s: &str) -> Result<(), Error> {
         if let Some(f) = &self.current_function {
             let code : &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
-            code.append_comment(s.trim().to_string());
+            code.append_comment(s.trim_end().to_string());
         }
-        self.write(";")?;
-        self.write(s)?;
         Ok(()) 
     } 
 
@@ -311,25 +309,17 @@ impl<'a, 'b> GeneratorState<'a> {
             let code : &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
             code.append_label(l.to_string());
         }
-        self.write_label(l)?;
         Ok(()) 
     } 
 
+    fn write_function(&mut self, f: &str) -> Result<usize, std::io::Error>
+    {
+        let code: &AssemblyCode = self.functions_code.get(f).unwrap();
+        code.write(self.writer)
+    }
+
     fn write(&mut self, s: &str) -> Result<usize, std::io::Error> {
         self.writer.write(s.as_bytes())
-    }
-    fn write_asm(&mut self, asm: &str, cycles: u32) -> Result<usize, std::io::Error> {
-        if self.insert_code {
-            self.writer.write(format!("\t{:23}\t; {} cycles\n", asm, cycles).as_bytes())
-        } else {
-            self.writer.write(format!("\t{}\n", asm).as_bytes())
-        }
-    }
-    fn write_label(&mut self, label: &str) -> Result<usize, std::io::Error> {
-        self.flags = FlagsState::Unknown; // There is a label, so there are some jumps to it -
-                                          // flags are then unknown at that point
-        self.write(label)?;
-        self.write(&"\n")
     }
     fn purge_deferred_plusplus(&mut self) -> Result<(), Error> {
         let def = self.deferred_plusplus.clone();
@@ -625,6 +615,7 @@ fn generate_assign<'a>(left: &ExprType<'a>, right: &ExprType<'a>, gstate: &mut G
                     match left {
                         ExprType::Absolute(_, _, _) | ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) => {
                             gstate.asm(STA, left, pos, high_byte)?;
+                            gstate.flags = FlagsState::Unknown;
                         },
                         ExprType::A(_) => {
                             if acc_in_use {
@@ -1301,16 +1292,16 @@ fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>,
 
     let switch = match &l {
         ExprType::X | ExprType::Y => {
-            left = &l; right = &r;
+            left = l; right = r;
             false
         }, 
         _ => match &r {
             ExprType::A(_) => {
-                left = &r; right = &l;
+                left = r; right = l;
                 true 
             },
             _ => {
-                left = &l; right = &r;
+                left = l; right = r;
                 false
             }
         }
@@ -1341,7 +1332,7 @@ fn generate_condition_ex<'a>(l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>,
     } else { opx };
 
     if let ExprType::Immediate(v) = *right {
-        if *v == 0 {
+        if v == 0 {
             // Let's see if we can shortcut compare instruction 
             if flags_ok(&gstate.flags, &left) {
                 match operator {
@@ -2034,6 +2025,8 @@ Powerup
                 generate_statement(&f.1.code, &mut gstate)?;
                 generate_return(&mut gstate)?;
                 gstate.current_function = None;
+
+                gstate.write_function(f.0)?;
             }
         }
 
