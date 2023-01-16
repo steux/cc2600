@@ -1,10 +1,10 @@
-use crate::error::Error;
-use crate::compile::*;
-use crate::assemble::{AsmMnemonic, AsmMnemonic::*};
-
+use std::collections::HashMap;
+use log::debug;
 use std::io::Write;
 
-use log::debug;
+use crate::error::Error;
+use crate::compile::*;
+use crate::assemble::{AssemblyCode, AsmMnemonic, AsmMnemonic::*, AsmInstruction};
 
 // TODO: add cctmp in use
 
@@ -46,6 +46,8 @@ struct GeneratorState<'a> {
     deferred_plusplus: Vec<(ExprType<'a>, usize, bool)>,
     bankswitching_method: &'static str,
     current_bank: u32,
+    functions_code: HashMap<String, AssemblyCode>,
+    current_code: Option<&'a mut AssemblyCode>,
 }
 
 impl<'a> GeneratorState<'a> {
@@ -53,7 +55,7 @@ impl<'a> GeneratorState<'a> {
     {
         let dasm_operand: String;
         let signed;
-        let bytes;
+        let nb_bytes;
 
         let mut cycles = match mnemonic {
             PHA | PLA => 3,
@@ -64,7 +66,7 @@ impl<'a> GeneratorState<'a> {
         if *operand != ExprType::Nothing { 
             match operand {
                 ExprType::Label(l) => {
-                    bytes = match mnemonic {
+                    nb_bytes = match mnemonic {
                         JMP | JSR => 3,
                         _ => 2,
                     };
@@ -77,7 +79,7 @@ impl<'a> GeneratorState<'a> {
                     dasm_operand = format!("{}", *l);
                 },
                 ExprType::Immediate(v) => {
-                    bytes = 2;
+                    nb_bytes = 2;
                     signed = if *v < 0 { true } else { false };
                     dasm_operand = format!("#{}", *v);
                 },
@@ -99,10 +101,10 @@ impl<'a> GeneratorState<'a> {
                             }
                             if v.memory == VariableMemory::Zeropage {
                                 cycles += 1;
-                                bytes = 2;
+                                nb_bytes = 2;
                             } else {
                                 cycles += 2;
-                                bytes = 3;
+                                nb_bytes = 3;
                             }
                         },
                         VariableType::Short => {
@@ -114,10 +116,10 @@ impl<'a> GeneratorState<'a> {
                             }
                             if v.memory == VariableMemory::Zeropage {
                                 cycles += 1;
-                                bytes = 2;
+                                nb_bytes = 2;
                             } else {
                                 cycles += 2;
-                                bytes = 3;
+                                nb_bytes = 3;
                             }
                         },
                         VariableType::CharPtr => if v.var_type == VariableType::CharPtr && !*eight_bits && v.var_const {
@@ -126,11 +128,11 @@ impl<'a> GeneratorState<'a> {
                             } else {
                                 dasm_operand = format!("#<{}", variable);
                             }
-                            bytes = 2;
+                            nb_bytes = 2;
                         } else {
                             if high_byte && *eight_bits {
                                 dasm_operand = "#0".to_string();
-                                bytes = 2;
+                                nb_bytes = 2;
                             } else {
                                 let off = if high_byte { offset + 1 } else { offset };
                                 if off > 0 {
@@ -140,10 +142,10 @@ impl<'a> GeneratorState<'a> {
                                 }
                                 if v.memory == VariableMemory::Zeropage {
                                     cycles += 1;
-                                    bytes = 2;
+                                    nb_bytes = 2;
                                 } else {
                                     cycles += 2;
-                                    bytes = 3;
+                                    nb_bytes = 3;
                                 }
                             }
                         },
@@ -168,7 +170,7 @@ impl<'a> GeneratorState<'a> {
                             if v.memory != VariableMemory::Zeropage {
                                 return Err(syntax_error(self.compiler_state, "Y indirect addressing works only on zeropage variables", pos))
                             }
-                            bytes = 2;
+                            nb_bytes = 2;
                             cycles = if mnemonic == STA {6} else {5};
                             // TODO : Implement alternative using A
                             match mnemonic {
@@ -189,14 +191,14 @@ impl<'a> GeneratorState<'a> {
                         if v.memory == VariableMemory::Zeropage {
                             match mnemonic {
                                 STA | LDA => {
-                                    bytes = 3;
+                                    nb_bytes = 3;
                                 },
                                 _ => {
-                                    bytes = 2;
+                                    nb_bytes = 2;
                                 }
                             }
                         } else {
-                            bytes = 3;
+                            nb_bytes = 3;
                         }
                         match mnemonic {
                             STA => cycles += 1,
@@ -223,10 +225,10 @@ impl<'a> GeneratorState<'a> {
                     }
                     if v.memory == VariableMemory::Zeropage {
                         cycles += 2;
-                        bytes = 2;
+                        nb_bytes = 2;
                     } else {
                         cycles += 3;
-                        bytes = 3;
+                        nb_bytes = 3;
                     }
                     match mnemonic {
                         STX | LDX | CPX => return Err(syntax_error(self.compiler_state, "Can't use X addressing on X operation", pos)),
@@ -240,7 +242,7 @@ impl<'a> GeneratorState<'a> {
         } else {
             dasm_operand = "".to_string();
             signed = false;
-            bytes = 1;
+            nb_bytes = 1;
         }
         
         let mut s = mnemonic.to_string();
@@ -248,6 +250,12 @@ impl<'a> GeneratorState<'a> {
         s += &dasm_operand;
         self.write_asm(&s, cycles)?;
 
+        if let Some(code) = &mut self.current_code {
+            let instruction = AsmInstruction {
+                mnemonic, dasm_operand, cycles, nb_bytes 
+            };
+            code.append(instruction);
+        }
         Ok(signed)
     }
 
@@ -2097,6 +2105,8 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         deferred_plusplus: Vec::new(),
         bankswitching_method: "4K",
         current_bank: 0,
+        functions_code: HashMap::new(),
+        current_code: None,
     };
 
     gstate.write("\tPROCESSOR 6502\n\n")?;
@@ -2171,6 +2181,12 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
 
     let mut nb_banked_functions = 0;
     let mut banked_function_address = 0;
+    
+    for f in compiler_state.sorted_functions().iter() {
+        if f.1.bank != 0 {
+            nb_banked_functions += 1;
+        }
+    }
 
     for bank in 0..=maxbank {
         // Prelude code for each bank
@@ -2257,16 +2273,11 @@ Powerup
 
         // Epilogue code
         gstate.write(&format!("
-        ECHO ([$FFFC-.]d), \"bytes free in bank {}\"
-        ", bank))?;
+        ECHO ([${:04x}-.]d), \"bytes free in bank {}\"
+        ", 0xFFE0 - nb_banked_functions * 10, bank))?;
 
         if bank == 0 {
             // Generate bankswitching functions code
-            for f in compiler_state.sorted_functions().iter() {
-                if f.1.bank != 0 {
-                    nb_banked_functions += 1;
-                }
-            }
             banked_function_address = 0x0FE0 - nb_banked_functions * 10;
             debug!("Banked function address={:04x}", banked_function_address);
             gstate.write(&format!("

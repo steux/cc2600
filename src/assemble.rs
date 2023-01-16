@@ -24,9 +24,9 @@ impl fmt::Display for AsmMnemonic {
 }
 
 #[derive(Debug)]
-struct AsmInstruction {
+pub struct AsmInstruction {
     pub mnemonic: AsmMnemonic,
-    pub dasm: String,
+    pub dasm_operand: String,
     pub cycles: u32,
     pub nb_bytes: u32
 }
@@ -51,7 +51,7 @@ impl AsmLine {
                 s += writer.write("\n".as_bytes())?;
             },
             AsmLine::Instruction(inst) => {
-                s += writer.write(&format!("\t{} {:19}\t; {} cycles\n", inst.mnemonic.to_string(), &inst.dasm, inst.cycles).as_bytes())?;
+                s += writer.write(&format!("\t{} {:19}\t; {} cycles\n", inst.mnemonic.to_string(), &inst.dasm_operand, inst.cycles).as_bytes())?;
             },
             AsmLine::Inline(inst) => {
                 s += writer.write(inst.as_bytes())?;
@@ -64,15 +64,18 @@ impl AsmLine {
     }
 }
 
-pub struct Assembly {
+pub struct AssemblyCode {
     code: Vec<AsmLine>
 }
 
-impl Assembly {
-    fn new() -> Assembly {
-        Assembly {
+impl AssemblyCode {
+    fn new() -> AssemblyCode {
+        AssemblyCode {
             code: Vec::<AsmLine>::new()
         }
+    }
+    pub fn append(&mut self, inst: AsmInstruction) -> () {
+        self.code.push(AsmLine::Instruction(inst));
     }
     fn write(&self, writer: &mut dyn Write) -> Result<usize, std::io::Error> {
         let mut s = 0;
