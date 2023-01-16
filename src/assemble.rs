@@ -69,7 +69,7 @@ pub struct AssemblyCode {
 }
 
 impl AssemblyCode {
-    fn new() -> AssemblyCode {
+    pub fn new() -> AssemblyCode {
         AssemblyCode {
             code: Vec::<AsmLine>::new()
         }

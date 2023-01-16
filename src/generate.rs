@@ -47,7 +47,7 @@ struct GeneratorState<'a> {
     bankswitching_method: &'static str,
     current_bank: u32,
     functions_code: HashMap<String, AssemblyCode>,
-    current_code: Option<&'a mut AssemblyCode>,
+    current_function: Option<String>,
 }
 
 impl<'a> GeneratorState<'a> {
@@ -250,7 +250,8 @@ impl<'a> GeneratorState<'a> {
         s += &dasm_operand;
         self.write_asm(&s, cycles)?;
 
-        if let Some(code) = &mut self.current_code {
+        if let Some(f) = &self.current_function {
+            let code : &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
             let instruction = AsmInstruction {
                 mnemonic, dasm_operand, cycles, nb_bytes 
             };
@@ -2106,7 +2107,7 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         bankswitching_method: "4K",
         current_bank: 0,
         functions_code: HashMap::new(),
-        current_code: None,
+        current_function: None,
     };
 
     gstate.write("\tPROCESSOR 6502\n\n")?;
@@ -2238,8 +2239,12 @@ Powerup
                 gstate.write(&format!("\n{}\tSUBROUTINE\n", f.0))?;
                 gstate.local_label_counter_for = 0;
                 gstate.local_label_counter_if = 0;
+
+                gstate.functions_code.insert(f.0.clone(), AssemblyCode::new());
+                gstate.current_function = Some(f.0.clone());
                 generate_statement(&f.1.code, &mut gstate)?;
                 gstate.write_asm("RTS", 6)?;
+                gstate.current_function = None;
             }
         }
 
