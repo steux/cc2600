@@ -87,7 +87,7 @@ mod tests {
         compile(input.as_bytes(), &mut output, &args).unwrap();
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
-        assert!(result.contains("LDA #0\n\tSTA i\n\tLDA i\n\tCMP #10\n\tBCS .forend1\n.for1\n.forupdate1\n\tINC i\n\tLDA i\n\tCMP #10\n\tBCC .for1\n.forend1\n"));
+        assert!(result.contains("LDA #0\n\tSTA i\n\tCMP #10\n\tBCS .forend1\n.for1\n.forupdate1\n\tINC i\n\tLDA i\n\tCMP #10\n\tBCC .for1\n.forend1\n"));
     }
     
     #[test]
@@ -104,7 +104,7 @@ mod tests {
         compile(input.as_bytes(), &mut output, &args).unwrap();
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
-        assert!(result.contains("LDA #0\n\tSTA i\n\tLDA i\n\tSTA j\n\tINC i\n"));
+        assert!(result.contains("LDA #0\n\tSTA i\n\tSTA j\n\tINC i\n"));
     }
     
     #[test]
@@ -184,7 +184,7 @@ mod tests {
             defines: Vec::new(),
             insert_code: false
         };
-        let input = "unsigned char i, j; void main() { i = 0; i = 0; if (i == 0 && j == 0) X = 1; }";
+        let input = "unsigned char i, j; void main() { i = 0; j = 0; if (i == 0 && j == 0) X = 1; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
         let result = str::from_utf8(&output).unwrap();
@@ -201,7 +201,7 @@ mod tests {
             defines: Vec::new(),
             insert_code: false
         };
-        let input = "unsigned char i, j; void main() { i = 0; i = 0; if (i == 0 || j == 0) X = 1; }";
+        let input = "unsigned char i, j; void main() { i = 0; j = 0; if (i == 0 || j == 0) X = 1; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
         let result = str::from_utf8(&output).unwrap();
@@ -218,7 +218,7 @@ mod tests {
             defines: Vec::new(),
             insert_code: false
         };
-        let input = "unsigned char i, j, k; void main() { i = 0; i = 0; k = 0; if (i == 0 || j == 0 || k == 0) X = 1; }";
+        let input = "unsigned char i, j, k; void main() { i = 0; j = 0; k = 0; if (i == 0 || j == 0 || k == 0) X = 1; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
         let result = str::from_utf8(&output).unwrap();

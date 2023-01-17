@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use log::debug;
+use log::{debug, info};
 use std::io::Write;
 
 use crate::error::Error;
@@ -275,7 +275,6 @@ impl<'a, 'b> GeneratorState<'a> {
             s += " ";
             s += &dasm_operand;
         }
-        //self.write_asm(&s, cycles)?;
 
         if let Some(f) = &self.current_function {
             let code : &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
@@ -317,9 +316,20 @@ impl<'a, 'b> GeneratorState<'a> {
         code.write(self.writer, self.insert_code)
     }
 
+    fn optimize_function(&mut self, f: &str) -> u32 
+    {
+        let code: &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
+        let nb = code.optimize();
+        if nb > 0 {
+            info!("#{} optimized out instructions in function {}", nb, f);
+        }
+        nb
+    }
+
     fn write(&mut self, s: &str) -> Result<usize, std::io::Error> {
         self.writer.write(s.as_bytes())
     }
+
     fn purge_deferred_plusplus(&mut self) -> Result<(), Error> {
         let def = self.deferred_plusplus.clone();
         self.deferred_plusplus.clear();
@@ -2025,6 +2035,7 @@ Powerup
                 generate_return(&mut gstate)?;
                 gstate.current_function = None;
 
+                gstate.optimize_function(f.0);
                 gstate.write_function(f.0)?;
             }
         }

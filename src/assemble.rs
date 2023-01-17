@@ -31,15 +31,13 @@ pub struct AsmInstruction {
     pub nb_bytes: u32
 }
 
-impl AsmInstruction {
-}
-
 #[derive(Debug)]
 enum AsmLine {
     Label(String),
     Instruction(AsmInstruction),
     Inline(String),
-    Comment(String)
+    Comment(String),
+    Dummy,
 }
 
 impl AsmLine {
@@ -71,6 +69,7 @@ impl AsmLine {
             AsmLine::Comment(comment) => {
                 s += writer.write(&format!(";{}\n", comment).as_bytes())?;
             },
+            AsmLine::Dummy => (),
         }
         Ok(s)
     }
@@ -104,5 +103,78 @@ impl AssemblyCode {
             s += i.write(writer, cycles)?;
         }
         Ok(s)
-    } 
+    }
+
+    pub fn optimize(&mut self) -> u32 {
+        let mut removed_instructions = 0u32;
+        let mut iter = self.code.iter_mut();
+        let mut first = iter.next();
+        loop {
+            match &first {
+                None => return removed_instructions,
+                Some(AsmLine::Instruction(_)) => break,
+                _ => first = iter.next(),
+            }
+        }
+
+        let mut second = iter.next();
+        loop {
+            // For each iteration of this loop, first must point to an Instruction
+            // and second point to the next asm line
+            let mut remove_both = false;
+            let mut remove_second = false;
+            
+            // Make sure second points also to an instruction
+            loop {
+                match &second {
+                    None => return removed_instructions,
+                    Some(AsmLine::Instruction(_)) => break,
+                    Some(AsmLine::Label(_)) => {
+                        // If this is a label, restart 
+                        first = iter.next();
+                        loop {
+                            match &first {
+                                None => return removed_instructions,
+                                Some(AsmLine::Instruction(_)) => break,
+                                _ => first = iter.next(),
+                            }
+                        }
+                        second = iter.next();
+                    },
+                    _ => second = iter.next(),
+                }
+            }
+
+            if let Some(AsmLine::Instruction(i1)) = &first {
+                if let Some(AsmLine::Instruction(i2)) = &second {
+                    // Remove PLA/PHA pairs
+                    remove_both = i1.mnemonic == AsmMnemonic::PLA && i2.mnemonic == AsmMnemonic::PHA;
+                    // Remove STA followed by LDA
+                    remove_second = i1.mnemonic == AsmMnemonic::STA && i2.mnemonic == AsmMnemonic::LDA && i1.dasm_operand == i2.dasm_operand;
+                }
+            }
+
+            if remove_both {
+                *first.unwrap() = AsmLine::Dummy;
+                *second.unwrap() = AsmLine::Dummy;
+                removed_instructions += 2;
+                first = iter.next();
+                loop {
+                    match &first {
+                        None => return removed_instructions,
+                        Some(AsmLine::Instruction(_)) => break,
+                        _ => first = iter.next(),
+                    }
+                }
+                second = iter.next();
+            } else if remove_second {
+                *second.unwrap() = AsmLine::Dummy;
+                removed_instructions += 1;
+                second = iter.next();
+            } else {
+                first = second;
+                second = iter.next();
+            }
+        }
+    }
 }
