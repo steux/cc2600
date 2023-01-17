@@ -1976,7 +1976,18 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         if f.1.bank != 0 {
             nb_banked_functions += 1;
         }
-    }
+
+        gstate.local_label_counter_for = 0;
+        gstate.local_label_counter_if = 0;
+
+        gstate.functions_code.insert(f.0.clone(), AssemblyCode::new());
+        gstate.current_function = Some(f.0.clone());
+        generate_statement(&f.1.code, &mut gstate)?;
+        generate_return(&mut gstate)?;
+        gstate.current_function = None;
+
+        gstate.optimize_function(f.0);
+     }
 
     for bank in 0..=maxbank {
         // Prelude code for each bank
@@ -2026,16 +2037,6 @@ Powerup
                 debug!("Generating code for function #{}", f.0);
 
                 gstate.write(&format!("\n{}\tSUBROUTINE\n", f.0))?;
-                gstate.local_label_counter_for = 0;
-                gstate.local_label_counter_if = 0;
-
-                gstate.functions_code.insert(f.0.clone(), AssemblyCode::new());
-                gstate.current_function = Some(f.0.clone());
-                generate_statement(&f.1.code, &mut gstate)?;
-                generate_return(&mut gstate)?;
-                gstate.current_function = None;
-
-                gstate.optimize_function(f.0);
                 gstate.write_function(f.0)?;
             }
         }
