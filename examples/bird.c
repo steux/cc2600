@@ -81,26 +81,7 @@ unsigned char random;
 unsigned char do_display_score;
 unsigned char counter;
 unsigned char blinking_if_high_score;
-
-// TIATracker variables
-// =====================================================================
-// Permanent variables. These are states needed by the player.
-// =====================================================================
-char tt_timer;                // current music timer value
-char tt_cur_pat_index_c0;     // current pattern index into tt_SequenceTable
-char tt_cur_pat_index_c1;     
-char tt_cur_note_index_c0;    // note index into current pattern
-char tt_cur_note_index_c1;    
-char tt_envelope_index_c0;    // index into ADSR envelope
-char tt_envelope_index_c1;    
-char tt_cur_ins_c0;           // current instrument
-char tt_cur_ins_c1;     
-
-// =====================================================================
-// Temporary variables. These will be overwritten during a call to the
-// player routine, but can be used between calls for other things.
-// =====================================================================
-char *tt_ptr; 
+unsigned char blinking_counter;
 
 const bank1 unsigned char grass_style1[16] = {
     0x00, 0x00, 0x00, 0x00, 
@@ -582,6 +563,7 @@ void increment_score()
         highscore_high = score_high;
         highscore_low = score_low;
         blinking_if_high_score = 0;
+        blinking_counter = 0;
     }
 }
 
@@ -1285,18 +1267,19 @@ void main()
 
     if (blinking_if_high_score != BROWN) {
 #ifdef PAL
-        if (counter & 16) {
-            blinking_if_high_score = 0x20 + (counter & 0x0f);
+        if (blinking_counter & 16) {
+            blinking_if_high_score = 0x20 + (blinking_counter & 0x0f);
         } else {
-            blinking_if_high_score = 0x2f - (counter & 0x0f);
+            blinking_if_high_score = 0x2f - (blinking_counter & 0x0f);
         }
 #else
-        if (counter & 16) {
-            blinking_if_high_score = 0x10 + (counter & 0x0f);
+        if (blinking_counter & 16) {
+            blinking_if_high_score = 0x10 + (blinking_counter & 0x0f);
         } else {
-            blinking_if_high_score = 0x1f - (counter & 0x0f);
+            blinking_if_high_score = 0x1f - (blinking_counter & 0x0f);
         }
 #endif
+        blinking_counter++;
     }
 
     *ENAM0 = 0;
