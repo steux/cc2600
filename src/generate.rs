@@ -46,6 +46,7 @@ struct GeneratorState<'a> {
     current_bank: u32,
     functions_code: HashMap<String, AssemblyCode>,
     current_function: Option<String>,
+    optimization_level: u8
 }
 
 impl<'a, 'b> GeneratorState<'a> {
@@ -1929,7 +1930,7 @@ fn flags_ok(flags: &FlagsState, expr_type: &ExprType) -> bool
     }
 }
 
-pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, insert_code: bool) -> Result<(), Error> 
+pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, insert_code: bool, optimization_level: u8) -> Result<(), Error> 
 {
     let mut gstate = GeneratorState {
         compiler_state,
@@ -1949,6 +1950,7 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         current_bank: 0,
         functions_code: HashMap::new(),
         current_function: None,
+        optimization_level
     };
 
     gstate.write("\tPROCESSOR 6502\n\n")?;
@@ -2039,7 +2041,9 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         gstate.generate_return()?;
         gstate.current_function = None;
 
-        gstate.optimize_function(f.0);
+        if gstate.optimization_level > 0 {
+            gstate.optimize_function(f.0);
+        }
      }
 
     for bank in 0..=maxbank {

@@ -750,7 +750,7 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
     };
 
     // Generate assembly code from compilation output (abstract syntax tree)
-    generate_asm(&mut state, output, args.insert_code)?;
+    generate_asm(&mut state, output, args.insert_code, args.optimization_level)?;
     Ok(())
 }
 
