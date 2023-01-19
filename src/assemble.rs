@@ -190,85 +190,6 @@ impl AssemblyCode {
                 }
             }
 
-            // Analyze the second instruction to check for a load
-            if let Some(AsmLine::Instruction(inst)) = &second {
-                match inst.mnemonic {
-                    AsmMnemonic::LDA => {
-                        if inst.dasm_operand.starts_with("#") {
-                            match inst.dasm_operand[1..].parse::<i32>() {
-                                Ok(v) => {
-                                    if let Some(v2) = accumulator {
-                                        if v == v2 {
-                                            remove_second = true;
-                                            // Remove this instruction
-                                        } else {
-                                            accumulator = Some(v);
-                                        }
-                                    } else {
-                                        accumulator = Some(v);
-                                    } 
-                                },
-                                _ => accumulator = None,
-                            }
-                        } else {
-                            accumulator = None;
-                        } 
-                    },
-                    AsmMnemonic::LDX => {
-                        if inst.dasm_operand.starts_with("#") {
-                            match inst.dasm_operand[1..].parse::<i32>() {
-                                Ok(v) => {
-                                    if let Some(v2) = x_register {
-                                        if v == v2 {
-                                            remove_second = true;
-                                            // Remove this instruction
-                                        } else {
-                                            x_register = Some(v);
-                                        }
-                                    } else {
-                                        x_register = Some(v);
-                                    } 
-                                },
-                                _ => x_register = None,
-                            }
-                        } else {
-                            x_register = None;
-                        } 
-                    },
-                    AsmMnemonic::LDY => {
-                        if inst.dasm_operand.starts_with("#") {
-                            match inst.dasm_operand[1..].parse::<i32>() {
-                                Ok(v) => {
-                                    if let Some(v2) = y_register {
-                                        if v == v2 {
-                                            remove_second = true;
-                                            // Remove this instruction
-                                        } else {
-                                            y_register = Some(v);
-                                        }
-                                    } else {
-                                        y_register = Some(v);
-                                    }
-                                },
-                                _ => y_register = None,
-                            }
-                        } else {
-                            y_register = None;
-                        } 
-                    },
-                    AsmMnemonic::INX | AsmMnemonic::DEX  => x_register = None,
-                    AsmMnemonic::INY | AsmMnemonic::DEY  => y_register = None,
-                    AsmMnemonic::TAX => x_register = accumulator,
-                    AsmMnemonic::TAY => y_register = accumulator,
-                    AsmMnemonic::TXA => accumulator = x_register,
-                    AsmMnemonic::TYA => accumulator = y_register,
-                    AsmMnemonic::ADC | AsmMnemonic::SBC | AsmMnemonic::EOR | AsmMnemonic::AND | AsmMnemonic::ORA => accumulator = None,
-                    AsmMnemonic::LSR | AsmMnemonic::ASL => accumulator = None,
-                    AsmMnemonic::PLA | AsmMnemonic::PHA => accumulator = None,
-                    _ => ()
-                }
-            } else { unreachable!(); }
-            
             // Analyze pairs of instructions
             if let Some(AsmLine::Instruction(i1)) = &first {
                 if let Some(AsmLine::Instruction(i2)) = &second {
@@ -340,6 +261,87 @@ impl AssemblyCode {
                     }
                 } else { unreachable!() };
             } else { unreachable!() };
+
+            if !remove_second {
+                // Analyze the second instruction to check for a load
+                if let Some(AsmLine::Instruction(inst)) = &second {
+                    match inst.mnemonic {
+                        AsmMnemonic::LDA => {
+                            if inst.dasm_operand.starts_with("#") {
+                                match inst.dasm_operand[1..].parse::<i32>() {
+                                    Ok(v) => {
+                                        if let Some(v2) = accumulator {
+                                            if v == v2 {
+                                                remove_second = true;
+                                                // Remove this instruction
+                                            } else {
+                                                accumulator = Some(v);
+                                            }
+                                        } else {
+                                            accumulator = Some(v);
+                                        } 
+                                    },
+                                    _ => accumulator = None,
+                                }
+                            } else {
+                                accumulator = None;
+                            } 
+                        },
+                        AsmMnemonic::LDX => {
+                            if inst.dasm_operand.starts_with("#") {
+                                match inst.dasm_operand[1..].parse::<i32>() {
+                                    Ok(v) => {
+                                        if let Some(v2) = x_register {
+                                            if v == v2 {
+                                                remove_second = true;
+                                                // Remove this instruction
+                                            } else {
+                                                x_register = Some(v);
+                                            }
+                                        } else {
+                                            x_register = Some(v);
+                                        } 
+                                    },
+                                    _ => x_register = None,
+                                }
+                            } else {
+                                x_register = None;
+                            } 
+                        },
+                        AsmMnemonic::LDY => {
+                            if inst.dasm_operand.starts_with("#") {
+                                match inst.dasm_operand[1..].parse::<i32>() {
+                                    Ok(v) => {
+                                        if let Some(v2) = y_register {
+                                            if v == v2 {
+                                                remove_second = true;
+                                                // Remove this instruction
+                                            } else {
+                                                y_register = Some(v);
+                                            }
+                                        } else {
+                                            y_register = Some(v);
+                                        }
+                                    },
+                                    _ => y_register = None,
+                                }
+                            } else {
+                                y_register = None;
+                            } 
+                        },
+                        AsmMnemonic::INX | AsmMnemonic::DEX  => x_register = None,
+                        AsmMnemonic::INY | AsmMnemonic::DEY  => y_register = None,
+                        AsmMnemonic::TAX => x_register = accumulator,
+                        AsmMnemonic::TAY => y_register = accumulator,
+                        AsmMnemonic::TXA => accumulator = x_register,
+                        AsmMnemonic::TYA => accumulator = y_register,
+                        AsmMnemonic::ADC | AsmMnemonic::SBC | AsmMnemonic::EOR | AsmMnemonic::AND | AsmMnemonic::ORA => accumulator = None,
+                        AsmMnemonic::LSR | AsmMnemonic::ASL => accumulator = None,
+                        AsmMnemonic::PLA | AsmMnemonic::PHA => accumulator = None,
+                        _ => ()
+                    }
+                } else { unreachable!(); }
+            }
 
             if remove_both {
                 *first.unwrap() = AsmLine::Dummy;
