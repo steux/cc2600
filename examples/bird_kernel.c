@@ -110,12 +110,12 @@ bank1 void kernel()
     strobe(HMOVE);
     *COLUBK = GREEN;
     *ENAM0 = 0;
-    strobe(ENAM1);
-    strobe(PF0);
-    strobe(PF1);
-    strobe(PF2);
-    strobe(HMM0);
-    strobe(HMM1);
-    strobe(WSYNC);
-    strobe(HMOVE);
+    *ENAM1 = 0;
+    *PF0 = 0;
+    *PF1 = 0;
+    *PF2 = 0;
+    *HMM0 = 0;
+    *HMM1 = 0;
+    *WSYNC = 0;
+    *HMOVE = 0;
 }
