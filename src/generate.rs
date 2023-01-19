@@ -1792,7 +1792,7 @@ fn generate_goto_statement<'a>(s: &'a str, gstate: &mut GeneratorState<'a>) -> R
     Ok(())
 }
 
-fn generate_store_statement<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
+fn generate_strobe_statement<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>, pos: usize) -> Result<(), Error>
 {
     match expr {
         Expr::Identifier((name, _)) => {
@@ -1807,6 +1807,12 @@ fn generate_store_statement<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a>
         },
         _ => Err(syntax_error(gstate.compiler_state, "Strobe only works on memory pointers", pos)),
     }
+}
+
+fn generate_load_store_statement<'a>(expr: &ExprType<'a>, gstate: &mut GeneratorState<'a>, pos: usize, load: bool) -> Result<(), Error>
+{
+    gstate.asm(if load {LDA} else {STA}, expr, pos, false)?;
+    Ok(())
 }
 
 fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'a>) -> Result<(), Error>
@@ -1866,9 +1872,15 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
         Statement::Continue => { generate_continue(gstate, code.pos)?; }
         Statement::Return => { generate_return(gstate)?; }
         Statement::Asm(s) => { generate_asm_statement(s, gstate)?; }
-        Statement::Strobe(s) => { generate_store_statement(s, gstate, code.pos)?; }
-        Statement::Store(s) => { generate_store_statement(s, gstate, code.pos)?; }
-        Statement::Load(_) => { return Err(Error::Unimplemented { feature: "Load intrinsics not implemented" }); }
+        Statement::Strobe(s) => { generate_strobe_statement(s, gstate, code.pos)?; }
+        Statement::Store(e) => { 
+            let param = generate_expr(e, gstate, code.pos, false)?;
+            generate_load_store_statement(&param, gstate, code.pos, false)?; 
+        }
+        Statement::Load(e) => { 
+            let param = generate_expr(e, gstate, code.pos, false)?;
+            generate_load_store_statement(&param, gstate, code.pos, true)?; 
+        }
         Statement::CSleep(_) => { return Err(Error::Unimplemented { feature: "csleep intrinsics not implemented" }); }
         Statement::Goto(s) => { generate_goto_statement(s, gstate)?; }
     }
