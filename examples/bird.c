@@ -291,11 +291,8 @@ void init_bird_sprite_pos()
     *NUSIZ0 = 0x10;
     *NUSIZ1 = 0x00;
     if (state == 0) {
-        asm("pha");
-        asm("pla");
-        asm("pha");
-        asm("pla");
-        asm("nop");
+        csleep(7);
+        csleep(7);
     }
     strobe(RESP0);
     strobe(RESP1);
@@ -306,14 +303,12 @@ void init_bird_sprite_pos()
     strobe(WSYNC);
     strobe(HMOVE);
     *CTRLPF = 0x20;
-    asm("pha");
-    asm("pla");
+    csleep(7);
     *HMP0 = 0xF0;
     *HMBL = 0x10;
     strobe(WSYNC);
     strobe(HMOVE);
-    asm("pha");
-    asm("pla");
+    csleep(7);
     *HMP0 = 0x00;
     *HMBL = 0x00;
     strobe(WSYNC);
@@ -645,8 +640,7 @@ bank1 void display_gameover()
     strobe(RESP1);
     strobe(WSYNC);
     strobe(HMOVE);
-    asm("pha"); asm("pla");
-    asm("pha"); asm("pla");
+    csleep(7);
     *HMP1 = 0x0;
     *HMP0 = 0x0;
     if (i == 0) {
@@ -769,8 +763,7 @@ void display_happybird()
     *HMP0 = 0x90;
     strobe(WSYNC);
     strobe(HMOVE);
-    asm("pha"); asm("pla");
-    asm("pha"); asm("pla");
+    csleep(7);
     *HMP1 = 0x0;
     *HMP0 = 0x0;
     for (Y = 31; Y >= 0; Y--) {
@@ -829,8 +822,7 @@ bank2 void display_mode()
     strobe(RESP1);
     strobe(WSYNC);
     strobe(HMOVE);
-    asm("pha"); asm("pla");
-    asm("pha"); asm("pla");
+    csleep(7);
     *HMP1 = 0x0;
     *HMP0 = 0x0;
     if (game_mode == 0) {
@@ -905,8 +897,7 @@ bank3 void display_score()
     }
     strobe(WSYNC);
     strobe(HMOVE);
-    asm("pha"); asm("pla");
-    asm("pha"); asm("pla");
+    csleep(7);
     *HMP0 = 0x00;
     *HMP1 = 0x00;
     
@@ -1165,7 +1156,7 @@ void bottom()
 
 void display_arrow()
 {
-#define START asm("pha"); asm("pla");
+#define START csleep(7)
     *NUSIZ0 = 0x10;
     *NUSIZ1 = 0x00;
     //#include "arrow.c"

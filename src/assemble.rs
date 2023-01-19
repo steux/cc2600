@@ -15,6 +15,7 @@ pub enum AsmMnemonic {
     DEC, DEX, DEY,
     JMP, JSR, RTS,
     PHA, PLA,
+    NOP
 }
 
 impl fmt::Display for AsmMnemonic {

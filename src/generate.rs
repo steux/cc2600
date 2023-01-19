@@ -1809,6 +1809,45 @@ fn generate_strobe_statement<'a>(expr: &Expr<'a>, gstate: &mut GeneratorState<'a
     }
 }
 
+fn generate_csleep_statement<'a>(gstate: &mut GeneratorState<'a>, cycles: i32, pos: usize) -> Result<(), Error>
+{
+    match cycles {
+        2 => gstate.sasm(NOP)?,
+        3 => gstate.asm(STA, &ExprType::Absolute("DUMMY", true, 0), pos, false)?,
+        4 => {
+            gstate.sasm(NOP)?;
+            gstate.sasm(NOP)?
+        },
+        5 => gstate.asm(DEC, &ExprType::Absolute("DUMMY", true, 0), pos, false)?,
+        6 => {
+            gstate.sasm(NOP)?;
+            gstate.sasm(NOP)?;
+            gstate.sasm(NOP)?
+        },
+        7 => {
+            gstate.sasm(PHA)?;
+            gstate.sasm(PLA)?
+        }
+        8 => {
+            gstate.sasm(NOP)?;
+            gstate.sasm(NOP)?;
+            gstate.sasm(NOP)?;
+            gstate.sasm(NOP)?
+        }
+        9 => {
+            gstate.asm(DEC, &ExprType::Absolute("DUMMY", true, 0), pos, false)?;
+            gstate.sasm(NOP)?;
+            gstate.sasm(NOP)?
+        },
+        10 => {
+            gstate.asm(DEC, &ExprType::Absolute("DUMMY", true, 0), pos, false)?;
+            gstate.asm(DEC, &ExprType::Absolute("DUMMY", true, 0), pos, false)?
+        },
+        _ => return Err(syntax_error(gstate.compiler_state, "Unsupported cycle sleep value", pos))
+    };
+    Ok(())
+}
+
 fn generate_load_store_statement<'a>(expr: &ExprType<'a>, gstate: &mut GeneratorState<'a>, pos: usize, load: bool) -> Result<(), Error>
 {
     gstate.asm(if load {LDA} else {STA}, expr, pos, false)?;
@@ -1881,7 +1920,7 @@ fn generate_statement<'a>(code: &StatementLoc<'a>, gstate: &mut GeneratorState<'
             let param = generate_expr(e, gstate, code.pos, false)?;
             generate_load_store_statement(&param, gstate, code.pos, true)?; 
         }
-        Statement::CSleep(_) => { return Err(Error::Unimplemented { feature: "csleep intrinsics not implemented" }); }
+        Statement::CSleep(s) => { generate_csleep_statement(gstate, *s, code.pos)?; }
         Statement::Goto(s) => { generate_goto_statement(s, gstate)?; }
     }
     
@@ -1921,6 +1960,7 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         }
     }
 
+    gstate.write("DUMMY\tEQU $2D\n")?;
     gstate.write("\n\tSEG.U VARS\n\tORG $80\n\n")?;
     
     // Generate variables code

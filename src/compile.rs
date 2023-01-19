@@ -557,7 +557,7 @@ fn compile_statement_ex<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> 
             })
         },
         Rule::csleep_statement => {
-            let s = parse_int(pair.into_inner().next().unwrap());
+            let s = parse_int(pair.into_inner().next().unwrap().into_inner().next().unwrap());
             Ok(StatementLoc {
                 pos, label: None, statement: Statement::CSleep(s)
             })
