@@ -488,6 +488,11 @@ pub fn process<I: BufRead, O: Write>(
 
                                 // Process file
                                 let f = File::open(path)?;
+                                let assembler = fname.ends_with(".inc") || fname.ends_with(".a") || fname.ends_with(".asm");
+                                if assembler {
+                                    lines.push((filename_rc.clone(), line, included_in_rc.clone()));
+                                    output.write_all("=== ASSEMBLER BEGIN ===\n".as_bytes())?;
+                                }
                                 let f = BufReader::new(f);
                                 context.current_filename = fname.clone();
                                 context.includes_stack.push((filename.clone(), line));
@@ -495,6 +500,10 @@ pub fn process<I: BufRead, O: Write>(
                                 context.includes_stack.pop();
                                 context.current_filename = filename.clone();
                                 lines.append(&mut mapped_lines);
+                                if assembler {
+                                    lines.push((filename_rc.clone(), line, included_in_rc.clone()));
+                                    output.write_all("==== ASSEMBLER END ====\n".as_bytes())?;
+                                }
                             } },
                         "#if" => {
                             let expr = maybe_expr.ok_or_else(|| Error::Syntax {

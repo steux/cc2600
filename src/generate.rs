@@ -2051,7 +2051,7 @@ pub fn generate_asm(compiler_state: &CompilerState, writer: &mut dyn Write, inse
         debug!("Generating code for bank #{}", bank);
         gstate.current_bank = bank;
         gstate.write(&format!("\n\tORG ${}000\n\tRORG $F000\n", bank))?;
-
+    
         if maxbank > 0 && bank != 0 {
             // Generate trampoline code
             gstate.write("
@@ -2086,6 +2086,11 @@ Powerup
 
         JMP main
         ")?;
+
+            // Generate included assembler
+            for asm in &compiler_state.included_assembler {
+                gstate.write(&asm)?;
+            }
         }
         
         // Generate functions code

@@ -14,6 +14,8 @@ use crate::generate::generate_asm;
 #[grammar = "cc2600.pest"]
 struct Cc2600Parser;
 
+//TODO: Implement inlinu functions
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum VariableType {
     Char,
@@ -149,6 +151,7 @@ pub struct CompilerState<'a> {
     pratt: PrattParser<Rule>,
     mapped_lines: &'a Vec::<(std::rc::Rc::<String>,u32,Option<(std::rc::Rc::<String>,u32)>)>,
     pub preprocessed_utf8: &'a str,
+    pub included_assembler: Vec<String>
 }
 
 impl<'a> CompilerState<'a> {
@@ -653,6 +656,10 @@ fn compile_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Re
             Rule::func_decl => {
                 compile_func_decl(state, pair.into_inner())?;
             },
+            Rule::included_assembler => {
+                debug!("Assembler: {:?}", pair);
+                state.included_assembler.push(pair.into_inner().next().unwrap().as_str().to_string());
+            },
             _ => {
                 debug!("What's this ? {:?}", pair);
                 unreachable!()
@@ -695,6 +702,7 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
     }
 
     // Start preprocessor
+    debug!("Preprocessor");
     let mapped_lines = cpp::process(input, &mut preprocessed, &mut context)?;
     debug!("Mapped lines = {:?}", mapped_lines);
 
@@ -706,7 +714,8 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
         functions: HashMap::new(),
         pratt,
         mapped_lines: &mapped_lines,
-        preprocessed_utf8
+        preprocessed_utf8,
+        included_assembler: Vec::<String>::new()
     };
 
     let r = Cc2600Parser::parse(Rule::program, &preprocessed_utf8);

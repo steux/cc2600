@@ -5,8 +5,8 @@ program      =   { SOI ~ decl* ~ EOI }
 
 decl = { var_decl
        | func_decl 
+       | included_assembler
        }
-
 var_decl = { var_type ~ id_name_ex ~ ("," ~ id_name_ex)* ~ ";" }
 var_type = { var_const? ~ superchip? ~ bank? ~ aligned? ~ var_sign ~ var_simple_type }
 var_const = { "const" }
@@ -24,6 +24,9 @@ func_decl = { inline? ~ bank? ~ "void" ~ id_name ~ "(" ~ ("void")? ~ ")" ~ (";" 
 inline = { "inline" }
 bank = ${ "bank" ~ bank_number }
 bank_number = { ASCII_NONZERO_DIGIT }
+
+included_assembler = ${ "=== ASSEMBLER BEGIN ===" ~ assembler_code ~ "==== ASSEMBLER END ====" }
+assembler_code = ${(!"==== ASSEMBLER END ===="~ ANY)*} 
 
 block = { "{" ~ statement* ~ "}" }
 label = { id_name ~ ":" }
