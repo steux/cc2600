@@ -1,3 +1,23 @@
+/*
+    cc2600 - a subset of C compiler for the Atari 2600
+    Copyright (C) 2023 Bruno STEUX 
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+    Contact info: bruno.steux@gmail.com
+*/
+
 mod cpp;
 mod error;
 mod compile;
@@ -14,9 +34,8 @@ extern crate pest_derive;
 
 use clap::Parser as ClapParser;
 
-/// Subset of C compiler for the Atari 2600
 #[derive(ClapParser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about = "cc2600 - a subset of C compiler for the Atari 2600", long_about = "cc2600 - a subset of C compiler for the Atari 2600\nCopyright (C) 2023 Bruno STEUX\n\nThis program comes with ABSOLUTELY NO WARRANTY;\nThis is free software, and you are welcome to redistribute it\nunder certain conditions;")]
 pub struct Args {
     /// Input file name
     input: String,
