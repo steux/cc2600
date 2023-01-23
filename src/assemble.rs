@@ -24,7 +24,7 @@ impl fmt::Display for AsmMnemonic {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AsmInstruction {
     pub mnemonic: AsmMnemonic,
     pub dasm_operand: String,
@@ -32,7 +32,7 @@ pub struct AsmInstruction {
     pub nb_bytes: u32
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum AsmLine {
     Label(String),
     Instruction(AsmInstruction),
@@ -76,6 +76,7 @@ impl AsmLine {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct AssemblyCode {
     code: Vec<AsmLine>
 }
@@ -97,6 +98,9 @@ impl AssemblyCode {
     }
     pub fn append_comment(&mut self, s: String) -> () {
         self.code.push(AsmLine::Comment(s));
+    }
+    pub fn append_code(&mut self, code: &AssemblyCode) -> () {
+        self.code.extend_from_slice(&code.code);
     }
     pub fn write(&self, writer: &mut dyn Write, cycles: bool) -> Result<usize, std::io::Error> {
         let mut s = 0;

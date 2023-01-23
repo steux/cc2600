@@ -75,7 +75,6 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         bankswitching_address = 0;
     }
     
-
     // Generate functions code
     gstate.write("\n; Functions definitions\n\tSEG CODE\n")?;
 
@@ -83,21 +82,22 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
     let mut banked_function_address = 0;
     
     for f in compiler_state.sorted_functions().iter() {
-        if f.1.bank != 0 {
-            nb_banked_functions += 1;
-        }
+        if f.1.code.is_some() {
+            if f.1.bank != 0 {
+                nb_banked_functions += 1;
+            }
 
-        gstate.local_label_counter_for = 0;
-        gstate.local_label_counter_if = 0;
+            gstate.local_label_counter_for = 0;
+            gstate.local_label_counter_if = 0;
 
-        gstate.functions_code.insert(f.0.clone(), AssemblyCode::new());
-        gstate.current_function = Some(f.0.clone());
-        gstate.generate_statement(&f.1.code)?;
-        gstate.generate_return()?;
-        gstate.current_function = None;
+            gstate.functions_code.insert(f.0.clone(), AssemblyCode::new());
+            gstate.current_function = Some(f.0.clone());
+            gstate.generate_statement(f.1.code.as_ref().unwrap())?;
+            gstate.current_function = None;
 
-        if args.optimization_level > 0 {
-            gstate.optimize_function(f.0);
+            if args.optimization_level > 0 {
+                gstate.optimize_function(f.0);
+            }
         }
      }
 
@@ -150,11 +150,12 @@ Powerup
         
         // Generate functions code
         for f in compiler_state.sorted_functions().iter() {
-            if f.1.bank == bank {
+            if f.1.code.is_some() && !f.1.inline && f.1.bank == bank {
                 debug!("Generating code for function #{}", f.0);
 
                 gstate.write(&format!("\n{}\tSUBROUTINE\n", f.0))?;
                 gstate.write_function(f.0)?;
+                gstate.write("\tRTS\n")?;
             }
         }
 
@@ -200,7 +201,7 @@ Powerup
         RORG ${:04x}", banked_function_address, 0xF000 + banked_function_address))?;
             for bank_ex in 1..=maxbank {
                 for f in compiler_state.sorted_functions().iter() {
-                    if f.1.bank == bank_ex {
+                    if f.1.code.is_some() && !f.1.inline && f.1.bank == bank_ex {
                         gstate.write(&format!("
 Call{}
         LDX ${:04x}+{}
@@ -217,7 +218,7 @@ Call{}
         } else {
             for f in compiler_state.sorted_functions().iter() {
                 let address = banked_function_address;
-                if f.1.bank == bank {
+                if f.1.code.is_some() && !f.1.inline && f.1.bank == bank {
                     debug!("#{} Banked function address={:04x}", bank, banked_function_address);
                     gstate.write(&format!("
         ORG ${:04x}

@@ -330,6 +330,15 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         Ok(()) 
     } 
 
+    fn push_code(&mut self, f: &str) -> Result<(), Error> {
+        if let Some(fx) = &self.current_function {
+            let code2: AssemblyCode = self.functions_code.get(f).unwrap().clone();
+            let code : &mut AssemblyCode = self.functions_code.get_mut(fx).unwrap();
+            code.append_code(&code2);
+        }
+        Ok(()) 
+    }
+
     pub fn write_function(&mut self, f: &str) -> Result<usize, std::io::Error>
     {
         let code: &AssemblyCode = self.functions_code.get(f).unwrap();
@@ -782,7 +791,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
             },
             ExprType::Y => {
                 signed = false;
-                self.asm(STX, &ExprType::Tmp(false), pos, high_byte)?;
+                self.asm(STY, &ExprType::Tmp(false), pos, high_byte)?;
                 self.asm(operation, &ExprType::Tmp(false), pos, high_byte)?;
             },
             ExprType::Tmp(s) => {
@@ -945,17 +954,24 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                             Some(f) => {
                                 let acc_in_use = self.acc_in_use;
                                 if acc_in_use { self.sasm(PHA)?; }
-
-                                if f.bank == self.current_bank {
-                                    self.asm(JSR, &ExprType::Label(*var), pos, false)?;
-                                } else {
-                                    if self.current_bank == 0 {
-                                        // Generate bankswitching call
-                                        self.asm(JSR, &ExprType::Label(&format!("Call{}", *var)), pos, false)?;
+                                if f.inline {
+                                    if f.code.is_some() {
+                                        self.push_code(var)?;
                                     } else {
-                                        return Err(syntax_error(self.compiler_state, "Banked code can only be called from bank 0 or same bank", pos))
+                                        return Err(syntax_error(self.compiler_state, "Undefined function", pos));
                                     }
-                                } 
+                                } else {
+                                    if f.bank == self.current_bank {
+                                        self.asm(JSR, &ExprType::Label(*var), pos, false)?;
+                                    } else {
+                                        if self.current_bank == 0 {
+                                            // Generate bankswitching call
+                                            self.asm(JSR, &ExprType::Label(&format!("Call{}", *var)), pos, false)?;
+                                        } else {
+                                            return Err(syntax_error(self.compiler_state, "Banked code can only be called from bank 0 or same bank", pos))
+                                        }
+                                    } 
+                                }
                                 if acc_in_use { self.sasm(PLA)?; }
                                 self.flags = FlagsState::Unknown;
                                 Ok(())

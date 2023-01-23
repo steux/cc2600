@@ -14,7 +14,7 @@ use crate::build::build_cartridge;
 #[grammar = "cc2600.pest"]
 struct Cc2600Parser;
 
-//TODO: Implement inlinu functions
+//TODO: Implement inline functions
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum VariableType {
@@ -143,7 +143,7 @@ pub struct Function<'a> {
     order: usize,
     pub inline: bool,
     pub bank: u32,
-    pub code: StatementLoc<'a>,
+    pub code: Option<StatementLoc<'a>>,
 }
 
 pub struct CompilerState<'a> {
@@ -610,7 +610,6 @@ fn compile_block<'a>(state: &CompilerState<'a>, p: Pair<'a, Rule>) -> Result<Sta
     })
 }
 
-// TODO: Accept undefined functions
 fn compile_func_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<(), Error>
 {
     let mut inline = false;
@@ -625,23 +624,45 @@ fn compile_func_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) 
         bank = u32::from_str_radix(pair.into_inner().next().unwrap().as_str(), 10).unwrap();
         pair = p.next().unwrap();
     }
+    if bank != 0 && inline {
+        return Err(syntax_error(state, "Bank spec and inlining are incompatible", pair.as_span().start()));
+    }
     match pair.as_rule() {
         Rule::id_name => {
             let name = pair.as_str();
             let pair = p.next().unwrap();
             match pair.as_rule() {
                 Rule::block => {
+                    let n = name.to_string();
+                    match state.functions.get(&n) {
+                        Some(f) => {
+                            if !f.code.is_none() {
+                                return Err(syntax_error(state, &format!("Function {} already defined", n), pair.as_span().start()));
+                            }
+                        },
+                        None => ()
+                    }
                     let code = compile_block(state, pair)?;
-                    state.functions.insert(name.to_string(), Function {
+                    state.functions.insert(n, Function {
                         order: state.functions.len(),
                         inline,
                         bank,
-                        code 
+                        code: Some(code)
                     });
                 },
                 _ => {
-                    debug!("What's this ? {:?}", pair);
-                    unreachable!()
+                    let n = name.to_string();
+                    match state.functions.get(&n) {
+                        None => {
+                            state.functions.insert(n, Function {
+                                order: state.functions.len(),
+                                inline,
+                                bank,
+                                code: None 
+                            });
+                        },
+                        _ => ()
+                    }
                 }
             }
         },
