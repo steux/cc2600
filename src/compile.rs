@@ -8,7 +8,7 @@ use std::io::{BufRead, Write};
 use crate::error::Error;
 use crate::cpp;
 use crate::Args;
-use crate::generate::generate_asm;
+use crate::build::build_cartridge;
 
 #[derive(Parser)]
 #[grammar = "cc2600.pest"]
@@ -759,7 +759,7 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
     };
 
     // Generate assembly code from compilation output (abstract syntax tree)
-    generate_asm(&mut state, output, args.insert_code, args.optimization_level)?;
+    build_cartridge(&mut state, output, &args)?;
     Ok(())
 }
 

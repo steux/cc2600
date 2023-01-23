@@ -21,6 +21,7 @@
 mod cpp;
 mod error;
 mod compile;
+mod build;
 mod generate;
 mod assemble;
 
