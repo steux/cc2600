@@ -85,6 +85,8 @@ unsigned char blinking_counter;
 unsigned char sound_iterator;
 unsigned char sound_counter;
 
+// Sound code
+
 #define GAMEOVER_SOUND  0
 #define SCORE_SOUND     1
 #define HIGHSCORE_SOUND 2
@@ -124,6 +126,53 @@ void play_sound_iteration()
         } 
     }
 }
+
+// Savekey code
+
+#include "i2c_v2.2.inc"
+
+=== ASSEMBLER BEGIN ===
+    I2C_SUBS
+==== ASSEMBLER END ====
+
+void save_highscore()
+{
+    asm("jsr i2c_startwrite");
+    asm("bcs .eeprom_error");
+    load(0x01);
+    asm("jsr i2c_txbyte");
+    load(0x40);
+    asm("jsr i2c_txbyte");
+    load(highscore_high);
+    asm("jsr i2c_txbyte");
+    load(highscore_low);
+    asm("jsr i2c_txbyte");
+eeprom_error:
+    asm("jsr i2c_stopwrite");
+}
+
+void load_highscore()
+{
+    asm("jsr i2c_startwrite	; Start signal and $a0 command byte");
+    asm("bcs .eeprom_error	; exit if command byte not acknowledged");
+    load(0x01);
+    asm("jsr i2c_txbyte");
+    load(0x40);
+    asm("jsr i2c_txbyte");
+    asm("jsr i2c_stopwrite");
+    asm("jsr i2c_rxbyte");
+    store(highscore_high);
+    asm("jsr i2c_rxbyte");
+    store(highscore_low);
+    if (highscore_high == 0xff || highscore_low == 0xff) {
+        highscore_high = 0;
+        highscore_low = 0;
+    }
+eeprom_error:
+    asm("jsr i2c_stopread");
+}
+
+// Display kernel code
 
 const bank1 unsigned char grass_style1[16] = {
     0x00, 0x00, 0x00, 0x00, 
@@ -283,6 +332,8 @@ const bank1 unsigned char getready5[16] = { 0x70, 0x78, 0x18, 0x1b, 0x3b, 0x78, 
 #undef LEFT_PLAYFIELD
 #undef RIGHT_PLAYFIELD
 
+// Init code
+
 void set_rainbow_and_grass()
 {
     i = (counter >> 2) & 3;
@@ -334,6 +385,7 @@ void init_bird_sprite_pos()
     *NUSIZ1 = 0x00;
     if (state == 0) {
         csleep(7);
+        csleep(2);
         csleep(7);
     }
     strobe(RESP0);
@@ -507,7 +559,7 @@ void load_scroll_sequence()
         }
     }
 }
-    
+   
 void init()
 {
     init_bird_sprite_pos();
@@ -522,6 +574,7 @@ void init()
     button_pressed = 1;
     random = 0xaa;
     blinking_if_high_score = BROWN;
+    load_highscore();
 }
 
 void rand()
@@ -584,6 +637,9 @@ void gameover()
 #endif 
     X = GAMEOVER_SOUND;
     play_sound();
+    if (score_low == highscore_low && score_high == highscore_high) {
+        save_highscore();
+    }
 }
 
 void increment_score()
@@ -1209,16 +1265,6 @@ void bottom()
     init_bird_sprite_pos(); // 4 lines
     play_sound_iteration();
     while (*INTIM);
-    //for (X = OVERSCAN - 4; X != 0; X--) strobe(WSYNC);
-}
-
-void display_arrow()
-{
-#define START csleep(7)
-    *NUSIZ0 = 0x10;
-    *NUSIZ1 = 0x00;
-    //#include "arrow.c"
-#undef START
 }
 
 void main()
@@ -1389,7 +1435,6 @@ void main()
         *COLUBK = BLUE;
         display_mode();
         init_bird_sprite_pos(); // 4 lines
-        //display_arrow();
         i = (KERNAL - 49) / 16;
         Y = KERNAL - 49;
 #endif
