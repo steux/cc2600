@@ -333,7 +333,6 @@ mod tests {
     
     #[test]
     fn ternary_test() {
-        //env_logger::init();
         let args = Args {
             input: "string".to_string(),
             output: "string".to_string(),
@@ -352,7 +351,6 @@ mod tests {
     
     #[test]
     fn switch_test() {
-        //env_logger::init();
         let args = Args {
             input: "string".to_string(),
             output: "string".to_string(),
@@ -371,7 +369,6 @@ mod tests {
     
     #[test]
     fn goto_test() {
-        //env_logger::init();
         let args = Args {
             input: "string".to_string(),
             output: "string".to_string(),
@@ -390,7 +387,6 @@ mod tests {
     
     #[test]
     fn assign_test() {
-        //env_logger::init();
         let args = Args {
             input: "string".to_string(),
             output: "string".to_string(),

@@ -28,6 +28,7 @@ pub enum VariableMemory {
     ROM(u32),
     Zeropage,
     Superchip,
+    Display,
 }
 
 #[derive(Debug, PartialEq)]
@@ -306,7 +307,6 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
         .parse(pairs)
 }
 
-// TODO: Exclude already defined variables
 fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(), Error>
 {
     let mut var_type = VariableType::Char;
@@ -322,6 +322,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                         Rule::var_const => memory = VariableMemory::ROM(0),
                         Rule::bank => memory = VariableMemory::ROM(u32::from_str_radix(p.into_inner().next().unwrap().as_str(), 10).unwrap()),
                         Rule::superchip => memory = VariableMemory::Superchip,
+                        Rule::display => memory = VariableMemory::Display,
                         Rule::var_sign => if p.as_str().eq("unsigned") {
                             signed = false;
                         },
@@ -342,7 +343,13 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                     match p.as_rule() {
                         Rule::pointer => var_type = VariableType::CharPtr,
                         Rule::var_const => var_const = true,
-                        Rule::id_name => name = p.as_str(),
+                        Rule::id_name => {
+                            name = p.as_str();
+                            let start = p.as_span().start();
+                            if !state.variables.get(name).is_none() {
+                                return Err(syntax_error(state, &format!("Variable {} already defined", &name), start));
+                            }
+                        },
                         Rule::int => size = p.as_str().parse::<usize>().unwrap(),
                         Rule::var_def => {
                             let px = p.into_inner().next().unwrap();

@@ -26,9 +26,10 @@ decl = { var_decl
        | included_assembler
        }
 var_decl = { var_type ~ id_name_ex ~ ("," ~ id_name_ex)* ~ ";" }
-var_type = { var_const? ~ superchip? ~ bank? ~ aligned? ~ var_sign ~ var_simple_type }
+var_type = { (var_const | superchip | bank | aligned | display)* ~ var_sign ~ var_simple_type }
 var_const = { "const" }
 superchip = { "superchip" }
+display = { "display" }
 aligned = { "aligned" ~ "(" ~ int ~ ")" }
 var_sign = { ("signed" | "unsigned")? } 
 var_simple_type = { "char" | "short" }
