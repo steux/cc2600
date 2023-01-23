@@ -82,6 +82,48 @@ unsigned char do_display_score;
 unsigned char counter;
 unsigned char blinking_if_high_score;
 unsigned char blinking_counter;
+unsigned char sound_iterator;
+unsigned char sound_counter;
+
+#define GAMEOVER_SOUND  0
+#define SCORE_SOUND     1
+#define HIGHSCORE_SOUND 2
+#define GREAT_SOUND     3
+
+const unsigned char sound[4] = { 0x38, 0x48, 0x48, 0x48 };
+const unsigned char sound_index[4] = { 0, 9, 13, 17 };
+const unsigned char sound_pitch[26] = { 11, 12, 13, 14, 15, 16, 17, 18, 0, 25, 26, 23, 0, 13, 11, 12, 0, 19, 16, 15, 12, 0, 12, 0, 12, 0 };
+const unsigned char sound_duration[26] = { 7, 7, 7, 7, 7, 7, 7, 7, 0, 7, 7, 14, 0, 7, 7, 10, 0, 7, 7, 7, 14, 7, 7, 7, 21, 0 };
+
+// X is the sound to play
+void play_sound()
+{
+    *AUDV1 = sound[X];
+    *AUDC1 = sound[X] >> 4;
+    Y = sound_index[X];
+    sound_iterator = Y;
+    sound_counter = sound_duration[Y];
+    *AUDF1 = sound_pitch[Y];
+}
+
+void play_sound_iteration()
+{
+    if (sound_counter) {
+        sound_counter--;
+        if (sound_counter == 0) {
+            sound_iterator++;
+            Y = sound_iterator;
+            sound_counter = sound_duration[Y];
+            if (sound_counter) {
+                *AUDF1 = sound_pitch[Y];
+            } else {
+                *AUDV1 = 0;
+                *AUDC1 = 0;
+                *AUDF1 = 0;
+            }
+        } 
+    }
+}
 
 const bank1 unsigned char grass_style1[16] = {
     0x00, 0x00, 0x00, 0x00, 
@@ -510,6 +552,7 @@ void next_sequence()
 
 void getready()
 {
+    *AUDV0 = 0; // Cut bird sound
     button_pressed = 1;
     ybird = 100 * 256;
     left_window = -1;
@@ -526,6 +569,7 @@ void getready()
 
 void gameover()
 {
+    *AUDV0 = 0; // Cut bird sound
     button_pressed = 1;
     state = 3;
     yspeed = 0;
@@ -538,6 +582,8 @@ void gameover()
        ybird = (KERNAL - 60) * 256;
     }
 #endif 
+    X = GAMEOVER_SOUND;
+    play_sound();
 }
 
 void increment_score()
@@ -559,7 +605,12 @@ void increment_score()
         highscore_low = score_low;
         blinking_if_high_score = 0;
         blinking_counter = 0;
+        X = HIGHSCORE_SOUND;
+    } else {
+        X = SCORE_SOUND;
     }
+    if (!score_low) X = GREAT_SOUND;
+    play_sound();
 }
 
 void scrolling()
@@ -589,8 +640,11 @@ void flap()
         bird_type = 1;
     else {
         bird_type = 0;
-        bird_animation_counter = 5;
     }
+    bird_animation_counter = 5;
+    *AUDV0 = 8;
+    *AUDC0 = 4;
+    *AUDF0 = 4;
 }
 
 void game_logic()
@@ -1153,6 +1207,7 @@ void bottom()
                  // Now we have 30 lines of VBLANK
     *TIM64T = (OVERSCAN * 76 + 13) / 64;
     init_bird_sprite_pos(); // 4 lines
+    play_sound_iteration();
     while (*INTIM);
     //for (X = OVERSCAN - 4; X != 0; X--) strobe(WSYNC);
 }
@@ -1190,8 +1245,12 @@ void main()
         yspeed -= 15;
         if (yspeed >> 8 < 0) bird_type = 0;
         if (bird_animation_counter != 0) {
+            *AUDF0 = bird_animation_counter;
             bird_animation_counter--;
-            if (bird_animation_counter == 0) bird_type = 1;
+            if (bird_animation_counter == 0) {
+                *AUDV0 = 0;
+                bird_type = 1;
+            }
         }
         ybird = ybird + yspeed;
         if (ybird >> 8 < 20) {
