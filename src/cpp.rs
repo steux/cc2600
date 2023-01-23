@@ -32,7 +32,7 @@ use std::path::Path;
 
 use log::debug;
 
-use regex::Regex;
+use regex::{Regex, RegexSet};
 use std::borrow::Cow;
 
 /// The context for preprocessing a file.
@@ -51,7 +51,11 @@ pub struct Context {
     current_filename: String,
     includes_stack: Vec<(String, u32)>,
     pub include_directories: Vec<String>,
-    defs: BTreeMap<String, (Regex, String)>,
+    defs: BTreeMap<String, String>,
+    regex_set: RegexSet,
+    defs_ex: Vec::<String>, // Used for undefeine
+    defs_ex_ex: Vec::<String>, // Used to contrust regex_set
+    regexes: Vec::<(Regex, String)>,
     define_regex: Regex,
 }
 
@@ -63,6 +67,10 @@ impl Context {
             includes_stack: Vec::<(String, u32)>::new(),
             include_directories: Vec::<String>::new(),
             defs: BTreeMap::new(),
+            regex_set: RegexSet::empty(),
+            defs_ex: Vec::new(),
+            defs_ex_ex: Vec::new(),
+            regexes: Vec::<(Regex, String)>::new(),
             define_regex: Regex::new(r"([a-zA-Z_][a-zA-Z0-9_]*)(?:\(((?:(?:[a-zA-Z_][a-zA-Z0-9_]*)\s*,\s*)*(?:(?:[a-zA-Z_][a-zA-Z0-9_]*)))\))?\s*(.*)").unwrap()
         }
     }
@@ -76,32 +84,53 @@ impl Context {
     /// ```
     pub fn define<N: Into<String>, V: Into<String>>(&mut self, name: N, value: V) -> &mut Self {
         let n = name.into();
-        let regex = Regex::new(&format!("\\b{}\\b", &n)).unwrap();
-        self.defs.insert(n, (regex, value.into()));
+        let v = value.into();
+        let rstring = format!("\\b{}\\b", &n);
+        let regex = Regex::new(&rstring).unwrap();
+        self.defs.insert(n.clone(), v.clone());
+        self.defs_ex.push(n);
+        self.defs_ex_ex.push(rstring);
+        self.regexes.push((regex, v));
+        self.regex_set = RegexSet::new(&self.defs_ex_ex).unwrap();
         self
     }
     /// ```
-    pub fn define_ex<N: Into<String>>(&mut self, name: N, value: (Regex, String)) -> &mut Self {
-        self.defs.insert(name.into(), value);
+    pub fn define_ex<N: Into<String>>(&mut self, name: N, value: (String, String)) -> &mut Self {
+        let n = name.into();
+        let regex = Regex::new(&value.0).unwrap();
+        self.defs.insert(n.clone(), value.0.clone());
+        self.defs_ex.push(n);
+        self.defs_ex_ex.push(value.0);
+        self.regexes.push((regex, value.1));
+        self.regex_set = RegexSet::new(&self.defs_ex_ex).unwrap();
         self
     }
     /// 
     pub fn undefine<N: Into<String>>(&mut self, name: N) -> &mut Self {
-        self.defs.remove(&name.into());
+        let n = name.into();
+        self.defs.remove(&n);
+        let mut i = 0;
+        for j in self.defs_ex.iter() {
+            if j.eq(&n) { break; }
+            i += 1;
+        }
+        self.defs_ex.remove(i);
+        self.defs_ex_ex.remove(i);
+        self.regexes.remove(i);
+        self.regex_set = RegexSet::new(&self.defs_ex_ex).unwrap();
         self
     }
     /// Gets a macro that may or may not be defined from a context.
-    pub fn get_macro<N: Into<String>>(&self, name: N) -> Option<&(Regex, String)> {
+    pub fn get_macro<N: Into<String>>(&self, name: N) -> Option<&String> {
         self.defs.get(&name.into())
     }
 
     pub fn replace_all(&self, s: &str) -> String {
         let mut res = String::from(s);
-        for (_, value) in &self.defs {
-            let x = value.0.replace_all(&res, &value.1);
+        for idx in self.regex_set.matches(s).into_iter() {
+            let x = self.regexes[idx].0.replace_all(&res, &self.regexes[idx].1);
             if let Cow::Owned(z) = x {
                 res = z.to_string();
-            } else {
             }
         }
         res
@@ -418,7 +447,7 @@ pub fn process<I: BufRead, O: Write>(
                     if caps.get(2).is_none() {
                         context.define(mcro, value);
                     } else {
-                        let mut rex = format!("{}\\(", mcro);
+                        let mut rex = format!("\\b{}\\(", mcro);
                         for v in caps.get(2).unwrap().as_str().split(",") {
                             value = value.replace(v, &format!("${}",v));
                             rex += &format!("(?P<{}>[^,]*),", v);
@@ -426,8 +455,7 @@ pub fn process<I: BufRead, O: Write>(
                         rex = rex.strip_suffix(",").unwrap().to_string();
                         rex += "\\)";
                         debug!("regex:{}", &rex);
-                        let regex = Regex::new(&rex).unwrap();
-                        context.define_ex(mcro, (regex, value));
+                        context.define_ex(mcro, (rex, value));
                     }
                 }
             } else { 
