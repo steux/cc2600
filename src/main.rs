@@ -387,4 +387,23 @@ mod tests {
         print!("{:?}", result);
         assert!(result.contains("JMP .test\n\tRTS\n.test\n\tLDX #0"));
     }
+    
+    #[test]
+    fn assign_test() {
+        //env_logger::init();
+        let args = Args {
+            input: "string".to_string(),
+            output: "string".to_string(),
+            include_directories: Vec::new(),
+            defines: Vec::new(),
+            insert_code: false,
+            optimization_level: 1
+        };
+        let input = "char a, b, c, d, e, f, g; void main() { g = (a+b)+(c+(d&(e=f))); }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA a\n\tCLC\n\tADC b\n\tPHA\n\tLDA f\n\tSTA e\n\tLDA d\n\tAND e\n\tSTA cctmp\n\tLDA c\n\tCLC\n\tADC cctmp\n\tSTA cctmp\n\tPLA\n\tCLC\n\tADC cctmp\n\tSTA g"));
+    }
 }
