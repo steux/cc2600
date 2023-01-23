@@ -52,7 +52,7 @@ const unsigned char s1_PF1[24]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x0
 const unsigned char s1_PF2[24]={0x00,0x80,0xc0,0xe0,0x70,0x38,0x1c,0x0e,0x07,0x03,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
 char state;
-unsigned char i, j, k, l;
+unsigned char i, j, k;
 unsigned char scroll_sequence;
 unsigned char scroll_counter;
 unsigned char lPFx[12];
@@ -1147,11 +1147,14 @@ void bottom()
     }
 #endif
 
+    strobe(WSYNC);
+    strobe(HMOVE);
     *VBLANK = 2; // Enable VBLANK again
                  // Now we have 30 lines of VBLANK
-                 //strobe(HMCLR);
+    *TIM64T = (OVERSCAN * 76 + 13) / 64;
     init_bird_sprite_pos(); // 4 lines
-    for (X = OVERSCAN - 4; X != 0; X--) strobe(WSYNC);
+    while (*INTIM);
+    //for (X = OVERSCAN - 4; X != 0; X--) strobe(WSYNC);
 }
 
 void display_arrow()
@@ -1354,9 +1357,9 @@ void main()
         *COLUP0 = WHITE;
         *COLUP1 = WHITE;
         display_gameover();
-        i = (KERNAL - 40) / 16;
+        i = (KERNAL - 38) / 16;
         init_bird_sprite_pos(); // 4 lines
-        Y = KERNAL - 40;
+        Y = KERNAL - 38;
 #endif
     }
 
