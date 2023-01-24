@@ -6,8 +6,6 @@ use crate::error::Error;
 use crate::compile::*;
 use crate::assemble::{AssemblyCode, AsmMnemonic, AsmMnemonic::*, AsmInstruction};
 
-// TODO: add cctmp in use
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ExprType<'a> {
     Nothing,
@@ -40,6 +38,7 @@ pub struct GeneratorState<'a> {
     loops: Vec<(String,String)>,
     flags: FlagsState<'a>,
     acc_in_use: bool,
+    tmp_in_use: bool,
     insert_code: bool,
     deferred_plusplus: Vec<(ExprType<'a>, usize, bool)>,
     pub current_bank: u32,
@@ -61,6 +60,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
             loops: Vec::new(),
             flags: FlagsState::Unknown,
             acc_in_use: false,
+            tmp_in_use: false,
             insert_code,
             deferred_plusplus: Vec::new(),
             current_bank: 0,
@@ -421,9 +421,15 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         match left {
             ExprType::X => {
                 match right {
-                    ExprType::Immediate(_) | ExprType::Tmp(_) | ExprType::AbsoluteY(_) => {
+                    ExprType::Immediate(_) | ExprType::AbsoluteY(_) => {
                         self.asm(LDX, right, pos, high_byte)?;
                         self.flags = FlagsState::X; 
+                        Ok(ExprType::X) 
+                    },
+                    ExprType::Tmp(_) => {
+                        self.asm(LDX, right, pos, high_byte)?;
+                        self.flags = FlagsState::X; 
+                        self.tmp_in_use = false;
                         Ok(ExprType::X) 
                     },
                     ExprType::Absolute(_, eight_bits, _) => {
@@ -473,9 +479,15 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
             },
             ExprType::Y => {
                 match right {
-                    ExprType::Immediate(_) | ExprType::Tmp(_) | ExprType::AbsoluteX(_) => {
+                    ExprType::Immediate(_) | ExprType::AbsoluteX(_) => {
                         self.asm(LDY, right, pos, high_byte)?;
                         self.flags = FlagsState::Y; 
+                        Ok(ExprType::Y) 
+                    },
+                    ExprType::Tmp(_) => {
+                        self.asm(LDY, right, pos, high_byte)?;
+                        self.flags = FlagsState::Y; 
+                        self.tmp_in_use = false;
                         Ok(ExprType::Y) 
                     },
                     ExprType::Absolute(_, eight_bits, _) => {
@@ -676,6 +688,10 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                                 return Ok(ExprType::A(signed));
                             },
                             ExprType::Tmp(_) => {
+                                if self.tmp_in_use {
+                                    return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+                                }
+                                self.tmp_in_use = true;
                                 return Ok(ExprType::Tmp(signed));
                             },
                             _ => return Err(syntax_error(self.compiler_state, "Bad left value in assignement", pos)),
@@ -718,8 +734,12 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         let x;
         right2 = match right {
             ExprType::A(s) => {
+                if self.tmp_in_use {
+                    return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+                }
                 self.asm(STA, &ExprType::Tmp(*s), pos, false)?;
                 acc_in_use = false;
+                self.tmp_in_use = true;
                 x = ExprType::Tmp(*s);
                 &x
             },
@@ -749,9 +769,14 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                     }
                 };
             },
-            ExprType::Absolute(_, _, _) | ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) | ExprType::Tmp(_) => {
+            ExprType::Absolute(_, _, _) | ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) => {
                 if acc_in_use { self.sasm(PHA)?; }
                 self.asm(LDA, left, pos, high_byte)?;
+            },
+            ExprType::Tmp(_) => {
+                if acc_in_use { self.sasm(PHA)?; }
+                self.asm(LDA, left, pos, high_byte)?;
+                self.tmp_in_use = false;
             },
             ExprType::X => {
                 if acc_in_use { self.sasm(PHA)?; }
@@ -800,16 +825,23 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
             },
             ExprType::X => {
                 signed = false;
+                if self.tmp_in_use {
+                    return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+                }
                 self.asm(STX, &ExprType::Tmp(false), pos, high_byte)?;
                 self.asm(operation, &ExprType::Tmp(false), pos, high_byte)?;
             },
             ExprType::Y => {
                 signed = false;
+                if self.tmp_in_use {
+                    return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+                }
                 self.asm(STY, &ExprType::Tmp(false), pos, high_byte)?;
                 self.asm(operation, &ExprType::Tmp(false), pos, high_byte)?;
             },
             ExprType::Tmp(s) => {
                 self.asm(operation, right2, pos, high_byte)?;
+                self.tmp_in_use = false;
                 signed = *s;
             },
             _ => { return Err(Error::Unimplemented { feature: "arithmetics is partially implemented" }); },
@@ -818,6 +850,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         if acc_in_use {
             self.asm(STA, &ExprType::Tmp(false), pos, high_byte)?;
             self.sasm(PLA)?;
+            self.tmp_in_use = true;
             Ok(ExprType::Tmp(signed))
         } else {
             Ok(ExprType::A(signed))
@@ -869,6 +902,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
             ExprType::Tmp(s) => {
                 if acc_in_use { self.sasm(PHA)?; }
                 signed = *s;
+                self.tmp_in_use = false;
                 self.asm(LDA, left, pos, false)?;
             },
             _ => return Err(syntax_error(self.compiler_state, "Bad left value for shift operation", pos))
@@ -899,6 +933,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         if acc_in_use {
             self.asm(STA, &ExprType::Tmp(signed), pos, false)?;
             self.sasm(PLA)?;
+            self.tmp_in_use = true;
             Ok(ExprType::Tmp(signed))
         } else {
             Ok(ExprType::A(signed))
@@ -912,6 +947,9 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                 if *op == Operation::TernaryCond2 {
                     if self.acc_in_use {
                         self.sasm(PHA)?; 
+                        if self.tmp_in_use {
+                            return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+                        }
                         self.local_label_counter_if += 1;
                         let ifend_label = format!(".ifend{}", self.local_label_counter_if);
                         let else_label = format!(".else{}", self.local_label_counter_if);
@@ -925,11 +963,12 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                         let ra = self.generate_assign(&ExprType::A(false), &right, pos, false)?;
                         self.label(&ifend_label)?;
                         self.asm(STA, &ExprType::Tmp(false), pos, false)?;
+                        self.tmp_in_use = true;
                         self.sasm(PLA)?;
                         if la != ra {
                             return Err(syntax_error(self.compiler_state, "Different alternative types in ?: expression", pos))
                         }
-                        Ok(la)
+                        Ok(ExprType::Tmp(false))
                     } else {
                         self.local_label_counter_if += 1;
                         let ifend_label = format!(".ifend{}", self.local_label_counter_if);
@@ -1070,6 +1109,9 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
     {
         if self.acc_in_use {
             self.sasm(PHA)?; 
+            if self.tmp_in_use {
+                return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+            }
             self.local_label_counter_if += 1;
             let ifend_label = format!(".ifend{}", self.local_label_counter_if);
             let else_label = format!(".else{}", self.local_label_counter_if);
@@ -1080,6 +1122,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
             self.asm(LDA, &ExprType::Immediate(1), pos, false)?;
             self.label(&ifend_label)?;
             self.asm(STA, &ExprType::Tmp(false), pos, false)?;
+            self.tmp_in_use = true;
             self.sasm(PLA)?;
             Ok(ExprType::Tmp(false))
         } else {
@@ -1242,7 +1285,6 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                     "X" => Ok(ExprType::X),
                     "Y" => Ok(ExprType::Y),
                     variable => {
-                        //debug!("Identifier: {:?}", variable);
                         let v = self.compiler_state.get_variable(variable);
                         if let VariableDefinition::Value(val) = &v.def {
                             Ok(ExprType::Immediate(*val))
@@ -1444,6 +1486,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                 if self.acc_in_use { self.sasm(PHA)?; }
                 signed = *sign;
                 self.asm(LDA, left, pos, false)?;
+                self.tmp_in_use = false;
                 cmp = true;
             },
             ExprType::Y => {
@@ -1461,6 +1504,9 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                         cmp = false;
                     },
                     ExprType::A(s) => {
+                        if self.tmp_in_use {
+                            return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+                        }
                         self.asm(STA, &ExprType::Tmp(*s), pos, false)?;
                         self.asm(CPY, &ExprType::Tmp(*s), pos, false)?;
                         cmp = false;
@@ -1469,6 +1515,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                     ExprType::Tmp(_) => {
                         self.asm(CPY, right, pos, false)?;
                         cmp = false;
+                        self.tmp_in_use = false;
                     },
                     _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
                 } 
@@ -1488,6 +1535,9 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                         cmp = false;
                     },
                     ExprType::A(s) => {
+                        if self.tmp_in_use {
+                            return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+                        }
                         self.asm(STA, &ExprType::Tmp(*s), pos, false)?;
                         self.asm(CPX, &ExprType::Tmp(*s), pos, false)?;
                         cmp = false;
@@ -1496,6 +1546,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                     ExprType::Tmp(_) => {
                         self.asm(CPX, right, pos, false)?;
                         cmp = false;
+                        self.tmp_in_use = false;
                     },
                     _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
                 } 
@@ -1634,6 +1685,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                     if self.acc_in_use { self.sasm(PHA)?; }
                     self.asm(LDA, &expr, pos, false)?;
                     cmp = true;
+                    self.tmp_in_use = false;
                 },
                 _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
             }
@@ -1925,6 +1977,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         self.purge_deferred_plusplus()?;
 
         self.acc_in_use = false;
+        self.tmp_in_use = false;
 
         if let Some(label) = &code.label {
             self.label(&format!(".{}", label))?;

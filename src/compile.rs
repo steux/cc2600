@@ -223,13 +223,15 @@ fn parse_identifier<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Re
     }
     match state.variables.get(varname) {
         Some(_var) => {
-            // TODO: Check subscript is correct
             Ok((varname, subscript))
         },
         None => {
             match state.functions.get(varname) {
                 Some(_var) => {
-                    Ok((varname, subscript))
+                    match *subscript {
+                        Expr::Nothing => return Ok((varname, subscript)),
+                        _ => return Err(syntax_error(state, "No subscript for functions", px.as_span().start())),
+                    }
                 },
                 None => Err(syntax_error(state, &format!("Unknown identifier {}", varname), px.as_span().start()))
             }
