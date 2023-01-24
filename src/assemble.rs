@@ -411,38 +411,31 @@ impl AssemblyCode {
                         AsmMnemonic::BEQ | AsmMnemonic::BNE | AsmMnemonic::BMI |
                         AsmMnemonic::BPL | AsmMnemonic::BCS | AsmMnemonic::BCC => {
                             // Ok, let's try to find the label above and under and try to count the bytes
-                            let mut bytes_above = 2;
+                            let mut bytes_above = 0;
                             let mut bytes_below = 0;
-                            //let mut iter_above = i.clone().rev();
-                            //let mut iter_below = i.clone();
-                            let mut iter_below = self.code.iter();
-                            for _ in 0..position {
-                                iter_below.next();
-                            }
-                            let mut iter_above = self.code.iter().rev();
-                            for _ in 0..(self.code.len() - position) {
-                                iter_above.next();
-                            }
+                            let mut index_above = position;
+                            let mut index_below = position + 1;
+                            let mut reached_above = false;
                             let above;
                             let mut notfound = 0;
-                            iter_below.next();
                             loop {
-                                match iter_above.next() {
-                                    Some(AsmLine::Label(l)) => {
-                                        debug!("Iter above: {:?}", l);
-                                        if *l == inst.dasm_operand {
-                                            above = true;
-                                            break;
-                                        } 
-                                    },
-                                    Some(AsmLine::Instruction(k)) => {
-                                        debug!("Iter above: {:?}", k);
-                                        bytes_above += k.nb_bytes;
-                                    },
-                                    None => notfound |= 1,
-                                    _ => ()
+                                if !reached_above {
+                                    match &self.code[index_above] {
+                                        AsmLine::Label(l) => {
+                                            debug!("Iter above: {:?}", l);
+                                            if *l == inst.dasm_operand {
+                                                above = true;
+                                                break;
+                                            } 
+                                        },
+                                        AsmLine::Instruction(k) => {
+                                            debug!("Iter above: {:?}", k);
+                                            bytes_above += k.nb_bytes;
+                                        },
+                                        _ => ()
+                                    }
                                 }
-                                match iter_below.next() {
+                                match self.code.get(index_below) {
                                     Some(AsmLine::Label(l)) => {
                                         debug!("Iter below: {:?}", l);
                                         if *l == inst.dasm_operand {
@@ -457,6 +450,13 @@ impl AssemblyCode {
                                     None => notfound |= 2,
                                     _ => ()
                                 }
+                                if index_above == 0 {
+                                    reached_above = true;
+                                    notfound |= 1;
+                                } else {
+                                    index_above -= 1;
+                                }
+                                index_below += 1;
                                 if notfound == 3 { 
                                     error!("Label {} not found", inst.dasm_operand);
                                     unreachable!() 
@@ -464,6 +464,8 @@ impl AssemblyCode {
                             }
                             // Ok, now we have the distance in bytes
                             let distance = if above { bytes_above } else { bytes_below };
+                            //error!("distance = {:?}", distance);
+                            //if above {unreachable!();}
                             if distance > 127 {
                                 // OK. We have a problem here
                                 // This branch should be changed for a jump
