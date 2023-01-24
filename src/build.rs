@@ -10,6 +10,7 @@ use crate::Args;
 pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, args: &Args) -> Result<(), Error> 
 {
     let mut gstate = GeneratorState::new(compiler_state, writer, args.insert_code);
+    let mut superchip = false;
 
     gstate.write("\tPROCESSOR 6502\n\n")?;
     
@@ -35,12 +36,34 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
             };
             gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
         }
+        if !v.1.var_const && v.1.memory == VariableMemory::Superchip && v.1.def == VariableDefinition::None {
+            superchip = true;
+        }
+    }
+
+    if superchip {
+        gstate.write("\n\tSEG.U SUPERVARS\n\tORG $1000\n\tRORG $F000\n")?;
+        // Superchip variables
+        for v in compiler_state.sorted_variables().iter() {
+            if !v.1.var_const && v.1.memory == VariableMemory::Superchip && v.1.def == VariableDefinition::None {
+                let s = match v.1.var_type {
+                    VariableType::Char => 1,
+                    VariableType::Short => 2,
+                    VariableType::CharPtr => 2,
+                };
+                gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
+            }
+        }
     }
 
     // Try to figure out what is the bankswitching method
     let mut maxbank = 0;
     for f in compiler_state.sorted_functions().iter() {
          if f.1.bank > maxbank { maxbank = f.1.bank; }
+    }
+    // Minimum 8K for superchip
+    if superchip && maxbank == 0 {
+        maxbank = 1;
     }
     let bankswitching_address: u32;
     if maxbank > 0 {
@@ -107,11 +130,15 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         debug!("Generating code for bank #{}", bank);
         gstate.current_bank = bank;
         gstate.write(&format!("\n\tORG ${}000\n\tRORG $F000\n", bank))?;
-    
-        if maxbank > 0 && bank != 0 {
+   
+        if superchip {
+            gstate.write("\n\tDS 256, $FF\n")?;
+        }
+
+        if maxbank > 0 {
             // Generate trampoline code
             gstate.write("
-;----The following code is the same on all banks, except bank 0----
+;----The following code is the same on all banks----
 Start
 ; Ensure that bank 0 is selected
         LDX #$FF

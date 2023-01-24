@@ -4,6 +4,16 @@ using C language, including writing kernels, not to provide full C support for t
 (have a look at cc65 if this is what you are looking for). Any code written for cc2600 can be compiled with gcc, but not
 the other way round... 
 
+Note that this compiler is for writing "old school" code for ATARI 2600. It's not meant to be used for CDFJ (custom ARM
+code on the Melody/Harmony cart) development, where the 6507 code is reduced to the minimum. On the contrary, it was
+designed to write code the classical atari way, possibly with DPC or DPC+ accelerators or a superchip for more RAM.
+
+cc2600 should not be a starting point for writing ATARI 2600. You'll first have to learn writing games
+in assembler (I definitely recommand reading "Making Games For The Atari 2600", by Steven Hugg, see http://8bitworkshop.com/docs/book).
+On the other hand, if you're an experienced ASM code writer, you may gain a lot of time using cc2600 for your
+next game developement, since cc2600 will enable you to leverage the use of structural code writing.
+
+
 ## Main features
 
 - Produces DASM compatible code
@@ -25,3 +35,8 @@ the other way round...
 - 16-bits arithmetics is severly constrained
 - No 32-bits operations, no floating point.
 - Only basic bankswitching schemes are supported
+
+## TODO
+
+- DPC / DPC+ support
+- PlusROM support
