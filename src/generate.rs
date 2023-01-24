@@ -74,11 +74,17 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         self.asm(mnemonic, &ExprType::Nothing, 0, false)
     }
 
+    fn sasm_protected(&mut self, mnemonic: AsmMnemonic) -> Result<bool, Error>
+    {
+        self.asm(mnemonic, &ExprType::Nothing, 0, true)
+    }
+
     fn asm(&mut self, mnemonic: AsmMnemonic, operand: &ExprType<'b>, pos: usize, high_byte: bool) -> Result<bool, Error>
     {
         let dasm_operand: String;
         let signed;
         let nb_bytes;
+        let protected;
 
         let mut cycles = match mnemonic {
             PHA | PLA => 3,
@@ -217,13 +223,11 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                             }
                             nb_bytes = 2;
                             cycles = if mnemonic == STA {6} else {5};
-                            // TODO : Implement alternative using A
                             match mnemonic {
                                 STX | STY | LDX | LDY | CPX | CPY => return Err(syntax_error(self.compiler_state, "Can't use Y indirect addressing on X or Y operation", pos)),
                                 _ => () 
                             }
                         } else {
-                            // TODO : Implement alternative using A
                             return Err(syntax_error(self.compiler_state, "X-Indirect adressing mode not available with Y register", pos));
                         }
                     } else {
@@ -284,10 +288,12 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                 },
                 _ => unreachable!()
             }
+            protected = false;
         } else {
             dasm_operand = "".to_string();
             signed = false;
             nb_bytes = 1;
+            protected = high_byte; // high byte in that case is used as a placeholder
         }
         
         let mut s = mnemonic.to_string();
@@ -299,7 +305,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         if let Some(f) = &self.current_function {
             let code : &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
             let instruction = AsmInstruction {
-                mnemonic, dasm_operand, cycles, nb_bytes 
+                mnemonic, dasm_operand, cycles, nb_bytes, protected
             };
             code.append_asm(instruction);
         }
@@ -443,8 +449,6 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                         if self.acc_in_use { self.sasm(PHA)?; }
                         self.sasm(TYA)?;
                         self.sasm(TAX)?;
-                        //self.sasm(TYA)?;
-                        //self.sasm(TAX)?;
                         if self.acc_in_use { 
                             self.sasm(PLA)?;
                             self.flags = FlagsState::Unknown;
@@ -1850,8 +1854,8 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                 self.sasm(NOP)?
             },
             7 => {
-                self.sasm(PHA)?;
-                self.sasm(PLA)?
+                self.sasm_protected(PHA)?;
+                self.sasm_protected(PLA)?
             }
             8 => {
                 self.sasm(NOP)?;

@@ -14,8 +14,6 @@ use crate::build::build_cartridge;
 #[grammar = "cc2600.pest"]
 struct Cc2600Parser;
 
-//TODO: Implement inline functions
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum VariableType {
     Char,

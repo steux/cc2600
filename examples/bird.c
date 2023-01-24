@@ -385,7 +385,6 @@ void init_bird_sprite_pos()
     *NUSIZ1 = 0x00;
     if (state == 0) {
         csleep(7);
-        csleep(2);
         csleep(7);
     }
     strobe(RESP0);

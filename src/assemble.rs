@@ -29,7 +29,8 @@ pub struct AsmInstruction {
     pub mnemonic: AsmMnemonic,
     pub dasm_operand: String,
     pub cycles: u32,
-    pub nb_bytes: u32
+    pub nb_bytes: u32,
+    pub protected: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -198,7 +199,7 @@ impl AssemblyCode {
             if let Some(AsmLine::Instruction(i1)) = &first {
                 if let Some(AsmLine::Instruction(i2)) = &second {
                     // Remove PLA/PHA pairs
-                    if i1.mnemonic == AsmMnemonic::PLA && i2.mnemonic == AsmMnemonic::PHA {
+                    if i1.mnemonic == AsmMnemonic::PLA && i2.mnemonic == AsmMnemonic::PHA && !i1.protected && !i2.protected {
                         remove_both = true;
                     }
                     // Remove STA followed by LDA
