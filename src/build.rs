@@ -98,6 +98,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
             if args.optimization_level > 0 {
                 gstate.optimize_function(f.0);
             }
+            gstate.check_branches(f.0);
         }
      }
 

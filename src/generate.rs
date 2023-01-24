@@ -305,7 +305,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         if let Some(f) = &self.current_function {
             let code : &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
             let instruction = AsmInstruction {
-                mnemonic, dasm_operand, cycles, nb_bytes, protected
+                mnemonic, dasm_operand, cycles, nb_bytes, protected,
             };
             code.append_asm(instruction);
         }
@@ -357,6 +357,16 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         let nb = code.optimize();
         if nb > 0 {
             info!("#{} optimized out instructions in function {}", nb, f);
+        }
+        nb
+    }
+
+    pub fn check_branches(&mut self, f: &str) -> u32 
+    {
+        let code: &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
+        let nb = code.check_branches();
+        if nb > 0 {
+            info!("#{} too far relative branch fixes in function {}", nb, f);
         }
         nb
     }

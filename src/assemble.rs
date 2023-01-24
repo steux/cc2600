@@ -1,5 +1,6 @@
 use std::io::Write;
 use std::fmt::{self, Debug};
+use log::{debug, error};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AsmMnemonic {
@@ -389,5 +390,96 @@ impl AssemblyCode {
                 second = iter.next();
             }
         }
+    }
+    
+    pub fn check_branches(&mut self) -> u32 {
+        // Loop until there is no problematic branch instruction
+        let mut restart = true;
+        let mut nb_fixes = 0;
+        debug!("Code: {:?}", self);
+        while restart {
+            // Check each branch instruction one after each other
+            // Let's find the first one
+            let mut position = 0;
+            let mut i = self.code.iter();
+            let mut repair = false;
+            loop {
+                let j = i.next();
+                if j.is_none() { restart = false; break; }
+                if let Some(AsmLine::Instruction(inst)) = j {
+                    match inst.mnemonic {
+                        AsmMnemonic::BEQ | AsmMnemonic::BNE | AsmMnemonic::BMI |
+                        AsmMnemonic::BPL | AsmMnemonic::BCS | AsmMnemonic::BCC => {
+                            // Ok, let's try to find the label above and under and try to count the bytes
+                            let mut bytes_above = 2;
+                            let mut bytes_below = 0;
+                            //let mut iter_above = i.clone().rev();
+                            //let mut iter_below = i.clone();
+                            let mut iter_below = self.code.iter();
+                            for _ in 0..position {
+                                iter_below.next();
+                            }
+                            let mut iter_above = self.code.iter().rev();
+                            for _ in 0..(self.code.len() - position) {
+                                iter_above.next();
+                            }
+                            let above;
+                            let mut notfound = 0;
+                            iter_below.next();
+                            loop {
+                                match iter_above.next() {
+                                    Some(AsmLine::Label(l)) => {
+                                        debug!("Iter above: {:?}", l);
+                                        if *l == inst.dasm_operand {
+                                            above = true;
+                                            break;
+                                        } 
+                                    },
+                                    Some(AsmLine::Instruction(k)) => {
+                                        debug!("Iter above: {:?}", k);
+                                        bytes_above += k.nb_bytes;
+                                    },
+                                    None => notfound |= 1,
+                                    _ => ()
+                                }
+                                match iter_below.next() {
+                                    Some(AsmLine::Label(l)) => {
+                                        debug!("Iter below: {:?}", l);
+                                        if *l == inst.dasm_operand {
+                                            above = false;
+                                            break;
+                                        } 
+                                    },
+                                    Some(AsmLine::Instruction(k)) => {
+                                        debug!("Iter below: {:?}", k);
+                                        bytes_below += k.nb_bytes;
+                                    },
+                                    None => notfound |= 2,
+                                    _ => ()
+                                }
+                                if notfound == 3 { 
+                                    error!("Label {} not found", inst.dasm_operand);
+                                    unreachable!() 
+                                };
+                            }
+                            // Ok, now we have the distance in bytes
+                            let distance = if above { bytes_above } else { bytes_below };
+                            if distance > 127 {
+                                // OK. We have a problem here
+                                // This branch should be changed for a jump
+                                repair = true;
+                                break;
+                            }
+                        },
+                        _ => ()
+                    }
+                }
+                position += 1;
+            }
+            if repair {
+                nb_fixes += 1;
+            }
+        }
+        nb_fixes
     }
 }
