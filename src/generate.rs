@@ -1300,11 +1300,10 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
             },
             Operation::Gt => {
                 let label_here = format!(".ifhere{}", self.local_label_counter_if);
+                self.asm(BEQ, &ExprType::Label(&label_here), 0, false)?;
                 if signed {
-                    self.asm(BEQ, &ExprType::Label(&label_here), 0, false)?;
                     self.asm(BPL, &ExprType::Label(&label), 0, false)?;
                 } else {
-                    self.asm(BEQ, &ExprType::Label(&label_here), 0, false)?;
                     self.asm(BCS, &ExprType::Label(&label), 0, false)?;
                 }
                 self.label(&label_here)?;

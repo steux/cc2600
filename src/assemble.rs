@@ -1,6 +1,7 @@
 use std::io::Write;
 use std::fmt::{self, Debug};
 use log::{debug, error};
+use crate::compile::Operation;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AsmMnemonic {
@@ -480,6 +481,94 @@ impl AssemblyCode {
             }
             if repair {
                 nb_fixes += 1;
+                // Identifies branch operation
+                let signed;
+                let mut remove = 1;
+                let label;
+                let operation = if let AsmLine::Instruction(inst) = &self.code[position] {
+                    signed = (inst.mnemonic == AsmMnemonic::BPL) || (inst.mnemonic == AsmMnemonic::BMI);
+                    label = inst.dasm_operand.clone();
+                    match inst.mnemonic {
+                        AsmMnemonic::BNE => Operation::Neq,
+                        AsmMnemonic::BEQ => Operation::Eq,
+                        AsmMnemonic::BMI => if let Some(AsmLine::Instruction(inst2)) = self.code.get(position + 1) {
+                                if inst2.mnemonic == AsmMnemonic::BEQ && inst2.dasm_operand == inst.dasm_operand { remove = 2; Operation::Lte } else { Operation::Lt }
+                            } else { Operation::Lt },
+                        AsmMnemonic::BCC => if let Some(AsmLine::Instruction(inst2)) = self.code.get(position + 1) {
+                                if inst2.mnemonic == AsmMnemonic::BEQ && inst2.dasm_operand == inst.dasm_operand { remove = 2; Operation::Lte } else { Operation::Lt }
+                            } else { Operation::Lt },
+                        AsmMnemonic::BPL => Operation::Gte,
+                        AsmMnemonic::BCS => Operation::Gte,
+                        _ => unreachable!()
+                    }
+                } else {
+                    unreachable!();
+                };
+                // Negate the operation
+                let operation2 = match operation {
+                    Operation::Eq => Operation::Neq,
+                    Operation::Neq => Operation::Eq,
+                    Operation::Gt => Operation::Lte,
+                    Operation::Gte => Operation::Lt,
+                    Operation::Lt => Operation::Gte,
+                    Operation::Lte => Operation::Gt,
+                    _ => unreachable!()
+                };
+                let mut tail = self.code.split_off(position + remove);
+                self.code.truncate(position);
+                let label2 = format!(".fix{}", nb_fixes);
+                match operation2 {
+                    Operation::Eq => self.code.push(AsmLine::Instruction(AsmInstruction {
+                        mnemonic: AsmMnemonic::BEQ, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                    })),
+                    Operation::Neq => self.code.push(AsmLine::Instruction(AsmInstruction {
+                        mnemonic: AsmMnemonic::BNE, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                    })),
+                    Operation::Gt => {
+                        let label3 = format!(".fixup{}", nb_fixes);
+                        self.code.push(AsmLine::Instruction(AsmInstruction {
+                            mnemonic: AsmMnemonic::BEQ, dasm_operand: label3.clone(), cycles: 2, nb_bytes: 2, protected: false
+                        }));       
+                        if signed {
+                            self.code.push(AsmLine::Instruction(AsmInstruction {
+                                mnemonic: AsmMnemonic::BPL, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                            }));       
+                        } else {
+                            self.code.push(AsmLine::Instruction(AsmInstruction {
+                                mnemonic: AsmMnemonic::BCS, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                            }));       
+                        }
+                        self.code.push(AsmLine::Label(label3));
+                    },
+                    Operation::Gte => {
+                        if signed {
+                            self.code.push(AsmLine::Instruction(AsmInstruction {
+                                mnemonic: AsmMnemonic::BPL, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                            }));       
+                        } else {
+                            self.code.push(AsmLine::Instruction(AsmInstruction {
+                                mnemonic: AsmMnemonic::BCS, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                            }));       
+                        }
+                    },
+                    Operation::Lt => {
+                        if signed {
+                            self.code.push(AsmLine::Instruction(AsmInstruction {
+                                mnemonic: AsmMnemonic::BMI, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                            }));       
+                        } else {
+                            self.code.push(AsmLine::Instruction(AsmInstruction {
+                                mnemonic: AsmMnemonic::BCC, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                            }));       
+                        }
+                    },
+                    _ => unreachable!()
+                }
+                self.code.push(AsmLine::Instruction(AsmInstruction {
+                    mnemonic: AsmMnemonic::JMP, dasm_operand: label, cycles: 3, nb_bytes: 3, protected: false
+                }));
+                self.code.push(AsmLine::Label(label2));
+                self.code.append(&mut tail);
             }
         }
         nb_fixes
