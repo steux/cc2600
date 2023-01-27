@@ -34,8 +34,9 @@ aligned = { "aligned" ~ "(" ~ int ~ ")" }
 var_sign = { ("signed" | "unsigned")? } 
 var_simple_type = { "char" | "short" }
 id_name = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
-id_name_ex = { pointer? ~ var_const? ~ id_name ~ ("[" ~ int ~ "]")? ~ ("=" ~ var_def)? }
-var_def = { int | array_def }
+id_name_ex = { pointer? ~ var_const? ~ id_name ~ array_spec? ~ ("=" ~ var_def)? }
+array_spec = { "[" ~ int? ~ "]" }
+var_def = { int | array_def | quoted_string }
 array_def = { "{" ~ (int ~ ",")* ~ int ~ "}" }
 pointer = { "*" }
 

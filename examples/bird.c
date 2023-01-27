@@ -4,6 +4,10 @@
 #include "vcs.h"
 unsigned char X, Y;
 
+#ifdef PLUSROM
+const char *PLUSROM_API = "a\0h.firmaplus.de";
+#endif
+
 #ifdef PAL
 const unsigned char RED = 0x64;
 const unsigned char BLUE = 0xB2;
@@ -286,7 +290,7 @@ const bank1 unsigned char getready5[16] = { 0x70, 0x78, 0x18, 0x1b, 0x3b, 0x78, 
 #define grass_style2 grass_style2_bank2
 #define grass_style3 grass_style3_bank2
 #undef WAIT2
-#define WAIT2 i = right_shift4[Y]; Y--; 
+#define WAIT2 Y--; i = right_shift4[Y];
 
 #define kernel kernel12
 #define LEFT_PLAYFIELD *PF1 = lPFx[X]; *PF2 = lPFy[X]

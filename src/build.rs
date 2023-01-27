@@ -260,7 +260,18 @@ Call{}
         }
 
         let starting_code = if maxbank > 0 && bank != 0 { "Start" } else { "Powerup" };
-        gstate.write(&format!("
+
+        if bank == maxbank && compiler_state.variables.get("PLUSROM_API").is_some() {
+            gstate.write(&format!("
+        ORG ${}FFA
+        RORG $FFFA
+
+        .word PLUSROM_API - $E000\t; NMI
+        .word PLUSROM_API - $E000\t; RESET
+        .word {}\t; IRQ
+        \n", bank, starting_code))?;
+        } else {
+            gstate.write(&format!("
         ORG ${}FFA
         RORG $FFFA
 
@@ -268,7 +279,7 @@ Call{}
         .word {}\t; RESET
         .word {}\t; IRQ
         \n", bank, starting_code, starting_code, starting_code))?;
-
+        }
     }
  
     gstate.write("\tEND\n")?;

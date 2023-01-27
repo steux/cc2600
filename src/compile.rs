@@ -145,7 +145,7 @@ pub struct Function<'a> {
 }
 
 pub struct CompilerState<'a> {
-    variables: HashMap<String, Variable>,
+    pub variables: HashMap<String, Variable>,
     pub functions: HashMap<String, Function<'a>>,
     pratt: PrattParser<Rule>,
     mapped_lines: &'a Vec::<(std::rc::Rc::<String>,u32,Option<(std::rc::Rc::<String>,u32)>)>,
@@ -337,7 +337,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
             },
             Rule::id_name_ex => {
                 let mut name = "";
-                let mut size:usize = 1;
+                let mut size = None;
                 let mut def = VariableDefinition::None;
                 for p in pair.into_inner() {
                     match p.as_rule() {
@@ -350,7 +350,18 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                                 return Err(syntax_error(state, &format!("Variable {} already defined", &name), start));
                             }
                         },
-                        Rule::int => size = p.as_str().parse::<usize>().unwrap(),
+                        Rule::array_spec => {
+                            let start = p.as_span().start();
+                            match p.into_inner().next() {
+                                Some(px) => size = Some(px.as_str().parse::<usize>().unwrap()),
+                                _ => ()
+                            }
+                            if var_type == VariableType::Char {
+                                var_type = VariableType::CharPtr;
+                            } else {
+                                return Err(syntax_error(state, "Array of short integers are not available", start));
+                            }
+                        },
                         Rule::var_def => {
                             let px = p.into_inner().next().unwrap();
                             match px.as_rule() {
@@ -360,23 +371,51 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                                     if let VariableMemory::ROM(_) = memory {} else {
                                         memory = VariableMemory::ROM(0);
                                     }
-                                    if var_type == VariableType::Char {
-                                        var_type = VariableType::CharPtr;
-                                    } else {
-                                        return Err(syntax_error(state, "Array of short integers are not available", start));
+                                    if var_type != VariableType::CharPtr {
+                                        return Err(syntax_error(state, "Array definition provided for something not an array", start));
                                     }
                                     let mut v = Vec::new();
                                     for pxx in px.into_inner() {
                                         v.push(parse_int(pxx.into_inner().next().unwrap()));
                                     }
-                                    if size != v.len() {
-                                        return Err(syntax_error(state, "Specified array size is different from actual definition", start));
+                                    if let Some(s) = size {
+                                        if s != v.len() {
+                                            return Err(syntax_error(state, "Specified array size is different from actual definition", start));
+                                        }
                                     }
+                                    size = Some(v.len());
+                                    def = VariableDefinition::Array(v);
+                                    var_const = true;
+                                },
+                                Rule::quoted_string => {
+                                    let s = px.into_inner().next().unwrap().as_str();
+                                    let mut i = s.chars();
+                                    let mut v = Vec::new();
+                                    loop {
+                                        match i.next() {
+                                            Some(c) => if c == '\\' {
+                                                match i.next() {
+                                                    Some('0') => v.push(0),
+                                                    Some('n') => v.push(10),
+                                                    Some('r') => v.push(13),
+                                                    _ => (),
+                                                }
+                                            } else {
+                                                let mut b = [0;4];
+                                                let s = c.encode_utf8(&mut b);
+                                                for byte in s.as_bytes() {
+                                                    v.push(*byte as i32);
+                                                }
+                                            },
+                                            _ => break,
+                                        }
+                                    };
+                                    v.push(0);
+                                    size = Some(v.len());
                                     def = VariableDefinition::Array(v);
                                     var_const = true;
                                 },
                                 _ => unreachable!()
-
                             } 
                         },
                         _ => unreachable!()
@@ -391,7 +430,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                         var_const,
                         alignment,
                         def,
-                        var_type, size});
+                        var_type, size: size.unwrap_or(1)});
                 }
             },
             _ => {
