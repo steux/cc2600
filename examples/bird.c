@@ -620,6 +620,7 @@ void getready()
     score_high = 00;
     load_scroll_sequence();
     blinking_if_high_score = BROWN;
+    blinking_counter = 0;
     rainbow_offset = 0;
     rainbow_sequence = 0;
 }
@@ -630,6 +631,7 @@ void gameover()
     button_pressed = 1;
     state = 3;
     yspeed = 0;
+    blinking_counter = 0;
 #ifdef PAL 
     if (ybird >> 8 > KERNAL - 30) {
        ybird = (KERNAL - 60) * 256;
@@ -920,6 +922,13 @@ const bank2 unsigned char pro3[7] = { 0xa9, 0xaa, 0xaa, 0xaa, 0xf1, 0x00, 0x00 }
 const bank2 unsigned char pro4[7] = { 0x19, 0xaa, 0xab, 0xaa, 0x19, 0x08, 0x08 };
 const bank2 unsigned char pro5[7] = { 0x80, 0x00, 0x80, 0x80, 0x00, 0x00, 0x00 };
 
+const bank2 unsigned char pause0[7] = { 0x01, 0x00, 0x07, 0x00, 0x1f, 0x00, 0x00 };
+const bank2 unsigned char pause1[7] = { 0xfa, 0x02, 0xfb, 0x02, 0xfa, 0x02, 0x03 };
+const bank2 unsigned char pause2[7] = { 0x0c, 0x15, 0x8d, 0x45, 0x59, 0x40, 0x80 };
+const bank2 unsigned char pause3[7] = { 0xd8, 0x45, 0x49, 0x51, 0x4c, 0x00, 0x00 };
+const bank2 unsigned char pause4[7] = { 0xdf, 0x00, 0xdf, 0x40, 0x9f, 0x00, 0x00 };
+const bank2 unsigned char pause5[7] = { 0x80, 0x00, 0xe0, 0x00, 0xf8, 0x00, 0x00 };
+
 bank2 void display_mode()
 {
     strobe(WSYNC);
@@ -937,10 +946,30 @@ bank2 void display_mode()
     strobe(WSYNC);
     strobe(HMOVE);
     csleep(7);
+    Y = 6;
     *HMP1 = 0x0;
     *HMP0 = 0x0;
-    if (game_mode == 0) {
-        for (Y = 6; Y >= 0; Y--) {
+    if (state == 4) {
+        do {
+            strobe(WSYNC);
+            strobe(HMOVE);
+            i = Y;
+            *GRP0 = pause0[Y];
+            *GRP1 = pause1[Y];
+            *GRP0 = pause2[Y];
+            X = pause4[Y];
+            j = pause5[Y];
+            load(pause3[Y]);
+            Y = j;
+            store(*GRP1);
+            *GRP0 = X;
+            *GRP1 = Y;
+            strobe(GRP0);
+            Y = i;
+            Y--;
+        } while (Y >= 0);
+    } else if (game_mode == 0) {
+        do {
             strobe(WSYNC);
             strobe(HMOVE);
             i = Y;
@@ -956,9 +985,10 @@ bank2 void display_mode()
             *GRP1 = Y;
             strobe(GRP0);
             Y = i;
-        }
+            Y--;
+        } while (Y >= 0);
     } else {
-        for (Y = 6; Y >= 0; Y--) {
+        do {
             strobe(WSYNC);
             strobe(HMOVE);
             i = Y;
@@ -974,7 +1004,8 @@ bank2 void display_mode()
             *GRP1 = Y;
             strobe(GRP0);
             Y = i;
-        }
+            Y--;
+        } while (Y >= 0);
     }
     strobe(WSYNC);
     strobe(HMOVE);
@@ -1319,13 +1350,21 @@ void main()
         }
     }
    
-    if (state == 0 || state == 1) {
+    if (state == 0 || state == 1 || state == 3) {
         if (*SWCHB & 0x40) {
             game_mode = 1;
             difficulty = 4;
         } else {
             game_mode = 0;
             difficulty = 8;
+        }
+        // Select to reset high score
+        if (!(*SWCHB & 0x02)) {
+            blinking_counter++;
+            if (blinking_counter == 250) {
+                highscore_low = 0;
+                highscore_high = 0;
+            }
         }
     }
 
@@ -1355,6 +1394,7 @@ void main()
     } else if (state == 2) {
         *COLUBK = DBLUE;
         game_logic();
+        if (!(*SWCHB & 0x08)) state = 4;
     } else if (state == 3) {
         *COLUBK = BLACK;
         *COLUP0 = WHITE;
@@ -1366,6 +1406,10 @@ void main()
                 getready();
             }
         } else button_pressed = 0;
+    } else if (state == 4) {
+        if (bird_type == 0) bird_type = 1;
+        else bird_type = 0;
+        if (*SWCHB & 0x08) state = 2;
     }
 
     if (blinking_if_high_score != BROWN) {
@@ -1393,6 +1437,10 @@ void main()
     *PF1 = 0;
     *PF2 = 0;
     *CXCLR = 0;
+    strobe(WSYNC);
+    strobe(HMOVE);
+    *HMM0 = 0;
+    *HMM1 = 0;
     if (!(*SWCHB & 0x01)) init(); 
         
     set_rainbow_and_grass();
@@ -1403,8 +1451,6 @@ void main()
     strobe(HMOVE);
     *VBLANK = 0;
     *COLUPF = blinking_if_high_score;
-    *HMM0 = 0x00;
-    strobe(HMM1);
 
     if (state == 2) {
 #ifdef PAL
@@ -1452,6 +1498,20 @@ void main()
         i = (KERNAL - 33) / 16;
         init_bird_sprite_pos(); // 4 lines
         Y = KERNAL - 33;
+    } else if (state == 4) {
+        strobe(WSYNC);
+        strobe(HMOVE);
+        if (ybird >> 8 < 170) {
+            *COLUP0 = WHITE;
+            *COLUP1 = WHITE;
+            display_mode();
+            i = (KERNAL - 14) / 16;
+            init_bird_sprite_pos(); // 4 lines
+            Y = KERNAL - 14;
+        } else {
+            Y = KERNAL;
+            i = (KERNAL - 1) / 16;
+        }
     } else {
 #ifdef PAL
         i = 0;
