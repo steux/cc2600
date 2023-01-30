@@ -133,10 +133,10 @@ void play_sound_iteration()
 
 // Savekey code
 
-#include "i2c_v2.2.inc"
+#include "i2c.inc"
 
 === ASSEMBLER BEGIN ===
-    I2C_SUBS
+    I2C_SUBS i
 ==== ASSEMBLER END ====
 
 void save_highscore()
@@ -164,6 +164,7 @@ void load_highscore()
     load(0x40);
     asm("jsr i2c_txbyte");
     asm("jsr i2c_stopwrite");
+    asm("jsr i2c_startread");
     asm("jsr i2c_rxbyte");
     store(highscore_high);
     asm("jsr i2c_rxbyte");

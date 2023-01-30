@@ -73,7 +73,6 @@ unsigned char * const INPT5       = 0x3D; // x000 0000       Read Input (Trigger
 // RIOT MEMORY MAP
 
 unsigned char * const SWCHA       = 0x280; //   Port A data register for joysticks:
-																					 //		Bits 4-7 for player 1.  Bits 0-3 for player 2.
 
 unsigned char * const SWACNT      = 0x281; //   Port A data direction register (DDR)
 unsigned char * const SWCHB       = 0x282; //		Port B data (console switches)
