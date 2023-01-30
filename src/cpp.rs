@@ -52,27 +52,32 @@ pub struct Context {
     includes_stack: Vec<(String, u32)>,
     pub include_directories: Vec<String>,
     defs: BTreeMap<String, String>,
-    regex_set: RegexSet,
-    defs_ex: Vec::<String>, // Used for undefeine
-    defs_ex_ex: Vec::<String>, // Used to contrust regex_set
-    regexes: Vec::<(Regex, String)>,
+    regex_sets: Vec<RegexSet>,
+    defs_ex: Vec::<Vec::<String>>, // Used for undefine to find the vector
+    defs_ex_ex: Vec::<Vec::<String>>, // Used to contrust regex_set
+    regexes: Vec::<Vec::<(Regex, String)>>,
     define_regex: Regex,
 }
 
 impl Context {
     /// Creates a new, empty context with no macros defined.
     pub fn new(current_filename: &str) -> Self {
-        Context {
+        let mut c = Context {
             current_filename: String::from(current_filename),
             includes_stack: Vec::<(String, u32)>::new(),
             include_directories: Vec::<String>::new(),
             defs: BTreeMap::new(),
-            regex_set: RegexSet::empty(),
-            defs_ex: Vec::new(),
-            defs_ex_ex: Vec::new(),
-            regexes: Vec::<(Regex, String)>::new(),
+            regex_sets: Vec::new(),
+            defs_ex: Vec::new(), // Contains the simple string 
+            defs_ex_ex: Vec::new(), // Contains the string regexps that will be fed into regex_set
+            regexes: Vec::new(),
             define_regex: Regex::new(r"([a-zA-Z_][a-zA-Z0-9_]*)(?:\(((?:(?:[a-zA-Z_][a-zA-Z0-9_]*)\s*,\s*)*(?:(?:[a-zA-Z_][a-zA-Z0-9_]*)))\))?\s*(.*)").unwrap()
-        }
+        };
+        c.regex_sets.push(RegexSet::empty());
+        c.defs_ex.push(Vec::new());
+        c.defs_ex_ex.push(Vec::new());
+        c.regexes.push(Vec::new());
+        c
     }
     /// Defines a macro within a context. As this function returns &mut Self, it can be chained
     /// like in the example.
@@ -88,10 +93,17 @@ impl Context {
         let rstring = format!("\\b{}\\b", &n);
         let regex = Regex::new(&rstring).unwrap();
         self.defs.insert(n.clone(), v.clone());
-        self.defs_ex.push(n);
-        self.defs_ex_ex.push(rstring);
-        self.regexes.push((regex, v));
-        self.regex_set = RegexSet::new(&self.defs_ex_ex).unwrap();
+        self.defs_ex.last_mut().unwrap().push(n);
+        self.defs_ex_ex.last_mut().unwrap().push(rstring);
+        self.regexes.last_mut().unwrap().push((regex, v));
+        *self.regex_sets.last_mut().unwrap() = RegexSet::new(self.defs_ex_ex.last().unwrap()).unwrap();
+        if self.defs_ex.last().unwrap().len() >= 100 {
+            // Create a new regex_set
+            self.regex_sets.push(RegexSet::empty());
+            self.defs_ex.push(Vec::new());
+            self.defs_ex_ex.push(Vec::new());
+            self.regexes.push(Vec::new());
+        }
         self
     }
     /// ```
@@ -99,10 +111,17 @@ impl Context {
         let n = name.into();
         let regex = Regex::new(&value.0).unwrap();
         self.defs.insert(n.clone(), value.0.clone());
-        self.defs_ex.push(n);
-        self.defs_ex_ex.push(value.0);
-        self.regexes.push((regex, value.1));
-        self.regex_set = RegexSet::new(&self.defs_ex_ex).unwrap();
+        self.defs_ex.last_mut().unwrap().push(n);
+        self.defs_ex_ex.last_mut().unwrap().push(value.0);
+        self.regexes.last_mut().unwrap().push((regex, value.1));
+        *self.regex_sets.last_mut().unwrap() = RegexSet::new(self.defs_ex_ex.last().unwrap()).unwrap();
+        if self.defs_ex.last().unwrap().len() >= 100 {
+            // Create a new regex_set
+            self.regex_sets.push(RegexSet::empty());
+            self.defs_ex.push(Vec::new());
+            self.defs_ex_ex.push(Vec::new());
+            self.regexes.push(Vec::new());
+        }
         self
     }
     /// 
@@ -110,14 +129,24 @@ impl Context {
         let n = name.into();
         self.defs.remove(&n);
         let mut i = 0;
-        for j in self.defs_ex.iter() {
-            if j.eq(&n) { break; }
-            i += 1;
+        let mut k = 0;
+        for defs_ex in &self.defs_ex {
+            let mut found = false;
+            i = 0;
+            for j in defs_ex.iter() {
+                if j.eq(&n) { 
+                    found = true;
+                    break; 
+                }
+                i += 1;
+            }
+            if found { break; }
+            k += 1;
         }
-        self.defs_ex.remove(i);
-        self.defs_ex_ex.remove(i);
-        self.regexes.remove(i);
-        self.regex_set = RegexSet::new(&self.defs_ex_ex).unwrap();
+        self.defs_ex[k].remove(i);
+        self.defs_ex_ex[k].remove(i);
+        self.regexes[k].remove(i);
+        self.regex_sets[k] = RegexSet::new(&self.defs_ex_ex[k]).unwrap();
         self
     }
     /// Gets a macro that may or may not be defined from a context.
@@ -127,11 +156,15 @@ impl Context {
 
     pub fn replace_all(&self, s: &str) -> String {
         let mut res = String::from(s);
-        for idx in self.regex_set.matches(s).into_iter() {
-            let x = self.regexes[idx].0.replace_all(&res, &self.regexes[idx].1);
-            if let Cow::Owned(z) = x {
-                res = z.to_string();
+        let mut i = 0;
+        for set in &self.regex_sets {
+            for idx in set.matches(s).into_iter() {
+                let x = self.regexes[i][idx].0.replace_all(&res, &self.regexes[i][idx].1);
+                if let Cow::Owned(z) = x {
+                    res = z.to_string();
+                }
             }
+            i += 1;
         }
         res
     }
