@@ -27,6 +27,7 @@ pub enum VariableMemory {
     Zeropage,
     Superchip,
     Display,
+    Frequency,
 }
 
 #[derive(Debug, PartialEq)]
@@ -325,6 +326,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                         Rule::bank => memory = VariableMemory::ROM(u32::from_str_radix(p.into_inner().next().unwrap().as_str(), 10).unwrap()),
                         Rule::superchip => memory = VariableMemory::Superchip,
                         Rule::display => memory = VariableMemory::Display,
+                        Rule::frequency => memory = VariableMemory::Frequency,
                         Rule::var_sign => if p.as_str().eq("unsigned") {
                             signed = false;
                         },

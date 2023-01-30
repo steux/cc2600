@@ -79,33 +79,50 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
             maxbank = 1;
         }
     }
+    
+    if compiler_state.context.get_macro("__DPCPLUS__").is_some() {
+        bankswitching_scheme = "DPC+";
+        if maxbank > 5 {
+            return Err(Error::Configuration { error: "DPC+ framework only works with 32KB ROM".to_string() });
+        } else {
+            maxbank = 5;
+        }
+    }
 
     let bankswitching_address: u32;
+    if bankswitching_scheme == "DPC+" {
+        bankswitching_address = 0x1FF6;
+    } else {
+        if maxbank > 0 {
+            bankswitching_address = match maxbank {
+                1 => {
+                    if bankswitching_scheme == "Unknown" {
+                        bankswitching_scheme = if superchip {"F8S"} else {"F8"};
+                    }
+                    0x1FF8
+                },
+                2 | 3 => {
+                    if bankswitching_scheme == "Unknown" {
+                        bankswitching_scheme = if superchip {"F6S"} else {"F6"};
+                    }
+                    maxbank = 3;
+                    0x1FF6
+                },
+                4 | 5 | 6 | 7 => {
+                    if bankswitching_scheme == "Unknown" {
+                        bankswitching_scheme = if superchip {"F4S"} else {"F4"};
+                    }
+                    maxbank = 7;
+                    0x1FF4
+                },
+                _ => { return Err(Error::Unimplemented { feature: "Bankswitching scheme not implemented" }); },
+            };
+        } else {
+            bankswitching_address = 0;
+        }
+    }
     if maxbank > 0 {
-        bankswitching_address = match maxbank {
-            1 => {
-                if bankswitching_scheme == "Unknown" {
-                    bankswitching_scheme = if superchip {"F8S"} else {"F8"};
-                }
-                0x1FF8
-            },
-            2 | 3 => {
-                if bankswitching_scheme == "Unknown" {
-                    bankswitching_scheme = if superchip {"F6S"} else {"F6"};
-                }
-                maxbank = 3;
-                0x1FF6
-            },
-            4 | 5 | 6 | 7 => {
-                if bankswitching_scheme == "Unknown" {
-                    bankswitching_scheme = if superchip {"F4S"} else {"F4"};
-                }
-                maxbank = 7;
-                0x1FF4
-            },
-            _ => { return Err(Error::Unimplemented { feature: "Bankswitching scheme not implemented" }); },
-        };
-        gstate.write(&format!("
+            gstate.write(&format!("
 ; Macro that implements Bank Switching trampoline
 ; X = bank number
 ; A = hi byte of destination PC
@@ -118,8 +135,6 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         rts     ; return to target
         ENDM
         ", bankswitching_address))?;
-    } else {
-        bankswitching_address = 0;
     }
     
     // Generate functions code
@@ -157,7 +172,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
    
         if superchip {
             gstate.write("\n\tDS 256, $FF\n")?;
-        } else if bankswitching_scheme == "DPC" {
+        } else if bankswitching_scheme == "DPC" || bankswitching_scheme == "DPC+" {
             gstate.write("\n\tDS 128, $00\n")?;
         }
 
@@ -353,6 +368,80 @@ Call{}
             "))?;
     }
  
+    if bankswitching_scheme == "DPC+" {
+        gstate.write(&format!("
+            SEG DISPLAY
+            ORG $6000
+            RORG $0000
+            "))?;
+        
+        // Generate display tables
+        gstate.write("\n; Display in ROM\n")?;
+        for v in compiler_state.sorted_variables().iter() {
+            if let VariableMemory::Display = v.1.memory {
+                match &v.1.def {
+                    VariableDefinition::Array(arr) => {
+                        if v.1.alignment != 1 {
+                            gstate.write(&format!("\n\talign {}\n", v.1.alignment))?;
+                        }
+                        gstate.write(v.0)?;
+                        let mut counter = 0;
+                        for i in arr {
+                            if counter == 0 || counter == 16 {
+                                gstate.write("\n\thex ")?;
+                            }
+                            counter += 1;
+                            if counter == 16 { counter = 0; }
+                            gstate.write(&format!("{:02x}", i))?;
+                        } 
+                        gstate.write("\n")?;
+                    },
+                    _ => ()
+                };
+            }
+        }
+        gstate.write(&format!("
+            ECHO ([$1000-.]d), \"bytes free in DPC+ display memory\"
+            "))?;
+        
+        gstate.write(&format!("
+            SEG FREQUENCIES
+            ORG $7000
+            RORG $0000
+            "))?;
+        
+        // Generate display tables
+        gstate.write("\n; Frequencies in ROM\n")?;
+        for v in compiler_state.sorted_variables().iter() {
+            if let VariableMemory::Frequency = v.1.memory {
+                match &v.1.def {
+                    VariableDefinition::Array(arr) => {
+                        if v.1.alignment != 1 {
+                            gstate.write(&format!("\n\talign {}\n", v.1.alignment))?;
+                        }
+                        gstate.write(v.0)?;
+                        let mut counter = 0;
+                        for i in arr {
+                            if counter == 0 || counter == 16 {
+                                gstate.write("\n\thex ")?;
+                            }
+                            counter += 1;
+                            if counter == 16 { counter = 0; }
+                            gstate.write(&format!("{:02x}", i))?;
+                        } 
+                        gstate.write("\n")?;
+                    },
+                    _ => ()
+                };
+            }
+        }
+        gstate.write(&format!("
+            ECHO ([$400-.]d), \"bytes free in DPC+ frequency memory\"
+
+            ORG $73FF
+            DS 1, 0x81
+            "))?;
+    }
     gstate.write("\tEND\n")?;
     
     if args.verbose {
