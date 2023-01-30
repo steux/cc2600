@@ -46,7 +46,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
     }
 
     if superchip {
-        gstate.write("\n\tSEG.U SUPERVARS\n\tORG $1000\n\tRORG $F000\n")?;
+        gstate.write("\n\tSEG.U SUPERVARS\n\tORG $1000\n\tRORG $1000\n")?;
         // Superchip variables
         for v in compiler_state.sorted_variables().iter() {
             if !v.1.var_const && v.1.memory == VariableMemory::Superchip && v.1.def == VariableDefinition::None {
@@ -133,7 +133,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         // Prelude code for each bank
         debug!("Generating code for bank #{}", bank);
         gstate.current_bank = bank;
-        gstate.write(&format!("\n\tORG ${}000\n\tRORG $F000\n", bank))?;
+        gstate.write(&format!("\n\tORG ${}000\n\tRORG $1000\n", bank))?;
    
         if superchip {
             gstate.write("\n\tDS 256, $FF\n")?;
@@ -222,7 +222,7 @@ Powerup
         // Epilogue code
         gstate.write(&format!("
         ECHO ([${:04x}-.]d), \"bytes free in bank {}\"
-        ", 0xFFF0 - nb_banked_functions * 10, bank))?;
+        ", 0x1FF0 - nb_banked_functions * 10, bank))?;
 
         if bank == 0 {
             // Generate bankswitching functions code
@@ -230,7 +230,7 @@ Powerup
             debug!("Banked function address={:04x}", banked_function_address);
             gstate.write(&format!("
         ORG ${:04x}
-        RORG ${:04x}", banked_function_address, 0xF000 + banked_function_address))?;
+        RORG ${:04x}", banked_function_address, 0x1000 + banked_function_address))?;
             for bank_ex in 1..=maxbank {
                 for f in compiler_state.sorted_functions().iter() {
                     if f.1.code.is_some() && !f.1.inline && f.1.bank == bank_ex {
@@ -257,7 +257,7 @@ Call{}
         RORG ${:04x}
         JSR {}
         LDX ${:04x}
-                    ", address + f.1.bank * 0x1000 + 3, 0xF000 + address + 3, f.0, bankswitching_address))?;
+                    ", address + f.1.bank * 0x1000 + 3, 0x1000 + address + 3, f.0, bankswitching_address))?;
                     banked_function_address += 10;
                 }
             }
@@ -266,18 +266,23 @@ Call{}
         let starting_code = if maxbank > 0 && bank != 0 { "Start" } else { "Powerup" };
 
         if bank == maxbank && compiler_state.variables.get("PLUSROM_API").is_some() {
+            let v = compiler_state.get_variable("PLUSROM_API");
+            let offset = match v.memory {
+                VariableMemory::ROM(bank) => bank,
+                _ => 0,
+            };
             gstate.write(&format!("
         ORG ${}FFA
-        RORG $FFFA
+        RORG $1FFA
 
-        .word PLUSROM_API - $E000\t; NMI
-        .word PLUSROM_API - $E000\t; RESET
+        .word PLUSROM_API + ${:04x}\t
+        .word PLUSROM_API + ${:04x}\t
         .word {}\t; IRQ
-        \n", bank, starting_code))?;
+        \n", bank, offset * 0x1000, offset * 0x1000, starting_code))?;
         } else {
             gstate.write(&format!("
         ORG ${}FFA
-        RORG $FFFA
+        RORG $1FFA
 
         .word {}\t; NMI
         .word {}\t; RESET
