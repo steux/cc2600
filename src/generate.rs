@@ -421,7 +421,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         match left {
             ExprType::X => {
                 match right {
-                    ExprType::Immediate(_) | ExprType::AbsoluteY(_) => {
+                    ExprType::Immediate(_) => {
                         self.asm(LDX, right, pos, high_byte)?;
                         self.flags = FlagsState::X; 
                         Ok(ExprType::X) 
@@ -449,6 +449,24 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                             self.flags = FlagsState::Unknown;
                         } else {
                             self.flags = FlagsState::X;
+                        }
+                        Ok(ExprType::X)
+                    },
+                    ExprType::AbsoluteY(variable) => {
+                        let v = self.compiler_state.get_variable(variable);
+                        if v.var_type == VariableType::CharPtr && !v.var_const && v.size == 1 {
+                            if self.acc_in_use { self.sasm(PHA)?; }
+                            self.asm(LDA, right, pos, high_byte)?;
+                            self.sasm(TAX)?;
+                            if self.acc_in_use { 
+                                self.sasm(PLA)?;
+                                self.flags = FlagsState::Unknown;
+                            } else {
+                                self.flags = FlagsState::X;
+                            }
+                        } else {
+                            self.asm(LDX, right, pos, high_byte)?;
+                            self.flags = FlagsState::X; 
                         }
                         Ok(ExprType::X)
                     },

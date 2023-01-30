@@ -34,7 +34,11 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                 VariableType::Short => 2,
                 VariableType::CharPtr => 2,
             };
-            gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
+            if v.1.size > 1 {
+                gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size))?; 
+            } else {
+                gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
+            }
         }
         if !v.1.var_const && v.1.memory == VariableMemory::Superchip && v.1.def == VariableDefinition::None {
             superchip = true;
