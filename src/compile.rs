@@ -150,7 +150,8 @@ pub struct CompilerState<'a> {
     pratt: PrattParser<Rule>,
     mapped_lines: &'a Vec::<(std::rc::Rc::<String>,u32,Option<(std::rc::Rc::<String>,u32)>)>,
     pub preprocessed_utf8: &'a str,
-    pub included_assembler: Vec<String>
+    pub included_assembler: Vec<String>,
+    pub context: cpp::Context,
 }
 
 impl<'a> CompilerState<'a> {
@@ -318,6 +319,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
         match pair.as_rule() {
             Rule::var_type => {
                 for p in pair.into_inner() {
+                    //debug!("{:?}", p);
                     match p.as_rule() {
                         Rule::var_const => memory = VariableMemory::ROM(0),
                         Rule::bank => memory = VariableMemory::ROM(u32::from_str_radix(p.into_inner().next().unwrap().as_str(), 10).unwrap()),
@@ -328,7 +330,6 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                         },
                         Rule::var_simple_type => if p.as_str().eq("short") {
                             var_type = VariableType::Short;
-
                         },
                         Rule::aligned => alignment = p.into_inner().next().unwrap().as_str().parse::<usize>().unwrap(),
                         _ => unreachable!()
@@ -368,9 +369,11 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                                 Rule::int => def = VariableDefinition::Value(parse_int(px.into_inner().next().unwrap())),
                                 Rule::array_def => {
                                     let start = px.as_span().start();
-                                    if let VariableMemory::ROM(_) = memory {} else {
-                                        memory = VariableMemory::ROM(0);
-                                    }
+                                    memory = match memory {
+                                        VariableMemory::ROM(_) => memory,
+                                        VariableMemory::Display => memory,
+                                        _ => VariableMemory::ROM(0)
+                                    };
                                     if var_type != VariableType::CharPtr {
                                         return Err(syntax_error(state, "Array definition provided for something not an array", start));
                                     }
@@ -446,7 +449,7 @@ fn compile_statement<'a>(state: &CompilerState<'a>, p: Pair<'a, Rule>) -> Result
 {
     let mut inner = p.into_inner();
     let pair = inner.next().unwrap();
-    debug!("Compile statement: {:?}\ninner:{:?}", pair, inner);
+    //debug!("Compile statement: {:?}\ninner:{:?}", pair, inner);
     let pos = pair.as_span().start();
     match pair.as_rule() {
         Rule::label => {
@@ -527,7 +530,7 @@ fn compile_statement_ex<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> 
             let mut cases = Vec::<(Vec<i32>, Vec<StatementLoc<'a>>)>::new();
             let expr = parse_expr(state, p.next().unwrap().into_inner())?;
             let c = p.next().unwrap().into_inner();
-            debug!("Cases: {:?}", c);
+            //debug!("Cases: {:?}", c);
             let mut case_set = (Vec::<i32>::new(), Vec::<StatementLoc<'a>>::new());
             let mut last_was_a_statement = false;
             for i in c {
@@ -724,7 +727,7 @@ fn compile_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Re
                 compile_func_decl(state, pair.into_inner())?;
             },
             Rule::included_assembler => {
-                debug!("Assembler: {:?}", pair);
+                //debug!("Assembler: {:?}", pair);
                 state.included_assembler.push(pair.into_inner().next().unwrap().as_str().to_string());
             },
             _ => {
@@ -769,9 +772,9 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
     }
 
     // Start preprocessor
-    debug!("Preprocessor");
+    //debug!("Preprocessor");
     let mapped_lines = cpp::process(input, &mut preprocessed, &mut context)?;
-    debug!("Mapped lines = {:?}", mapped_lines);
+    //debug!("Mapped lines = {:?}", mapped_lines);
 
     let preprocessed_utf8 = std::str::from_utf8(&preprocessed)?;
     
@@ -782,7 +785,8 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
         pratt,
         mapped_lines: &mapped_lines,
         preprocessed_utf8,
-        included_assembler: Vec::<String>::new()
+        included_assembler: Vec::<String>::new(),
+        context
     };
 
     let r = Cc2600Parser::parse(Rule::program, &preprocessed_utf8);
@@ -824,6 +828,15 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
             }
         }
     };
+    
+    state.variables.insert("DUMMY".to_string(), Variable {
+        order: state.variables.len(),
+        signed: false,
+        memory: VariableMemory::Zeropage,
+        var_const: true,
+        alignment: 1,
+        def: VariableDefinition::Value(0x2d),
+        var_type: VariableType::Char, size: 1});
 
     // Generate assembly code from compilation output (abstract syntax tree)
     build_cartridge(&mut state, output, &args)?;

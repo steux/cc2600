@@ -11,6 +11,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
 {
     let mut gstate = GeneratorState::new(compiler_state, writer, args.insert_code);
     let mut superchip = false;
+    let mut bankswitching_scheme = "Unknown";
 
     gstate.write("\tPROCESSOR 6502\n\n")?;
     
@@ -22,12 +23,12 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         }
     }
 
-    gstate.write("DUMMY\tEQU $2D\n")?;
     gstate.write("\n\tSEG.U VARS\n\tORG $80\n\n")?;
     
     // Generate variables code
     gstate.write("cctmp                  \tds 1\n")?; 
     for v in compiler_state.sorted_variables().iter() {
+       // debug!("{:?}",v);
         if !v.1.var_const && v.1.memory == VariableMemory::Zeropage && v.1.def == VariableDefinition::None {
             let s = match v.1.var_type {
                 VariableType::Char => 1,
@@ -69,17 +70,36 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
     if superchip && maxbank == 0 {
         maxbank = 1;
     }
+    // Are we producing a DPC cartridge ?
+    if compiler_state.context.get_macro("__DPC__").is_some() {
+        bankswitching_scheme = "DPC";
+        if maxbank > 1 {
+            return Err(Error::Configuration { error: "DPC chip only works with 8KB ROM".to_string() });
+        } else {
+            maxbank = 1;
+        }
+    }
+
     let bankswitching_address: u32;
     if maxbank > 0 {
         bankswitching_address = match maxbank {
             1 => {
+                if bankswitching_scheme == "Unknown" {
+                    bankswitching_scheme = if superchip {"F8S"} else {"F8"};
+                }
                 0x1FF8
             },
             2 | 3 => {
+                if bankswitching_scheme == "Unknown" {
+                    bankswitching_scheme = if superchip {"F6S"} else {"F6"};
+                }
                 maxbank = 3;
                 0x1FF6
             },
             4 | 5 | 6 | 7 => {
+                if bankswitching_scheme == "Unknown" {
+                    bankswitching_scheme = if superchip {"F4S"} else {"F4"};
+                }
                 maxbank = 7;
                 0x1FF4
             },
@@ -133,10 +153,12 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         // Prelude code for each bank
         debug!("Generating code for bank #{}", bank);
         gstate.current_bank = bank;
-        gstate.write(&format!("\n\tORG ${}000\n\tRORG $1000\n", bank))?;
+        gstate.write(&format!("\n\tORG ${:04x}\n\tRORG $1000\n", bank * 0x1000))?;
    
         if superchip {
             gstate.write("\n\tDS 256, $FF\n")?;
+        } else if bankswitching_scheme == "DPC" {
+            gstate.write("\n\tDS 128, $00\n")?;
         }
 
         if maxbank > 0 {
@@ -290,7 +312,51 @@ Call{}
         \n", bank, starting_code, starting_code, starting_code))?;
         }
     }
+
+    if bankswitching_scheme == "DPC" {
+        gstate.write(&format!("
+            SEG DISPLAY
+            ORG $2000
+            RORG $0000
+            "))?;
+        
+        // Generate display tables
+        gstate.write("\n; Display in ROM\n")?;
+        for v in compiler_state.sorted_variables().iter() {
+            if let VariableMemory::Display = v.1.memory {
+                match &v.1.def {
+                    VariableDefinition::Array(arr) => {
+                        if v.1.alignment != 1 {
+                            gstate.write(&format!("\n\talign {}\n", v.1.alignment))?;
+                        }
+                        gstate.write(v.0)?;
+                        let mut counter = 0;
+                        for i in arr {
+                            if counter == 0 || counter == 16 {
+                                gstate.write("\n\thex ")?;
+                            }
+                            counter += 1;
+                            if counter == 16 { counter = 0; }
+                            gstate.write(&format!("{:02x}", i))?;
+                        } 
+                        gstate.write("\n")?;
+                    },
+                    _ => ()
+                };
+            }
+        }
+        gstate.write(&format!("
+            ECHO ([$800-.]d), \"bytes free in DPC display memory\"
+
+            ORG $27FF
+            DS 1, 0x81
+            "))?;
+    }
  
     gstate.write("\tEND\n")?;
+    
+    if args.verbose {
+        println!("Generated a {} ATARI 2600 cartridge", bankswitching_scheme);
+    }
     Ok(())
 }

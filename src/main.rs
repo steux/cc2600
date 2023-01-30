@@ -49,6 +49,10 @@ pub struct Args {
     #[arg(short='O', default_value="1", value_parser=clap::value_parser!(u8).range(0..=3))]
     optimization_level: u8,
 
+    /// Verbosity 
+    #[arg(short='v', default_value="false")]
+    verbose: bool,
+
     /// Include directories
     #[arg(short='I')]
     include_directories: Vec<String>,
@@ -105,7 +109,8 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
-            optimization_level: 1
+            verbose: false,
+            optimization_level: 1,
         };
         let input = "unsigned char i; void main() { for (i = 0; i < 10; i++); }";
         let mut output = Vec::new();
@@ -123,6 +128,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 1
         };
         let input = "unsigned char i; void main() { for (i = 0; i != 10; i++); }";
@@ -141,6 +147,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 1
         };
         let input = "unsigned char i, j; void main() { i = 0; j = i++; }";
@@ -159,6 +166,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 1
         };
         let input = "unsigned char i, j; void main() { i = 0; j = ++i; }";
@@ -177,6 +185,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 1
         };
         let input = "short i, j, k; void main() { i = 1; j = 1; k = i + j; }";
@@ -195,6 +204,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 1
         };
         let input = "void main() { if (0) X = 1; }";
@@ -213,6 +223,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 1
         };
         let input = "void main() { if (!0) X = 1; }";
@@ -231,6 +242,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 0
         };
         let input = "unsigned char i, j; void main() { i = 0; j = 0; if (i == 0 && j == 0) X = 1; }";
@@ -249,6 +261,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 0
         };
         let input = "unsigned char i, j; void main() { i = 0; j = 0; if (i == 0 || j == 0) X = 1; }";
@@ -267,6 +280,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 0
         };
         let input = "unsigned char i, j, k; void main() { i = 0; j = 0; k = 0; if (i == 0 || j == 0 || k == 0) X = 1; }";
@@ -285,6 +299,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 0
         };
         let input = "unsigned char i, j, k; void main() { i = 0; i = 0; k = 0; if (i == 0 && j == 0 && k == 0) X = 1; }";
@@ -303,6 +318,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 1
         };
         let input = "void main() { X = 0; Y = !X; }";
@@ -321,6 +337,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 1
         };
         let input = "void main() { X = 0; Y = X == 0; }";
@@ -339,6 +356,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 1
         };
         let input = "void main() { X = 0; Y = (X == 0)?0x10:0x20; }";
@@ -357,6 +375,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 1
         };
         let input = "void main() { switch(X) { case 0: case 1: Y = 0; case 2: Y = 1; break; default: Y = 2; } }";
@@ -375,6 +394,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 1
         };
         let input = "void main() { goto test; return; test: X = 0; }";
@@ -393,6 +413,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 1
         };
         let input = "char a, b, c, d, e, f, g; void main() { g = (a+b)+(c+(d&(e=f))); }";
@@ -411,6 +432,7 @@ mod tests {
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
+            verbose: false,
             optimization_level: 1
         };
         let input = "inline void add() { X += Y; }; void main() { add(); }";

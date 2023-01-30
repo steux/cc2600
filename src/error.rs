@@ -24,7 +24,8 @@ pub enum Error  {
     /// occurred and a string explaining the error further.
     Syntax { filename: String, included_in: Option<(String, u32)>, line: u32, msg: String },
     Compiler { filename: String, included_in: Option<(String, u32)>, line: u32, msg: String },
-    Unimplemented { feature: &'static str }
+    Unimplemented { feature: &'static str },
+    Configuration { error: String }
 }
 
 impl fmt::Display for Error {
@@ -46,6 +47,9 @@ impl fmt::Display for Error {
             Error::Unimplemented { feature } => {
                 write!(f, "Compiler error: Unimplemented feature - {}", feature)
             },
+            Error::Configuration { error } => {
+                write!(f, "Compiler error: Bad configuration - {}", error)
+            },
         }
     }
 }
@@ -57,6 +61,7 @@ impl error::Error for Error {
             &Error::Syntax { .. } => None,
             &Error::Compiler { .. } => None,
             &Error::Unimplemented { .. } => None,
+            &Error::Configuration { .. } => None,
         }
     }
 }

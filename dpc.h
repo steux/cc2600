@@ -59,19 +59,19 @@ unsigned char * const DF0LOW      = 0x1050; // Fetcher 0 pointer low
 unsigned char * const DF1LOW      = 0x1051; // Fetcher 1 pointer low
 unsigned char * const DF2LOW      = 0x1052; // Fetcher 2 pointer low
 unsigned char * const DF3LOW      = 0x1053; // Fetcher 3 pointer low
-unsigned char * const DF5LOW      = 0x1054; // Fetcher 4 pointer low
+unsigned char * const DF4LOW      = 0x1054; // Fetcher 4 pointer low
 unsigned char * const DF5LOW      = 0x1055; // Fetcher 5 pointer low
 unsigned char * const DF6LOW      = 0x1056; // Fetcher 6 pointer low
 unsigned char * const DF7LOW      = 0x1057; // Fetcher 7 pointer low
                                             //
-unsigned char * const DF0HI       = 0x1058; // Fetcher 0 end count
-unsigned char * const DF1HI       = 0x1059; // Fetcher 1 end count
-unsigned char * const DF2HI       = 0x105A; // Fetcher 2 end count
-unsigned char * const DF3HI       = 0x105B; // Fetcher 3 end count
-unsigned char * const DF4HI       = 0x105C; // Fetcher 4 end count
-unsigned char * const DF5HI       = 0x105D; // Fetcher 5 end count
-unsigned char * const DF6HI       = 0x105E; // Fetcher 6 end count
-unsigned char * const DF7HI       = 0x105F; // Fetcher 7 end count
+unsigned char * const DF0HI       = 0x1058; // Fetcher 0 pointer high
+unsigned char * const DF1HI       = 0x1059; // Fetcher 1 pointer high
+unsigned char * const DF2HI       = 0x105A; // Fetcher 2 pointer high
+unsigned char * const DF3HI       = 0x105B; // Fetcher 3 pointer high
+unsigned char * const DF4HI       = 0x105C; // Fetcher 4 pointer high
+unsigned char * const DF5HI       = 0x105D; // Fetcher 5 pointer high
+unsigned char * const DF6HI       = 0x105E; // Fetcher 6 pointer high
+unsigned char * const DF7HI       = 0x105F; // Fetcher 7 pointer high
                                             //
 unsigned char * const RAND_RESET  = 0x1070; // Random number generator reset
                                             //
