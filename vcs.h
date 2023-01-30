@@ -5,6 +5,9 @@
 //
 // TIA REGISTERS MEMORY MAP
 
+#ifndef __VCS_H__
+#define __VCS_H__
+
 unsigned char * const VSYNC       = 0x00; //  0000 00x0   Vertical Sync Set-Clear
 unsigned char * const VBLANK	  = 0x01; //  xx00 00x0   Vertical Blank Set-Clear
 unsigned char * const WSYNC       = 0x02; //  ---- ----   Wait for Horizontal Blank
@@ -85,3 +88,5 @@ unsigned char * const TIM1T       = 0x294; //		set 1 clock interval
 unsigned char * const TIM8T       = 0x295; //   set 8 clock interval
 unsigned char * const TIM64T      = 0x296; //   set 64 clock interval
 unsigned char * const T1024T      = 0x297; //   set 1024 clock interval
+                                           //
+#endif // __VCS_H__
