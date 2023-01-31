@@ -28,6 +28,7 @@ pub enum VariableMemory {
     Superchip,
     Display,
     Frequency,
+    MemoryOnChip,
 }
 
 #[derive(Debug, PartialEq)]
@@ -368,13 +369,17 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                         Rule::var_def => {
                             let px = p.into_inner().next().unwrap();
                             match px.as_rule() {
-                                Rule::int => def = VariableDefinition::Value(parse_int(px.into_inner().next().unwrap())),
+                                Rule::int => {
+                                    let v = parse_int(px.into_inner().next().unwrap());
+                                    def = VariableDefinition::Value(v);
+                                    if var_type == VariableType::CharPtr && v > 255 {
+                                        memory = VariableMemory::MemoryOnChip;
+                                    } 
+                                },
                                 Rule::array_def => {
                                     let start = px.as_span().start();
                                     memory = match memory {
-                                        VariableMemory::ROM(_) => memory,
-                                        VariableMemory::Display => memory,
-                                        VariableMemory::Frequency => memory,
+                                        VariableMemory::ROM(_) | VariableMemory::Display | VariableMemory::Frequency => memory,
                                         _ => VariableMemory::ROM(0)
                                     };
                                     if var_type != VariableType::CharPtr {
