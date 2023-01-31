@@ -1,6 +1,6 @@
 // This file defines register for the DPC (David Patrick Crane) Atari 2600 coprocessor
 // It is distributed as a companion to cc2600.
-
+// Copyleft 2023 Bruno STEUX
 //------------------------------------------------------------------------------
 //
 

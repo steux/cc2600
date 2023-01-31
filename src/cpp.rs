@@ -1,25 +1,25 @@
-//! C-like generic preprocessor for Rust. It supports macros, #define, #if, #elif, #else and
-//! #endif.
-//!
-//! Process text with the `process` and `process_str` functions.
-//!
-//! # Examples
-//!
-//! ```
-//! let text = "
-//!     some text
-//!     #if FOO
-//!     more text
-//!     #endif
-//!     more FOO text";
-//!
-//! let result = cpp::process_str(text, cpp::Context::new("string").define("FOO", "1")).unwrap();
-//!
-//! assert_eq!(result, "
-//!     some text
-//!     more text
-//!     more 1 text");
-//! ```
+/*
+    cc2600 - a subset of C compiler for the Atari 2600
+    Copyright (C) 2023 Bruno STEUX 
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+    Contact info: bruno.steux@gmail.com
+*/
+
+// C preprocessor inspired by minipre (https://github.com/Diggsey/minipre)
+// heavily extended in order to support inclusion of files (#include) and macros with parameters
 
 use crate::error::Error;
 
