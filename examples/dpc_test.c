@@ -16,10 +16,11 @@ unsigned char X, Y;
 unsigned char *sprite_ptr;
 unsigned char ypos;
 
-const display char sprite1[] = { 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7};
-const display char sprite2[] = { 0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7};
+const display char sprite1[] = { 0xAF, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7};
+const display char sprite2[] = { 0xFF, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7};
 
-void init()
+// This function is put to bank1 (instead of default bank0) just to check bankswitching
+bank1 void init()
 {
     ypos = 100;
     // Position sprite
@@ -90,9 +91,9 @@ void main()
         // Image
         // Do some logic here
         for (Y = KERNAL + 1; Y != 0; Y--) {
-            strobe(WSYNC);
             *GRP0 = *DF0DATAW;
             *GRP1 = *DF1DATAW;
+            strobe(WSYNC);
         }
         
         // Overscan

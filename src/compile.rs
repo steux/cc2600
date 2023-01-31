@@ -374,6 +374,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                                     memory = match memory {
                                         VariableMemory::ROM(_) => memory,
                                         VariableMemory::Display => memory,
+                                        VariableMemory::Frequency => memory,
                                         _ => VariableMemory::ROM(0)
                                     };
                                     if var_type != VariableType::CharPtr {
