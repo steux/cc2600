@@ -15,10 +15,11 @@ unsigned char X, Y;
 #endif
 
 unsigned char *sprite_ptr;
-unsigned char ypos;
+unsigned char *color_ptr;
+char ypos;
 
-const display char sprite1[] = { 0xAF, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7};
-const display char sprite2[] = { 0xFF, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7};
+const display unsigned char sprite0[20] = { 0x12, 0x36, 0x4a, 0x33, 0x55, 0x33, 0xcb, 0xb6, 0x48, 0x3e, 0x5e, 0x6e, 0x76, 0x36, 0x84, 0xbc, 0x3a, 0x76, 0x66, 0x66};
+const display unsigned char colors0[20] = { 0x3c, 0x3c, 0x3c, 0x0e, 0x0e, 0x0e, 0x3c, 0x3c, 0x3c, 0x3c, 0x38, 0x2c, 0x3c, 0x3c, 0x38, 0x38, 0x2c, 0x2c, 0x12, 0x12};
 
 // This function is put to bank1 (instead of default bank0) just to check bankswitching
 bank1 void init()
@@ -29,9 +30,6 @@ bank1 void init()
     X = 6;
     do { X--; } while (X >= 0);
     strobe(RESP0);
-    strobe(RESP1);
-    *COLUP0 = 0x64;
-    *COLUP1 = 0x44;
     strobe(WSYNC);
 }
 
@@ -53,18 +51,18 @@ void main()
 
         // Prepare DPC sprites for drawing
         // Set up first sprite
-        sprite_ptr = sprite1 - ypos;
+        sprite_ptr = sprite0 - ypos;
         *DF0HI = sprite_ptr >> 8;
         *DF0LOW = sprite_ptr;
-        *DF0TOP = sprite1 - 1;
-        *DF0BOT = sprite1 + 8;
+        *DF0TOP = sprite0 - 1;
+        *DF0BOT = sprite0 + 20;
         
         // Set up second sprite
-        sprite_ptr = sprite2 - ypos;
-        *DF1HI = sprite_ptr >> 8;
-        *DF1LOW = sprite_ptr;
-        *DF1TOP = sprite2 - 1;
-        *DF1BOT = sprite2 + 8;
+        color_ptr = colors0 - ypos;
+        *DF1HI = color_ptr >> 8;
+        *DF1LOW = color_ptr;
+        *DF1TOP = colors0 - 1;
+        *DF1BOT = colors0 + 20;
        
         // Joystick input 
         if (!(*SWCHA & 0x80)) *HMP0 = 0xF0; // Right
@@ -79,7 +77,6 @@ void main()
 
         // Stop moving
         *HMP0 = 0;
-        *HMP1 = 0;
         
         // Apply movement
         strobe(WSYNC);
@@ -93,7 +90,7 @@ void main()
         // Do some logic here
         for (Y = KERNAL + 1; Y != 0; Y--) {
             *GRP0 = *DF0DATAW;
-            *GRP1 = *DF1DATAW;
+            *COLUP0 = *DF1DATAW;
             strobe(WSYNC);
         }
         
