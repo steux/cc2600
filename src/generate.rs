@@ -1251,6 +1251,28 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         }
     }
 
+    fn generate_sizeof(&mut self, expr: &Expr<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+    {
+        match expr {
+            Expr::Identifier((var, _)) => {
+                let v = self.compiler_state.get_variable(var);
+                if v.var_type == VariableType::CharPtr {
+                    match &v.def {
+                        VariableDefinition::Array(s) => Ok(ExprType::Immediate(s.len() as i32)),
+                        _ => Ok(ExprType::Immediate(2)),
+                    } 
+                } else if v.var_type == VariableType::Char {
+                    Ok(ExprType::Immediate(1))
+                } else if v.var_type == VariableType::Short {
+                    Ok(ExprType::Immediate(2))
+                } else {
+                    Err(syntax_error(self.compiler_state, "Sizeof only works on variables", pos))
+                }
+            },
+            _ => Err(syntax_error(self.compiler_state, "Sizeof only works on variables", pos)),
+        }
+    }
+
     fn generate_expr(&mut self, expr: &Expr<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
     {
         //debug!("Expression: {:?}", expr);
@@ -1367,6 +1389,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
             Expr::Not(v) => self.generate_not(v, pos),
             Expr::BNot(v) => self.generate_bnot(v, pos),
             Expr::Deref(v) => self.generate_deref(v, pos),
+            Expr::Sizeof(v) => self.generate_sizeof(v, pos),
             Expr::Nothing => Ok(ExprType::Nothing),
         }
     }

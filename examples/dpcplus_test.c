@@ -55,14 +55,14 @@ void main()
         *DF0HI = sprite_ptr >> 8;
         *DF0LOW = sprite_ptr;
         *DF0TOP = sprite0 - 1;
-        *DF0BOT = sprite0 + 20;
+        *DF0BOT = sprite0 + sizeof(sprite0);
         
         // Set up second sprite
         color_ptr = colors0 - ypos;
         *DF1HI = color_ptr >> 8;
         *DF1LOW = color_ptr;
         *DF1TOP = colors0 - 1;
-        *DF1BOT = colors0 + 20;
+        *DF1BOT = colors0 + sizeof(colors0);
        
         // Joystick input 
         if (!(*SWCHA & 0x80)) *HMP0 = 0xF0; // Right
