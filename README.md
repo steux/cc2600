@@ -17,13 +17,14 @@ next game developement, since cc2600 will enable you to leverage the use of stru
 ## Main features
 
 - Produces DASM compatible code
-- Native Atari F4, F6 and F8 bankswitching schemes support
+- Native Atari F4, F6 and F8, DPC and DPC+ bankswitching schemes support
 - Superchip (128 bytes of additional RAM!) support
 - Uses only 1 byte of RAM
 - load/store/strobe intrinsics allow the writing of efficient kernels.
 - X and Y registers are directly usable, just like if they ware declared as unsigned char global variables.
 - All C constructs are implemented (for, if, while, goto, etc).
 - Clean bootstrap/bankswitching code is automatically generated
+- PlusROM support for Wifi communication with PlusCART
 
 ## Known limitations
 
@@ -38,5 +39,4 @@ next game developement, since cc2600 will enable you to leverage the use of stru
 
 ## TODO
 
-- DPC / DPC+ support
-- PlusROM support
+- 3E bankswitching scheme support

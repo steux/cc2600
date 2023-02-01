@@ -88,11 +88,23 @@ void main()
 
         // Image
         // Do some logic here
+#ifdef ENABLE_FASTFETCH
+        *FASTFETCH = 0x00; // Enable fast fetch DPC++ mode
+#endif
         for (Y = KERNAL + 1; Y != 0; Y--) {
+#ifdef ENABLE_FASTFETCH
+            // 5 cycles TIA register update instead of 7 cycles
+            *GRP0 = DF0DATAW; // DF0DATAW fast fetch
+            *COLUP0 = DF1DATAW; // DF1DATAW fast fetch
+#else
             *GRP0 = *DF0DATAW;
             *COLUP0 = *DF1DATAW;
+#endif
             strobe(WSYNC);
         }
+#ifdef ENABLE_FASTFETCH
+        *FASTFETCH = 0x0FF; // Disable fast fetch mode
+#endif
         
         // Overscan
         *VBLANK = 2; // Enable VBLANK
