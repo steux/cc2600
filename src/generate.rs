@@ -31,7 +31,7 @@ pub enum ExprType<'a> {
     Nothing,
     Immediate(i32),
     Tmp(bool),
-    Absolute(&'a str, bool, u16), // variable, eight_bits, offset
+    Absolute(&'a str, bool, i32), // variable, eight_bits, offset
     AbsoluteX(&'a str),
     AbsoluteY(&'a str),
     A(bool), X, Y,
@@ -43,7 +43,7 @@ pub enum FlagsState<'a> {
     Unknown,
     X, Y,
     Zero, 
-    Absolute(&'a str, bool, u16),
+    Absolute(&'a str, bool, i32),
 }
 
 pub struct GeneratorState<'a> {
@@ -178,7 +178,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                                 nb_bytes = 2;
                             } else {
                                 let off = if high_byte { offset + 1 } else { offset };
-                                if off > 0 {
+                                if off != 0 {
                                     dasm_operand = format!("{}+{}", variable, off);
                                 } else {
                                     dasm_operand = format!("{}", variable);
@@ -195,9 +195,17 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                         ,
                         VariableType::CharPtr => if v.var_type == VariableType::CharPtr && !*eight_bits && v.var_const {
                             if high_byte {
-                                dasm_operand = format!("#>{}", variable);
+                                if offset != 0 {
+                                    dasm_operand = format!("#>{}+{}", variable, offset);
+                                } else {
+                                    dasm_operand = format!("#>{}", variable);
+                                }
                             } else {
-                                dasm_operand = format!("#<{}", variable);
+                                if offset != 0 {
+                                    dasm_operand = format!("#<{}+{}", variable, offset);
+                                } else {
+                                    dasm_operand = format!("#<{}", variable);
+                                }
                             }
                             nb_bytes = 2;
                         } else {
@@ -206,7 +214,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                                 nb_bytes = 2;
                             } else {
                                 let off = if high_byte { offset + 1 } else { offset };
-                                if off > 0 {
+                                if off != 0 {
                                     dasm_operand = format!("{}+{}", variable, off);
                                 } else {
                                     dasm_operand = format!("{}", variable);
@@ -807,7 +815,29 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                     }
                 };
             },
-            ExprType::Absolute(_, _, _) | ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) => {
+            ExprType::Absolute(variable, eight_bits, off) => {
+                match right {
+                    ExprType::Immediate(r) => {
+                        let v = self.compiler_state.get_variable(variable);
+                        if v.var_type == VariableType::CharPtr && !*eight_bits && v.var_const {
+                            match op {
+                                Operation::Add(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off + *r)),
+                                Operation::Sub(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off - *r)),
+                                Operation::And(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off & *r)),
+                                Operation::Or(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off | *r)),
+                                Operation::Xor(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off ^ *r)),
+                                Operation::Mul(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off * *r)),
+                                Operation::Div(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off / *r)),
+                                _ => (),
+                            } 
+                        }
+                    },
+                    _ => ()
+                };
+                if acc_in_use { self.sasm(PHA)?; }
+                self.asm(LDA, left, pos, high_byte)?;
+            },
+            ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) => {
                 if acc_in_use { self.sasm(PHA)?; }
                 self.asm(LDA, left, pos, high_byte)?;
             },
@@ -1354,7 +1384,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                                 ExprType::Nothing => Ok(ExprType::Absolute(variable, v.var_type != VariableType::Short && v.var_type != VariableType::CharPtr, 0)),
                                 ExprType::X => Ok(ExprType::AbsoluteX(variable)),
                                 ExprType::Y => Ok(ExprType::AbsoluteY(variable)),
-                                ExprType::Immediate(v) => Ok(ExprType::Absolute(variable, true, v as u16)),
+                                ExprType::Immediate(v) => Ok(ExprType::Absolute(variable, true, v)),
                                 _ => Err(syntax_error(self.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                             }
                         }
