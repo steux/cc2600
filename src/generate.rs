@@ -64,10 +64,11 @@ pub struct GeneratorState<'a> {
     pub current_bank: u32,
     pub functions_code: HashMap<String, AssemblyCode>,
     pub current_function: Option<String>,
+    bankswitching_scheme: &'a str,
 }
 
 impl<'a, 'b, 'c> GeneratorState<'a> {
-    pub fn new(compiler_state: &'a CompilerState, writer: &'a mut dyn Write, insert_code: bool) -> GeneratorState<'a> {
+    pub fn new(compiler_state: &'a CompilerState, writer: &'a mut dyn Write, insert_code: bool, bankswitching_scheme: &'a str) -> GeneratorState<'a> {
         GeneratorState {
             compiler_state,
             last_included_line_number: 0,
@@ -86,6 +87,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
             current_bank: 0,
             functions_code: HashMap::new(),
             current_function: None,
+            bankswitching_scheme,
         }
     }
     
@@ -151,6 +153,13 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                             STA | STX | STY => *off,
                             _ => off + 0x80
                         }
+                    } else if let VariableMemory::MemoryOnChip(_) = v.memory {
+                        if self.bankswitching_scheme == "3E" {
+                            match mnemonic {
+                                STA | STX | STY => off + 0x400,
+                                _ => *off
+                            }
+                        } else { *off }
                     } else { *off };
                     match v.var_type {
                         VariableType::Char => {
@@ -238,6 +247,13 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                             STA | STX | STY => 0,
                             _ => 0x80
                         }
+                    } else if let VariableMemory::MemoryOnChip(_) = v.memory {
+                        if self.bankswitching_scheme == "3E" {
+                            match mnemonic {
+                                STA | STX | STY => 0x400,
+                                _ => 0 
+                            }
+                        } else { 0 }
                     } else { 0 };
                     if v.var_type == VariableType::CharPtr && !v.var_const {
                         if v.size == 1 {
@@ -294,6 +310,13 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                             STA | STX | STY => 0,
                             _ => 0x80
                         }
+                    } else if let VariableMemory::MemoryOnChip(_) = v.memory {
+                        if self.bankswitching_scheme == "3E" {
+                            match mnemonic {
+                                STA | STX | STY => 0x400,
+                                _ => 0 
+                            }
+                        } else { 0 }
                     } else { 0 };
                     if offset > 0 {
                         dasm_operand = format!("{}+{},X", variable, offset);
@@ -1085,11 +1108,22 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                                     if f.bank == self.current_bank {
                                         self.asm(JSR, &ExprType::Label(*var), pos, false)?;
                                     } else {
-                                        if self.current_bank == 0 {
-                                            // Generate bankswitching call
-                                            self.asm(JSR, &ExprType::Label(&format!("Call{}", *var)), pos, false)?;
+                                        if self.bankswitching_scheme == "3E" {
+                                            if self.current_bank == 0 {
+                                                // Generate bankswitching call
+                                                self.asm(LDA, &ExprType::Immediate((f.bank - 1) as i32), pos, false)?;
+                                                self.asm(STA, &ExprType::Absolute("ROM_SELECT", true, 0), pos, false)?;
+                                                self.asm(JSR, &ExprType::Label(*var), pos, false)?;
+                                            } else {
+                                                return Err(syntax_error(self.compiler_state, "Banked code can only be called from bank 0 or same bank", pos))
+                                            }
                                         } else {
-                                            return Err(syntax_error(self.compiler_state, "Banked code can only be called from bank 0 or same bank", pos))
+                                            if self.current_bank == 0 {
+                                                // Generate bankswitching call
+                                                self.asm(JSR, &ExprType::Label(&format!("Call{}", *var)), pos, false)?;
+                                            } else {
+                                                return Err(syntax_error(self.compiler_state, "Banked code can only be called from bank 0 or same bank", pos))
+                                            }
                                         }
                                     } 
                                 }
@@ -1130,21 +1164,24 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
             },
             ExprType::Absolute(variable, eight_bits, offset) => {
                 let v = self.compiler_state.get_variable(variable);
-                if v.memory == VariableMemory::Superchip {
-                    let op = if plusplus { Operation::Add(false) } else { Operation::Sub(false) };
-                    let right = ExprType::Immediate(1);
-                    let newright = self.generate_arithm(expr_type, &op, &right, pos, false)?;
-                    let ret = self.generate_assign(expr_type, &newright, pos, false);
-                    if v.var_type == VariableType::Short || (v.var_type == VariableType::CharPtr && !eight_bits) {
-                        let newright = self.generate_arithm(expr_type, &op, &right, pos, true)?;
-                        self.generate_assign(expr_type, &newright, pos, true)?;
+                match v.memory {
+                    VariableMemory::Superchip | VariableMemory::MemoryOnChip(_) => {
+                        let op = if plusplus { Operation::Add(false) } else { Operation::Sub(false) };
+                        let right = ExprType::Immediate(1);
+                        let newright = self.generate_arithm(expr_type, &op, &right, pos, false)?;
+                        let ret = self.generate_assign(expr_type, &newright, pos, false);
+                        if v.var_type == VariableType::Short || (v.var_type == VariableType::CharPtr && !eight_bits) {
+                            let newright = self.generate_arithm(expr_type, &op, &right, pos, true)?;
+                            self.generate_assign(expr_type, &newright, pos, true)?;
+                        }
+                        ret
+                    },
+                    _ => {
+                        self.asm(operation, expr_type, pos, false)?;
+                        self.flags = FlagsState::Absolute(variable, *eight_bits, *offset);
+                        Ok(ExprType::Absolute(variable, *eight_bits, *offset))
                     }
-                    ret
-                } else {
-                    self.asm(operation, expr_type, pos, false)?;
-                    self.flags = FlagsState::Absolute(variable, *eight_bits, *offset);
-                    Ok(ExprType::Absolute(variable, *eight_bits, *offset))
-                }
+                } 
             },
             ExprType::AbsoluteX(variable) => {
                 self.asm(operation, expr_type, pos, false)?;

@@ -18,7 +18,6 @@
     Contact info: bruno.steux@gmail.com
 */
 
-// TODO: 3E bankswitching scheme support
 // TODO: array of pointers support
 
 mod cpp;

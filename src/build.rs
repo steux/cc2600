@@ -29,10 +29,84 @@ use crate::Args;
 
 pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, args: &Args) -> Result<(), Error> 
 {
-    let mut gstate = GeneratorState::new(compiler_state, writer, args.insert_code);
     let mut superchip = false;
     let mut bankswitching_scheme = "4K";
+    
+    // Try to figure out what is the bankswitching method
 
+    // Let's identitfy superchip
+    for v in compiler_state.sorted_variables().iter() {
+        if !v.1.var_const && v.1.memory == VariableMemory::Superchip && v.1.def == VariableDefinition::None {
+            superchip = true;
+        }
+    }
+
+    let mut maxbank = 0;
+    for f in compiler_state.sorted_functions().iter() {
+         if f.1.bank > maxbank { maxbank = f.1.bank; }
+    }
+    // Minimum 8K for superchip
+    if superchip && maxbank == 0 {
+        maxbank = 1;
+    }
+
+    // Are we producing a DPC cartridge ?
+    if compiler_state.context.get_macro("__DPC__").is_some() {
+        bankswitching_scheme = "DPC";
+        if maxbank > 1 {
+            return Err(Error::Configuration { error: "DPC chip only works with 8KB ROM".to_string() });
+        } else {
+            maxbank = 1;
+        }
+    } else if compiler_state.context.get_macro("__DPCPLUS__").is_some() {
+        bankswitching_scheme = "DPC+";
+        if maxbank > 5 {
+            return Err(Error::Configuration { error: "DPC+ framework only works with 32KB ROM".to_string() });
+        } else {
+            maxbank = 5;
+        }
+    } else if compiler_state.context.get_macro("__3E__").is_some() {
+        bankswitching_scheme = "3E";
+        maxbank = ((maxbank / 8) + 1) * 8 - 1;
+    }
+
+    let bankswitching_address: u32;
+    if bankswitching_scheme == "DPC+" {
+        bankswitching_address = 0x1FF6;
+    } else if bankswitching_scheme != "3E" {
+        if maxbank > 0 {
+            bankswitching_address = match maxbank {
+                1 => {
+                    if bankswitching_scheme == "4K" {
+                        bankswitching_scheme = if superchip {"F8S"} else {"F8"};
+                    }
+                    0x1FF8
+                },
+                2 | 3 => {
+                    if bankswitching_scheme == "4K" {
+                        bankswitching_scheme = if superchip {"F6S"} else {"F6"};
+                    }
+                    maxbank = 3;
+                    0x1FF6
+                },
+                4 | 5 | 6 | 7 => {
+                    if bankswitching_scheme == "4K" {
+                        bankswitching_scheme = if superchip {"F4S"} else {"F4"};
+                    }
+                    maxbank = 7;
+                    0x1FF4
+                },
+                _ => { return Err(Error::Unimplemented { feature: "Bankswitching scheme not implemented" }); },
+            };
+        } else {
+            bankswitching_address = 0;
+        }
+    } else {
+        bankswitching_address = 0;
+    }
+    
+    // Start generation
+    let mut gstate = GeneratorState::new(compiler_state, writer, args.insert_code, bankswitching_scheme);
     gstate.write("\tPROCESSOR 6502\n\n")?;
     
     for v in compiler_state.sorted_variables().iter() {
@@ -61,9 +135,6 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                 gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
             }
         }
-        if !v.1.var_const && v.1.memory == VariableMemory::Superchip && v.1.def == VariableDefinition::None {
-            superchip = true;
-        }
     }
 
     if superchip {
@@ -81,68 +152,29 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         }
     }
 
-    // Try to figure out what is the bankswitching method
-    let mut maxbank = 0;
-    for f in compiler_state.sorted_functions().iter() {
-         if f.1.bank > maxbank { maxbank = f.1.bank; }
-    }
-    // Minimum 8K for superchip
-    if superchip && maxbank == 0 {
-        maxbank = 1;
-    }
-    // Are we producing a DPC cartridge ?
-    if compiler_state.context.get_macro("__DPC__").is_some() {
-        bankswitching_scheme = "DPC";
-        if maxbank > 1 {
-            return Err(Error::Configuration { error: "DPC chip only works with 8KB ROM".to_string() });
-        } else {
-            maxbank = 1;
-        }
-    }
-    
-    if compiler_state.context.get_macro("__DPCPLUS__").is_some() {
-        bankswitching_scheme = "DPC+";
-        if maxbank > 5 {
-            return Err(Error::Configuration { error: "DPC+ framework only works with 32KB ROM".to_string() });
-        } else {
-            maxbank = 5;
+    // Generate RAM for 3E bankswitching scheme
+    if bankswitching_scheme == "3E" {
+        for bank in 1..=512 { // Max 512ko
+            let mut first = true;
+            for v in compiler_state.sorted_variables().iter() {
+                if !v.1.var_const && v.1.memory == VariableMemory::MemoryOnChip(bank) && v.1.def == VariableDefinition::None {
+                    if first {
+                        first = false;
+                        gstate.write(&format!("\n\tSEG.U RAM_3E_{}\n\tORG $1000\n\tRORG $1000\n", bank))?;
+                    }
+                    let s = match v.1.var_type {
+                        VariableType::Char => 1,
+                        VariableType::Short => 2,
+                        VariableType::CharPtr => 2,
+                    };
+                    gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
+                }
+            }
         }
     }
 
-    let bankswitching_address: u32;
-    if bankswitching_scheme == "DPC+" {
-        bankswitching_address = 0x1FF6;
-    } else {
-        if maxbank > 0 {
-            bankswitching_address = match maxbank {
-                1 => {
-                    if bankswitching_scheme == "4K" {
-                        bankswitching_scheme = if superchip {"F8S"} else {"F8"};
-                    }
-                    0x1FF8
-                },
-                2 | 3 => {
-                    if bankswitching_scheme == "4K" {
-                        bankswitching_scheme = if superchip {"F6S"} else {"F6"};
-                    }
-                    maxbank = 3;
-                    0x1FF6
-                },
-                4 | 5 | 6 | 7 => {
-                    if bankswitching_scheme == "4K" {
-                        bankswitching_scheme = if superchip {"F4S"} else {"F4"};
-                    }
-                    maxbank = 7;
-                    0x1FF4
-                },
-                _ => { return Err(Error::Unimplemented { feature: "Bankswitching scheme not implemented" }); },
-            };
-        } else {
-            bankswitching_address = 0;
-        }
-    }
-    if maxbank > 0 {
-            gstate.write(&format!("
+    if maxbank > 0 && bankswitching_scheme != "3E" {
+        gstate.write(&format!("
 ; Macro that implements Bank Switching trampoline
 ; X = bank number
 ; A = hi byte of destination PC
@@ -156,7 +188,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         ENDM
         ", bankswitching_address))?;
     }
-    
+
     // Generate functions code
     gstate.write("\n; Functions definitions\n\tSEG CODE\n")?;
 
@@ -182,13 +214,19 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
             }
             gstate.check_branches(f.0);
         }
-     }
+    }
 
-    for bank in 0..=maxbank {
+    // Generate code for all banks
+    for b in 0..=maxbank {
+        
+        let (bank, banksize, rorg) = if bankswitching_scheme == "3E" { 
+            if b == maxbank { (0, 0x0800, 0x1800) } else { (b + 1, 0x0800, 0x1000) }
+        } else {(b, 0x1000, 0x1000)};
+
         // Prelude code for each bank
         debug!("Generating code for bank #{}", bank);
         gstate.current_bank = bank;
-        gstate.write(&format!("\n\tORG ${:04x}\n\tRORG $1000\n", bank * 0x1000))?;
+        gstate.write(&format!("\n\tORG ${:04x}\n\tRORG ${:04x}\n", b * banksize, rorg))?;
    
         if superchip {
             gstate.write("\n\tDS 256, $FF\n")?;
@@ -196,7 +234,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
             gstate.write("\n\tDS 128, $00\n")?;
         }
 
-        if maxbank > 0 {
+        if maxbank > 0 && bankswitching_scheme != "3E" {
             // Generate trampoline code
             gstate.write("
 ;----The following code is the same on all banks----
@@ -275,23 +313,35 @@ Powerup
                 }
             }
         }
-
+            
         // Epilogue code
-        gstate.write(&format!("
+        if bankswitching_scheme == "3E" {
+            if bank == 0 {
+                gstate.write(&format!("
+        ECHO ([$1FF0-.]d), \"bytes free in bank 0\"
+        "))?;
+            } else {
+                gstate.write(&format!("
+        ECHO ([$1800-.]d), \"bytes free in bank {}\"
+        ", bank))?;
+            }
+        } else {
+            gstate.write(&format!("
         ECHO ([${:04x}-.]d), \"bytes free in bank {}\"
         ", 0x1FF0 - nb_banked_functions * 10, bank))?;
 
-        if bank == 0 {
-            // Generate bankswitching functions code
-            banked_function_address = 0x0FF0 - nb_banked_functions * 10;
-            debug!("Banked function address={:04x}", banked_function_address);
-            gstate.write(&format!("
+            if bank == 0 {
+                // Generate bankswitching functions code
+                banked_function_address = 0x0FF0 - nb_banked_functions * 10;
+                debug!("Banked function address={:04x}", banked_function_address);
+                gstate.write(&format!("
         ORG ${:04x}
-        RORG ${:04x}", banked_function_address, 0x1000 + banked_function_address))?;
-            for bank_ex in 1..=maxbank {
-                for f in compiler_state.sorted_functions().iter() {
-                    if f.1.code.is_some() && !f.1.inline && f.1.bank == bank_ex {
-                        gstate.write(&format!("
+        RORG ${:04x}", 
+                banked_function_address, 0x1000 + banked_function_address))?;
+                for bank_ex in 1..=maxbank {
+                    for f in compiler_state.sorted_functions().iter() {
+                        if f.1.code.is_some() && !f.1.inline && f.1.bank == bank_ex {
+                            gstate.write(&format!("
 Call{}
         LDX ${:04x}+{}
         NOP
@@ -301,28 +351,29 @@ Call{}
         NOP
         NOP
         RTS", f.0, bankswitching_address, f.1.bank))?;
+                        }
                     }
                 }
-            }
-        } else {
-            for f in compiler_state.sorted_functions().iter() {
-                let address = banked_function_address;
-                if f.1.code.is_some() && !f.1.inline && f.1.bank == bank {
-                    debug!("#{} Banked function address={:04x}", bank, banked_function_address);
-                    gstate.write(&format!("
+            } else {
+                for f in compiler_state.sorted_functions().iter() {
+                    let address = banked_function_address;
+                    if f.1.code.is_some() && !f.1.inline && f.1.bank == bank {
+                        debug!("#{} Banked function address={:04x}", bank, banked_function_address);
+                        gstate.write(&format!("
         ORG ${:04x}
         RORG ${:04x}
         JSR {}
         LDX ${:04x}
                     ", address + f.1.bank * 0x1000 + 3, 0x1000 + address + 3, f.0, bankswitching_address))?;
                     banked_function_address += 10;
+                    }
                 }
             }
         }
 
         let starting_code = if maxbank > 0 && bank != 0 { "Start" } else { "Powerup" };
 
-        if bank == maxbank && compiler_state.variables.get("PLUSROM_API").is_some() {
+        if b == maxbank && compiler_state.variables.get("PLUSROM_API").is_some() {
             let v = compiler_state.get_variable("PLUSROM_API");
             let offset = match v.memory {
                 VariableMemory::ROM(bank) => bank,
@@ -337,14 +388,27 @@ Call{}
         .word {}\t; IRQ
         \n", bank, offset * 0x1000, offset * 0x1000, starting_code))?;
         } else {
-            gstate.write(&format!("
+            if bankswitching_scheme != "DPC+" && bankswitching_scheme != "3E" {
+                gstate.write(&format!("
         ORG ${}FFA
         RORG $1FFA
 
         .word {}\t; NMI
         .word {}\t; RESET
         .word {}\t; IRQ
-        \n", bank, starting_code, starting_code, starting_code))?;
+        \n", 
+                bank, starting_code, starting_code, starting_code))?;
+            } else if b == maxbank {
+                gstate.write(&format!("
+        ORG ${:04x}
+        RORG $1FFA
+
+        .word {}\t; NMI
+        .word {}\t; RESET
+        .word {}\t; IRQ
+        \n", 
+            (b + 1) * banksize - 6, starting_code, starting_code, starting_code))?;
+            }
         }
     }
 

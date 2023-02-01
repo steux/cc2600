@@ -345,6 +345,7 @@ impl AssemblyCode {
                         AsmMnemonic::ADC | AsmMnemonic::SBC | AsmMnemonic::EOR | AsmMnemonic::AND | AsmMnemonic::ORA => accumulator = None,
                         AsmMnemonic::LSR | AsmMnemonic::ASL => accumulator = None,
                         AsmMnemonic::PLA | AsmMnemonic::PHA => accumulator = None,
+                        AsmMnemonic::JSR | AsmMnemonic::JMP => accumulator = None,
                         _ => ()
                     }
                 } else { unreachable!(); }
