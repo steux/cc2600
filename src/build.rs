@@ -31,7 +31,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
 {
     let mut gstate = GeneratorState::new(compiler_state, writer, args.insert_code);
     let mut superchip = false;
-    let mut bankswitching_scheme = "Unknown";
+    let mut bankswitching_scheme = "4K";
 
     gstate.write("\tPROCESSOR 6502\n\n")?;
     
@@ -116,20 +116,20 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         if maxbank > 0 {
             bankswitching_address = match maxbank {
                 1 => {
-                    if bankswitching_scheme == "Unknown" {
+                    if bankswitching_scheme == "4K" {
                         bankswitching_scheme = if superchip {"F8S"} else {"F8"};
                     }
                     0x1FF8
                 },
                 2 | 3 => {
-                    if bankswitching_scheme == "Unknown" {
+                    if bankswitching_scheme == "4K" {
                         bankswitching_scheme = if superchip {"F6S"} else {"F6"};
                     }
                     maxbank = 3;
                     0x1FF6
                 },
                 4 | 5 | 6 | 7 => {
-                    if bankswitching_scheme == "Unknown" {
+                    if bankswitching_scheme == "4K" {
                         bankswitching_scheme = if superchip {"F4S"} else {"F4"};
                     }
                     maxbank = 7;
