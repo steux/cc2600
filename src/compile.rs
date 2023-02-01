@@ -39,6 +39,7 @@ pub enum VariableType {
     Char,
     Short,
     CharPtr,
+    CharPtrPtr,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -56,6 +57,7 @@ pub enum VariableDefinition {
     None,
     Value(i32),
     Array(Vec<i32>),
+    ArrayOfPointers(Vec<String>),
 }
 
 #[derive(Debug)]
@@ -384,6 +386,8 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                             }
                             if var_type == VariableType::Char {
                                 var_type = VariableType::CharPtr;
+                            } else if var_type == VariableType::CharPtr {
+                                var_type = VariableType::CharPtrPtr;
                             } else {
                                 return Err(syntax_error(state, "Array of short integers are not available", start));
                             }
@@ -404,20 +408,43 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                                         VariableMemory::ROM(_) | VariableMemory::Display | VariableMemory::Frequency => memory,
                                         _ => VariableMemory::ROM(0)
                                     };
-                                    if var_type != VariableType::CharPtr {
+                                    if var_type != VariableType::CharPtr && var_type != VariableType::CharPtrPtr {
                                         return Err(syntax_error(state, "Array definition provided for something not an array", start));
                                     }
-                                    let mut v = Vec::new();
-                                    for pxx in px.into_inner() {
-                                        v.push(parse_int(pxx.into_inner().next().unwrap()));
-                                    }
-                                    if let Some(s) = size {
-                                        if s != v.len() {
-                                            return Err(syntax_error(state, "Specified array size is different from actual definition", start));
+                                    if var_type == VariableType::CharPtr {
+                                        let mut v = Vec::new();
+                                        for pxx in px.into_inner() {
+                                            v.push(parse_int(pxx.into_inner().next().unwrap()));
                                         }
+                                        if let Some(s) = size {
+                                            if s != v.len() {
+                                                return Err(syntax_error(state, "Specified array size is different from actual definition", start));
+                                            }
+                                        }
+                                        size = Some(v.len());
+                                        def = VariableDefinition::Array(v);
+                                    } else {
+                                        let mut v = Vec::new();
+                                        for pxx in px.into_inner() {
+                                            let s = pxx.as_str().to_string();
+                                            let var = state.variables.get(&s);
+                                            if var.is_none() {
+                                                return Err(syntax_error(state, &format!("Unknown identifier {}", s), start));
+                                            } else {
+                                                if var.unwrap().var_type != VariableType::CharPtr {
+                                                    return Err(syntax_error(state, &format!("Reference {} should be a pointer", s), start));
+                                                }
+                                            }
+                                            v.push(s);
+                                        }
+                                        if let Some(s) = size {
+                                            if s != v.len() {
+                                                return Err(syntax_error(state, "Specified array size is different from actual definition", start));
+                                            }
+                                        }
+                                        size = Some(v.len());
+                                        def = VariableDefinition::ArrayOfPointers(v);
                                     }
-                                    size = Some(v.len());
-                                    def = VariableDefinition::Array(v);
                                     var_const = true;
                                 },
                                 Rule::quoted_string => {

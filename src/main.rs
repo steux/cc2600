@@ -18,8 +18,6 @@
     Contact info: bruno.steux@gmail.com
 */
 
-// TODO: array of pointers support
-
 mod cpp;
 mod error;
 mod compile;
@@ -445,4 +443,35 @@ mod tests {
         assert!(result.contains("main\tSUBROUTINE\n\tTXA\n\tCLC\n\tSTY cctmp\n\tADC cctmp\n\tTAX"));
     }
 
+    #[test]
+    fn array_of_pointers_test() {
+        let args = Args {
+            input: "string".to_string(),
+            output: "string".to_string(),
+            include_directories: Vec::new(),
+            defines: Vec::new(),
+            insert_code: false,
+            verbose: false,
+            optimization_level: 1
+        };
+        let input = "
+const char sprite1[] = {0};
+const char sprite2[] = {0};
+const char *sprites[] = {sprite1, sprite2};
+
+char *ptr;
+char v;
+
+void main()
+{
+    ptr = sprites[X];
+    v = ptr[Y];
+}
+            ";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA sprites,X\n\tSTA ptr\n\tLDA sprites+2,X\n\tSTA ptr+1\n\tLDA (ptr),Y\n\tSTA v"));
+    }
 }

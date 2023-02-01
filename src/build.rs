@@ -124,14 +124,20 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
     for v in compiler_state.sorted_variables().iter() {
        // debug!("{:?}",v);
         if !v.1.var_const && v.1.memory == VariableMemory::Zeropage && v.1.def == VariableDefinition::None {
-            let s = match v.1.var_type {
-                VariableType::Char => 1,
-                VariableType::Short => 2,
-                VariableType::CharPtr => 2,
-            };
             if v.1.size > 1 {
-                gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size))?; 
+                let s = match v.1.var_type {
+                    VariableType::CharPtr => 1,
+                    VariableType::CharPtrPtr => 2,
+                    _ => unreachable!()
+                };
+                gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
             } else {
+                let s = match v.1.var_type {
+                    VariableType::Char => 1,
+                    VariableType::Short => 2,
+                    VariableType::CharPtr => 2,
+                    VariableType::CharPtrPtr => 2,
+                };
                 gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
             }
         }
@@ -142,12 +148,22 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         // Superchip variables
         for v in compiler_state.sorted_variables().iter() {
             if !v.1.var_const && v.1.memory == VariableMemory::Superchip && v.1.def == VariableDefinition::None {
-                let s = match v.1.var_type {
-                    VariableType::Char => 1,
-                    VariableType::Short => 2,
-                    VariableType::CharPtr => 2,
-                };
-                gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
+                if v.1.size > 1 {
+                    let s = match v.1.var_type {
+                        VariableType::CharPtr => 1,
+                        VariableType::CharPtrPtr => 2,
+                        _ => unreachable!()
+                    };
+                    gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
+                } else {
+                    let s = match v.1.var_type {
+                        VariableType::Char => 1,
+                        VariableType::Short => 2,
+                        VariableType::CharPtr => 2,
+                        VariableType::CharPtrPtr => 2,
+                    };
+                    gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
+                }
             }
         }
     }
@@ -162,12 +178,22 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                         first = false;
                         gstate.write(&format!("\n\tSEG.U RAM_3E_{}\n\tORG $1000\n\tRORG $1000\n", bank))?;
                     }
-                    let s = match v.1.var_type {
-                        VariableType::Char => 1,
-                        VariableType::Short => 2,
-                        VariableType::CharPtr => 2,
-                    };
-                    gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
+                    if v.1.size > 1 {
+                        let s = match v.1.var_type {
+                            VariableType::CharPtr => 1,
+                            VariableType::CharPtrPtr => 2,
+                            _ => unreachable!()
+                        };
+                        gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
+                    } else {
+                        let s = match v.1.var_type {
+                            VariableType::Char => 1,
+                            VariableType::Short => 2,
+                            VariableType::CharPtr => 2,
+                            VariableType::CharPtrPtr => 2,
+                        };
+                        gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
+                    }
                 }
             }
         }
@@ -299,12 +325,41 @@ Powerup
                             gstate.write(v.0)?;
                             let mut counter = 0;
                             for i in arr {
-                                if counter == 0 || counter == 16 {
+                                if counter == 0 {
                                     gstate.write("\n\thex ")?;
                                 }
                                 counter += 1;
                                 if counter == 16 { counter = 0; }
                                 gstate.write(&format!("{:02x}", i))?;
+                            } 
+                            gstate.write("\n")?;
+                        },
+                        VariableDefinition::ArrayOfPointers(arr) => {
+                            if v.1.alignment != 1 {
+                                gstate.write(&format!("\n\talign {}\n", v.1.alignment))?;
+                            }
+                            gstate.write(v.0)?;
+
+                            let mut counter = 0;
+                            for i in arr {
+                                if counter % 8 == 0 {
+                                    gstate.write("\n\t.byte ")?;
+                                }
+                                counter += 1;
+                                gstate.write(&format!("<{}", i))?;
+                                if counter % 8 != 0 {
+                                    gstate.write(", ")?;
+                                } 
+                            } 
+                            for i in arr {
+                                if counter % 8 == 0 {
+                                    gstate.write("\n\t.byte ")?;
+                                }
+                                counter += 1;
+                                gstate.write(&format!(">{}", i))?;
+                                if counter % 8 != 0 && counter < 2 * arr.len() {
+                                    gstate.write(", ")?;
+                                } 
                             } 
                             gstate.write("\n")?;
                         },

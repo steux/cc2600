@@ -200,9 +200,8 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                                     nb_bytes = 3;
                                 }
                             }
-                        }
-                        ,
-                        VariableType::CharPtr => if v.var_type == VariableType::CharPtr && !*eight_bits && v.var_const {
+                        },
+                        VariableType::CharPtr => if !*eight_bits && v.var_const {
                             if high_byte {
                                 if offset != 0 {
                                     dasm_operand = format!("#>{}+{}", variable, offset);
@@ -237,6 +236,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                                 }
                             }
                         },
+                        VariableType::CharPtrPtr => return Err(syntax_error(self.compiler_state, "Pointer of pointers is not directly addressable", pos))
                     }
                 },
                 ExprType::AbsoluteY(variable) => {
@@ -255,7 +255,34 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                             }
                         } else { 0 }
                     } else { 0 };
-                    if v.var_type == VariableType::CharPtr && !v.var_const {
+                    if v.var_type == VariableType::CharPtrPtr {
+                        let off = offset + if high_byte { v.size } else { 0 };
+                        if off > 0 {
+                            dasm_operand = format!("{}+{},Y", variable, off);
+                        } else {
+                            dasm_operand = format!("{},Y", variable);
+                        }
+                        cycles += 2;
+                        if v.memory == VariableMemory::Zeropage {
+                            match mnemonic {
+                                STA | LDA => {
+                                    nb_bytes = 3;
+                                },
+                                _ => {
+                                    nb_bytes = 2;
+                                }
+                            }
+                        } else {
+                            nb_bytes = 3;
+                        }
+                        match mnemonic {
+                            STA => cycles += 1,
+                            STY | LDY | CPY => return Err(syntax_error(self.compiler_state, "Can't use Y addressing on Y operation", pos)),
+                            CPX => return Err(syntax_error(self.compiler_state, "Can't use Y addressing on compare with X operation", pos)),
+                            STX => if v.memory != VariableMemory::Zeropage { return Err(syntax_error(self.compiler_state, "Can't use Y addressing on a non zeropage variable with X storage", pos)) }, 
+                            _ => () 
+                        }
+                    } else if v.var_type == VariableType::CharPtr && !v.var_const {
                         if v.size == 1 {
                             if offset > 0 {
                                 dasm_operand = format!("({}+{}),Y", variable, offset);
@@ -318,8 +345,14 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                             }
                         } else { 0 }
                     } else { 0 };
-                    if offset > 0 {
-                        dasm_operand = format!("{}+{},X", variable, offset);
+                    if v.var_type == VariableType::CharPtr && v.size == 1 {
+                        return Err(syntax_error(self.compiler_state, "Y-Indirect adressing mode not available with X register", pos));
+                    }
+                    let off = if v.var_type == VariableType::CharPtrPtr {
+                        offset + if high_byte { v.size } else { 0 }
+                    } else { offset };
+                    if off > 0 {
+                        dasm_operand = format!("{}+{},X", variable, off);
                     } else {
                         dasm_operand = format!("{},X", variable);
                     }
