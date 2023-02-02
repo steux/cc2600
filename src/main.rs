@@ -455,16 +455,16 @@ mod tests {
             optimization_level: 1
         };
         let input = "
-const char sprite1[] = {0};
-const char sprite2[] = {0};
-const char *sprites[] = {sprite1, sprite2};
+const char s1[] = {0};
+const char s2[] = {0};
+const char *ss[] = {s1, s2};
 
 char *ptr;
 char v;
 
 void main()
 {
-    ptr = sprites[X];
+    ptr = ss[X];
     v = ptr[Y];
 }
             ";
@@ -472,6 +472,71 @@ void main()
         compile(input.as_bytes(), &mut output, &args).unwrap();
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
-        assert!(result.contains("LDA sprites,X\n\tSTA ptr\n\tLDA sprites+2,X\n\tSTA ptr+1\n\tLDA (ptr),Y\n\tSTA v"));
+        assert!(result.contains("LDA ss,X\n\tSTA ptr\n\tLDA ss+2,X\n\tSTA ptr+1\n\tLDA (ptr),Y\n\tSTA v"));
+    }
+    
+    #[test]
+    fn array_of_pointers_test2() {
+        let args = Args {
+            input: "string".to_string(),
+            output: "string".to_string(),
+            include_directories: Vec::new(),
+            defines: Vec::new(),
+            insert_code: false,
+            verbose: false,
+            optimization_level: 1
+        };
+        let input = "
+const char s1[] = {0};
+const char s2[] = {0};
+const char *ss[] = {s1, s2};
+
+char *ptr;
+char v;
+
+void main()
+{
+    ptr = ss[0];
+    v = ptr[Y];
+}
+            ";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA ss\n\tSTA ptr\n\tLDA ss+2\n\tSTA ptr+1\n\tLDA (ptr),Y\n\tSTA v"));
+    }
+    
+    #[test]
+    fn array_of_pointers_test3() {
+        let args = Args {
+            input: "string".to_string(),
+            output: "string".to_string(),
+            include_directories: Vec::new(),
+            defines: Vec::new(),
+            insert_code: false,
+            verbose: false,
+            optimization_level: 1
+        };
+        let input = "
+char *s1, *s2;
+char *ss[2];
+
+char *ptr;
+char v;
+
+void main()
+{
+    ss[0] = s1;
+    ss[1] = s2;
+    ptr = ss[1];
+    v = ptr[Y];
+}
+            ";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA s1\n\tSTA ss\n\tLDA s1+1\n\tSTA ss+2\n\tLDA s2\n\tSTA ss+1\n\tLDA s2+1\n\tSTA ss+3\n\tLDA ss+1\n\tSTA ptr\n\tLDA ss+3\n\tSTA ptr+1\n\tLDA (ptr),Y\n\tSTA v"));
     }
 }

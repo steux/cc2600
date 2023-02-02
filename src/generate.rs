@@ -236,7 +236,28 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                                 }
                             }
                         },
-                        VariableType::CharPtrPtr => return Err(syntax_error(self.compiler_state, "Pointer of pointers is not directly addressable", pos))
+                        VariableType::CharPtrPtr => {
+                            let v = self.compiler_state.get_variable(variable);
+                            let off = offset + if high_byte { v.size as i32 } else { 0 };
+                            if off > 0 {
+                                dasm_operand = format!("{}+{}", variable, off);
+                            } else {
+                                dasm_operand = format!("{}", variable);
+                            }
+                            cycles += 2;
+                            if v.memory == VariableMemory::Zeropage {
+                                match mnemonic {
+                                    STA | LDA => {
+                                        nb_bytes = 3;
+                                    },
+                                    _ => {
+                                        nb_bytes = 2;
+                                    }
+                                }
+                            } else {
+                                nb_bytes = 3;
+                            }
+                        }
                     }
                 },
                 ExprType::AbsoluteY(variable) => {
@@ -1451,10 +1472,10 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                         } else {
                             let sub_output = self.generate_expr(sub, pos, false)?;
                             match sub_output {
-                                ExprType::Nothing => Ok(ExprType::Absolute(variable, v.var_type != VariableType::Short && v.var_type != VariableType::CharPtr, 0)),
+                                ExprType::Nothing => Ok(ExprType::Absolute(variable, v.var_type == VariableType::Char, 0)),
                                 ExprType::X => Ok(ExprType::AbsoluteX(variable)),
                                 ExprType::Y => Ok(ExprType::AbsoluteY(variable)),
-                                ExprType::Immediate(v) => Ok(ExprType::Absolute(variable, true, v)),
+                                ExprType::Immediate(val) => Ok(ExprType::Absolute(variable, v.var_type != VariableType::CharPtrPtr, val)),
                                 _ => Err(syntax_error(self.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                             }
                         }
