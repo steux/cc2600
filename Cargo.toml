@@ -1,11 +1,15 @@
 [package]
 name = "cc2600"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 author = "Bruno STEUX <bruno.steux@gmail.com>"
-license = "GPLv3"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "GPL-3.0-or-later"
+description = "a subset of C compiler for Atari 2600"
+readme = "README.md"
+homepage = "https://github.com/steux/cc2600"
+repository = "https://github.com/steux/cc2600"
+keywords = ["cli", "atari2600", "compiler", "gamedev"]
+categories = ["command-line-utilities", "game-development", "compilers"]
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
