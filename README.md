@@ -22,7 +22,7 @@ next game developement, since cc2600 will enable you to leverage the use of stru
 ## Main features
 
 
-- Produces DASM compatible code
+- Produces DASM compatible code ([DASM](https://github.com/dasm-assembler/dasm) is required as a second stage compiler) 
 - Native Atari F4, F6 and F8, 3E (lots of RAM!), DPC and DPC+ bankswitching schemes support
 - Superchip (128 bytes of additional RAM!) support
 - Uses only 1 byte of RAM
@@ -58,7 +58,7 @@ This will produce `out.a`, which is a DASM compatible source code.
 
 Type `dasm out.a -f3 -v4 -oout.bin -lout.lst -sout.sym` to make the cartridge.
 
-You can then use the stella emulator to run the out.bin, or install it on a Harmony ou PlusCart cartridge.
+You can then use the stella emulator to run the binary `out.bin`, or copy it on a Harmony ou PlusCart cartridge.
 
 ## TODO
 
