@@ -3,7 +3,11 @@
 cc2600 implements a subset of C compiler for Atari 2600. The main goal of cc2600 is to be able to make games for the Atari 2600
 using C language, including writing kernels, not to provide full C support for the 6502 
 (have a look at cc65 if this is what you are looking for). Any code written for cc2600 can be compiled with gcc, but not
-the other way round... 
+the other way round... The 6502 processor is famous for being an inefficient target for C compilers, due to its poor
+stack support, its infamous indexing modes and its lack of registers. In addition the limitations of the Atari 2600 (128
+bytes of RAM, strong reliance on bankswitching, low speed in general), the use of pure C on this platform is limited.
+cc2600 tries to cope with these limitations by not strictly implementing all C features but mapping C syntax to the specifics of 6502,
+in particular indexing modes.
 
 Note that this compiler is for writing "old school" code for ATARI 2600. It's not meant to be used for CDFJ (custom ARM
 code on the Melody/Harmony cart) development, where the 6507 code is reduced to the minimum. On the contrary, it was
@@ -39,3 +43,12 @@ next game developement, since cc2600 will enable you to leverage the use of stru
 - 16-bits arithmetics is severly constrained
 - No 32-bits operations, no floating point.
 
+## How to install
+
+Installing from source is quite straightforward when Rust is available on your platform. If this is not the case, please
+use [rustup](https://www.rust-lang.org/tools/install) to install it, then use `cargo install --path .` in the root
+directoy to compile and install cc2600 locally. `cargo test` launches the unit tests of cc2600.
+
+## TODO
+
+- [ ] Windows installer
