@@ -27,7 +27,7 @@ next game developement, since cc2600 will enable you to leverage the use of stru
 - Superchip (128 bytes of additional RAM!) support
 - Uses only 1 byte of RAM
 - load/store/strobe intrinsics allow the writing of efficient kernels.
-- X and Y registers are directly usable, just like if they ware declared as unsigned char global variables.
+- X and Y registers are directly mapped to X and Y variables, just like if they ware declared as unsigned char global variables.
 - All C constructs are implemented (for, if, while, goto, etc).
 - Clean bootstrap/bankswitching code is automatically generated
 - PlusROM support for Wifi communication with PlusCART
@@ -35,11 +35,11 @@ next game developement, since cc2600 will enable you to leverage the use of stru
 ## Known limitations
 
 
-- The only data types supported are char (8-bit), short (8-bit) and char pointers (16-bits), and one dimensional arrays of chars.
+- The only data types supported are char (8-bit), short (16-bit) and char pointers (16-bits), and one dimensional arrays of chars and pointers.
 - Only global variables are supported, not local variables (no use of stack. It's so slow on 6502 and so dangerous due
     to the lack of RAM that it'd be a bad idea anyway)
 - Functions can't have arguments and return values (no use of stack). Everything must go through global variables.
-- Array subscripts are limited to constants, X and Y.
+- Array subscripts are limited to constants, X and Y variables / registers.
 - 16-bits arithmetics is severly constrained
 - No 32-bits operations, no floating point.
 
@@ -47,7 +47,18 @@ next game developement, since cc2600 will enable you to leverage the use of stru
 
 Installing from source is quite straightforward when Rust is available on your platform. If this is not the case, please
 use [rustup](https://www.rust-lang.org/tools/install) to install it, then use `cargo install --path .` in the root
-directoy to compile and install cc2600 locally. `cargo test` launches the unit tests of cc2600.
+directory to compile and install cc2600 locally. `cargo test` launches the unit tests of cc2600.
+
+A few examples are available in the `examples` directory. For instance, if you want to run the magnificient DPC (David
+Patrick Crane coprocessor) example featuring Garfield, type :
+
+`cc2600 examples/test_dpc.c`
+
+This will produce `out.a`, which is a DASM compatible source code.
+
+Type `dasm out.a -f3 -v4 -oout.bin -lout.lst -sout.sym` to make the cartridge.
+
+You can then use the stella emulator to run the out.bin, or install it on a Harmony ou PlusCart cartridge.
 
 ## TODO
 
