@@ -394,4 +394,20 @@ void main()
         print!("{:?}", result);
         assert!(result.contains("LDA s1\n\tSTA ss\n\tLDA s1+1\n\tSTA ss+2\n\tLDA s2\n\tSTA ss+1\n\tLDA s2+1\n\tSTA ss+3\n\tLDA ss+1\n\tSTA ptr\n\tLDA ss+3\n\tSTA ptr+1\n\tLDA (ptr),Y\n\tSTA v"));
     }
+    
+#[test]
+    fn longbranch_test() {
+        let args = sargs(1);
+        let mut input: String = "void main() { do {".to_string();
+        for _ in 0..130 {
+            input.push_str("csleep(2);");
+        }
+        input.push_str("} while (Y);}");
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("NOP\n.dowhilecondition1\n\tCPY #0\n\tBEQ .fix1\n\tJMP .dowhile1\n.fix1\n.dowhileend1"));
+    }
+
 }
