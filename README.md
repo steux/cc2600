@@ -1,10 +1,14 @@
+<p align="center">
+  <img src="misc/cc2600.svg" />
+</p>
+
 # cc2600
 
-cc2600 implements a subset of C compiler for Atari 2600. The main goal of cc2600 is to be able to make games for the Atari 2600
+cc2600 implements a subset of C compiler for Atari 2600. The main goal of cc2600 is to enable making games for the Atari 2600
 using C language, including writing kernels, not to provide full C support for the 6502 
 (have a look at cc65 if this is what you are looking for). Any code written for cc2600 can be compiled with gcc, but not
 the other way round... The 6502 processor is famous for being an inefficient target for C compilers, due to its poor
-stack support, its infamous indexing modes and its lack of registers. In addition the limitations of the Atari 2600 (128
+stack support, its infamous indexing modes and its lack of registers. In addition to the limitations of the Atari 2600 (128
 bytes of RAM, strong reliance on bankswitching, low speed in general), the use of pure C on this platform is limited.
 cc2600 tries to cope with these limitations by not strictly implementing all C features but mapping C syntax to the specifics of 6502,
 in particular indexing modes.
@@ -49,7 +53,9 @@ Installing from source is quite straightforward when Rust is available on your p
 use [rustup](https://www.rust-lang.org/tools/install) to install it, then use `cargo install --path .` in the root
 directory to compile and install cc2600 locally. `cargo test` launches the unit tests of cc2600.
 
-A few examples are available in the `examples` directory. For instance, if you want to run the magnificient DPC (David
+A big example of what is possible with cc2600 is the [HappyBird](https://github.com/steux/happybird) game, freely available for download.
+
+A few examples are also available in the `examples` directory. For instance, if you want to run the magnificient DPC (David
 Patrick Crane coprocessor) example featuring Garfield, type :
 
 `cc2600 examples/test_dpc.c`
@@ -63,3 +69,9 @@ You can then use the stella emulator to run the binary `out.bin`, or copy it on 
 ## TODO
 
 - [ ] Windows installer
+
+<p align="center">
+  In Memoriam</br>
+  <img src="misc/Chuck Peddle.png" /></br>
+  Chuck Peddle 1937 - 2019
+</p>
