@@ -383,11 +383,11 @@ Powerup
         } else {
             gstate.write(&format!("
         ECHO ([${:04x}-.]d), \"bytes free in bank {}\"
-        ", 0x1FF0 - nb_banked_functions * 10, bank))?;
+        ", 0x1FEF - nb_banked_functions * 10, bank))?;
 
             if bank == 0 {
                 // Generate bankswitching functions code
-                banked_function_address = 0x0FF0 - nb_banked_functions * 10;
+                banked_function_address = 0x0FEF - nb_banked_functions * 10;
                 debug!("Banked function address={:04x}", banked_function_address);
                 gstate.write(&format!("
         ORG ${:04x}
