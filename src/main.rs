@@ -101,17 +101,21 @@ mod tests {
     use super::compile::compile;
     use std::str;
 
-    #[test]
-    fn for_statement_test1() {
-        let args = Args {
+    fn sargs(optimization_level: u8) -> Args {
+        Args {
             input: "string".to_string(),
             output: "string".to_string(),
             include_directories: Vec::new(),
             defines: Vec::new(),
             insert_code: false,
             verbose: false,
-            optimization_level: 1,
-        };
+            optimization_level,
+        }
+    }
+
+    #[test]
+    fn for_statement_test1() {
+        let args = sargs(1); 
         let input = "unsigned char i; void main() { for (i = 0; i < 10; i++); }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -122,15 +126,7 @@ mod tests {
     
     #[test]
     fn for_statement_test2() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1); 
         let input = "unsigned char i; void main() { for (i = 0; i != 10; i++); }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -141,15 +137,7 @@ mod tests {
     
     #[test]
     fn plusplus_statement_test1() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1); 
         let input = "unsigned char i, j; void main() { i = 0; j = i++; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -160,15 +148,7 @@ mod tests {
     
     #[test]
     fn plusplus_statement_test2() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1); 
         let input = "unsigned char i, j; void main() { i = 0; j = ++i; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -179,15 +159,7 @@ mod tests {
     
     #[test]
     fn sixteen_bits_test1() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1);
         let input = "short i, j, k; void main() { i = 1; j = 1; k = i + j; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -198,15 +170,7 @@ mod tests {
     
     #[test]
     fn if_test1() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1);
         let input = "void main() { if (0) X = 1; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -217,15 +181,7 @@ mod tests {
 
     #[test]
     fn if_test2() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1);
         let input = "void main() { if (!0) X = 1; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -236,15 +192,7 @@ mod tests {
     
     #[test]
     fn if_test3() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 0
-        };
+        let args = sargs(0);
         let input = "unsigned char i, j; void main() { i = 0; j = 0; if (i == 0 && j == 0) X = 1; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -255,15 +203,7 @@ mod tests {
     
     #[test]
     fn if_test4() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 0
-        };
+        let args = sargs(0);
         let input = "unsigned char i, j; void main() { i = 0; j = 0; if (i == 0 || j == 0) X = 1; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -274,15 +214,7 @@ mod tests {
     
     #[test]
     fn if_test5() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 0
-        };
+        let args = sargs(0);
         let input = "unsigned char i, j, k; void main() { i = 0; j = 0; k = 0; if (i == 0 || j == 0 || k == 0) X = 1; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -293,15 +225,7 @@ mod tests {
     
     #[test]
     fn if_test6() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 0
-        };
+        let args = sargs(0);
         let input = "unsigned char i, j, k; void main() { i = 0; i = 0; k = 0; if (i == 0 && j == 0 && k == 0) X = 1; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -312,15 +236,7 @@ mod tests {
     
     #[test]
     fn not_test() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1);
         let input = "void main() { X = 0; Y = !X; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -331,15 +247,7 @@ mod tests {
     
     #[test]
     fn condition_test() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1);
         let input = "void main() { X = 0; Y = X == 0; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -350,15 +258,7 @@ mod tests {
     
     #[test]
     fn ternary_test() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1);
         let input = "void main() { X = 0; Y = (X == 0)?0x10:0x20; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -369,15 +269,7 @@ mod tests {
     
     #[test]
     fn switch_test() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1);
         let input = "void main() { switch(X) { case 0: case 1: Y = 0; case 2: Y = 1; break; default: Y = 2; } }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -388,15 +280,7 @@ mod tests {
     
     #[test]
     fn goto_test() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1);
         let input = "void main() { goto test; return; test: X = 0; }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -407,15 +291,7 @@ mod tests {
     
     #[test]
     fn assign_test() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1);
         let input = "char a, b, c, d, e, f, g; void main() { g = (a+b)+(c+(d&(e=f))); }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -426,15 +302,7 @@ mod tests {
 
     #[test]
     fn inline_test() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1);
         let input = "inline void add() { X += Y; }; void main() { add(); }";
         let mut output = Vec::new();
         compile(input.as_bytes(), &mut output, &args).unwrap();
@@ -444,16 +312,19 @@ mod tests {
     }
 
     #[test]
+    fn inline_test2() {
+        let args = sargs(1);
+        let input = "inline void w() { while(Y) Y--; }; void main() { w(); w(); }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains(".while1inline1\n\tCPY #0\n\tBEQ .whileend1inline1\n\tDEY\n\tJMP .while1inline1\n.whileend1inline1\n.while1inline2\n\tCPY #0\n\tBEQ .whileend1inline2\n\tDEY\n\tJMP .while1inline2\n.whileend1inline2"));
+    }
+
+    #[test]
     fn array_of_pointers_test() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1);
         let input = "
 const char s1[] = {0};
 const char s2[] = {0};
@@ -477,15 +348,7 @@ void main()
     
     #[test]
     fn array_of_pointers_test2() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1);
         let input = "
 const char s1[] = {0};
 const char s2[] = {0};
@@ -509,15 +372,7 @@ void main()
     
     #[test]
     fn array_of_pointers_test3() {
-        let args = Args {
-            input: "string".to_string(),
-            output: "string".to_string(),
-            include_directories: Vec::new(),
-            defines: Vec::new(),
-            insert_code: false,
-            verbose: false,
-            optimization_level: 1
-        };
+        let args = sargs(1);
         let input = "
 char *s1, *s2;
 char *ss[2];

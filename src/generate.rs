@@ -55,6 +55,7 @@ pub struct GeneratorState<'a> {
     pub local_label_counter_for: u32,
     pub local_label_counter_if: u32,
     local_label_counter_while: u32,
+    inline_label_counter: u32,
     loops: Vec<(String,String)>,
     flags: FlagsState<'a>,
     acc_in_use: bool,
@@ -78,6 +79,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
             local_label_counter_for: 0,
             local_label_counter_if: 0,
             local_label_counter_while: 0,
+            inline_label_counter: 0,
             loops: Vec::new(),
             flags: FlagsState::Unknown,
             acc_in_use: false,
@@ -441,11 +443,13 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         Ok(()) 
     } 
 
+    // Inline code
     fn push_code(&mut self, f: &str) -> Result<(), Error> {
+        self.inline_label_counter += 1;
         if let Some(fx) = &self.current_function {
             let code2: AssemblyCode = self.functions_code.get(f).unwrap().clone();
             let code : &mut AssemblyCode = self.functions_code.get_mut(fx).unwrap();
-            code.append_code(&code2);
+            code.append_code(&code2, self.inline_label_counter);
         }
         Ok(()) 
     }

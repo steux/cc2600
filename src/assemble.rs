@@ -102,8 +102,29 @@ impl AssemblyCode {
     pub fn append_comment(&mut self, s: String) -> () {
         self.code.push(AsmLine::Comment(s));
     }
-    pub fn append_code(&mut self, code: &AssemblyCode) -> () {
-        self.code.extend_from_slice(&code.code);
+    // For inlined code: modify local labels in each instruction
+    pub fn append_code(&mut self, code: &AssemblyCode, inline_counter: u32) -> () {
+        for i in &code.code {
+            match i {
+                AsmLine::Label(l) => self.code.push(AsmLine::Label(format!("{}inline{}", l, inline_counter))),
+                AsmLine::Instruction(inst) => {
+                    match inst.mnemonic {
+                        AsmMnemonic::BCC | AsmMnemonic::BCS | AsmMnemonic::BEQ | AsmMnemonic::BMI | AsmMnemonic::BNE | AsmMnemonic::BPL | AsmMnemonic::JMP => {
+                            self.code.push(AsmLine::Instruction(AsmInstruction {
+                                mnemonic: inst.mnemonic,
+                                dasm_operand: format!("{}inline{}", inst.dasm_operand, inline_counter),
+                                cycles: inst.cycles,
+                                nb_bytes: inst.nb_bytes,
+                                protected: false,
+                            }));
+                        },
+                        _ => self.code.push(i.clone()),
+                    }
+                },
+                _ => self.code.push(i.clone()),
+            }
+        }
+        //self.code.extend_from_slice(&code.code);
     }
     pub fn write(&self, writer: &mut dyn Write, cycles: bool) -> Result<usize, std::io::Error> {
         let mut s = 0;
