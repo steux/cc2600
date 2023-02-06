@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="50%" src="misc/cc2600.svg" />
+  <img width="50%" src="https://github.com/steux/cc2600/raw/main/misc/cc2600.svg" />
 </p>
 
 # cc2600
@@ -72,6 +72,6 @@ You can then use the stella emulator to run the binary `out.bin`, or copy it on 
 
 <p align="center">
   In Memoriam</br>
-  <img src="misc/Chuck Peddle.png" /></br>
+  <img src="https://github.com/steux/cc2600/raw/main/misc/Chuck Peddle.png" /></br>
   Chuck Peddle 1937 - 2019
 </p>
