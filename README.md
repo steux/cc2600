@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="misc/cc2600.svg" />
+  <img width="50%" src="misc/cc2600.svg" />
 </p>
 
 # cc2600
