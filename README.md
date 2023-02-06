@@ -44,21 +44,27 @@ next game developement, since cc2600 will enable you to leverage the use of stru
     to the lack of RAM that it'd be a bad idea anyway)
 - Functions can't have arguments and return values (no use of stack). Everything must go through global variables.
 - Array subscripts are limited to constants, X and Y variables / registers.
-- 16-bits arithmetics is severly constrained
+- 16-bits arithmetics is severly constrained. Generated code may not work if too complex (carry propagation is not ensured).
 - No 32-bits operations, no floating point.
 
 ## How to install
 
-Installing from source is quite straightforward when Rust is available on your platform. If this is not the case, please
+Installing from source is quite straightforward when Rust Cargo is available on your platform. If this is not the case, please
 use [rustup](https://www.rust-lang.org/tools/install) to install it, then use `cargo install --path .` in the root
 directory to compile and install cc2600 locally. `cargo test` launches the unit tests of cc2600.
 
-A big example of what is possible with cc2600 is the [HappyBird](https://github.com/steux/happybird) game, freely available for download.
+You can install the binary directly using Cargo by typing `Cargo install cc2600`
 
-A few examples are also available in the `examples` directory. For instance, if you want to run the magnificient DPC (David
+If you definitely don't want to install Rust (quite a shame), you can use the Windows isntaller provided.
+
+## Examples of code using cc2600
+
+A rather complete example of what is possible with cc2600 is the [HappyBird](https://github.com/steux/happybird) game, freely available for download. This example demonstrates a lot of different features : use of inlined assembler (for savekey i2c communication), 48 pixel wide graphics display, ROMplus access, bankswitching, indirect addressing via pointers, etc. 
+
+A few examples are also available in the `examples` directory. There is a Makefile in the folder, but it should only work on Linux. If you want to build yourself the magnificient DPC (David
 Patrick Crane coprocessor) example featuring Garfield, type :
 
-`cc2600 examples/test_dpc.c`
+`cc2600 -I../headers examples/test_dpc.c`
 
 This will produce `out.a`, which is a DASM compatible source code.
 
@@ -69,6 +75,8 @@ You can then use the stella emulator to run the binary `out.bin`, or copy it on 
 ## TODO
 
 - [ ] Windows installer
+- [ ] Provide more examples
+- [ ] Fix 16 bits arithmetics so that it becomes more usable...
 
 <p align="center">
   In Memoriam</br>
