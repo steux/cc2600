@@ -68,7 +68,7 @@ pub struct GeneratorState<'a> {
     bankswitching_scheme: &'a str,
 }
 
-impl<'a, 'b, 'c> GeneratorState<'a> {
+impl<'a, 'b> GeneratorState<'a> {
     pub fn new(compiler_state: &'a CompilerState, writer: &'a mut dyn Write, insert_code: bool, bankswitching_scheme: &'a str) -> GeneratorState<'a> {
         GeneratorState {
             compiler_state,
@@ -130,7 +130,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                         _ => 2,
                     };
                     signed = false;
-                    dasm_operand = format!("{}", *l);
+                    dasm_operand = (*l).to_string();
                 },
                 ExprType::Immediate(v) => {
                     nb_bytes = 2;
@@ -172,7 +172,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                                 if offset > 0 {
                                     dasm_operand = format!("{}+{}", variable, offset);
                                 } else {
-                                    dasm_operand = format!("{}", variable);
+                                    dasm_operand = variable.to_string();
                                 }
                                 if v.memory == VariableMemory::Zeropage {
                                     cycles += 1;
@@ -192,7 +192,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                                 if off != 0 {
                                     dasm_operand = format!("{}+{}", variable, off);
                                 } else {
-                                    dasm_operand = format!("{}", variable);
+                                    dasm_operand = variable.to_string();
                                 }
                                 if v.memory == VariableMemory::Zeropage {
                                     cycles += 1;
@@ -210,32 +210,28 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                                 } else {
                                     dasm_operand = format!("#>{}", variable);
                                 }
+                            } else if offset != 0 {
+                                dasm_operand = format!("#<{}+{}", variable, offset);
                             } else {
-                                if offset != 0 {
-                                    dasm_operand = format!("#<{}+{}", variable, offset);
-                                } else {
-                                    dasm_operand = format!("#<{}", variable);
-                                }
+                                dasm_operand = format!("#<{}", variable);
                             }
                             nb_bytes = 2;
+                        } else if high_byte && *eight_bits {
+                            dasm_operand = "#0".to_string();
+                            nb_bytes = 2;
                         } else {
-                            if high_byte && *eight_bits {
-                                dasm_operand = "#0".to_string();
+                            let off = if high_byte { offset + 1 } else { offset };
+                            if off != 0 {
+                                dasm_operand = format!("{}+{}", variable, off);
+                            } else {
+                                dasm_operand = variable.to_string();
+                            }
+                            if v.memory == VariableMemory::Zeropage {
+                                cycles += 1;
                                 nb_bytes = 2;
                             } else {
-                                let off = if high_byte { offset + 1 } else { offset };
-                                if off != 0 {
-                                    dasm_operand = format!("{}+{}", variable, off);
-                                } else {
-                                    dasm_operand = format!("{}", variable);
-                                }
-                                if v.memory == VariableMemory::Zeropage {
-                                    cycles += 1;
-                                    nb_bytes = 2;
-                                } else {
-                                    cycles += 2;
-                                    nb_bytes = 3;
-                                }
+                                cycles += 2;
+                                nb_bytes = 3;
                             }
                         },
                         VariableType::CharPtrPtr => {
@@ -244,7 +240,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                             if off > 0 {
                                 dasm_operand = format!("{}+{}", variable, off);
                             } else {
-                                dasm_operand = format!("{}", variable);
+                                dasm_operand = variable.to_string();
                             }
                             cycles += 2;
                             if v.memory == VariableMemory::Zeropage {
@@ -404,7 +400,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         }
         
         let mut s = mnemonic.to_string();
-        if dasm_operand.len() > 0 {
+        if !dasm_operand.is_empty() {
             s += " ";
             s += &dasm_operand;
         }
@@ -501,7 +497,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
             // Let's find the line including loc
             while self.last_included_position < loc {
                 let c = self.last_included_char.next();
-                if c.is_none() { return None; }
+                c?; 
                 let c = c.unwrap();
                 self.last_included_position += 1;
                 if c == '\n' { 
@@ -840,7 +836,6 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         debug!("Arithm: {:?},{:?},{:?}", l, op, r);    
         let left;
         let right;
-        let right2;
 
         match op {
             Operation::Sub(_) | Operation::Div(_) => {
@@ -859,7 +854,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         }
 
         let x;
-        right2 = match right {
+        let right2 = match right {
             ExprType::A(s) => {
                 if self.tmp_in_use {
                     return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
@@ -897,24 +892,21 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                 };
             },
             ExprType::Absolute(variable, eight_bits, off) => {
-                match right {
-                    ExprType::Immediate(r) => {
-                        let v = self.compiler_state.get_variable(variable);
-                        if v.var_type == VariableType::CharPtr && !*eight_bits && v.var_const {
-                            match op {
-                                Operation::Add(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off + *r)),
-                                Operation::Sub(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off - *r)),
-                                Operation::And(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off & *r)),
-                                Operation::Or(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off | *r)),
-                                Operation::Xor(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off ^ *r)),
-                                Operation::Mul(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off * *r)),
-                                Operation::Div(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off / *r)),
-                                _ => (),
-                            } 
-                        }
-                    },
-                    _ => ()
-                };
+                if let ExprType::Immediate(r) = right {
+                    let v = self.compiler_state.get_variable(variable);
+                    if v.var_type == VariableType::CharPtr && !*eight_bits && v.var_const {
+                        match op {
+                            Operation::Add(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off + *r)),
+                            Operation::Sub(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off - *r)),
+                            Operation::And(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off & *r)),
+                            Operation::Or(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off | *r)),
+                            Operation::Xor(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off ^ *r)),
+                            Operation::Mul(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off * *r)),
+                            Operation::Div(_) => return Ok(ExprType::Absolute(variable, *eight_bits, *off / *r)),
+                            _ => (),
+                        } 
+                    }
+                }
                 if acc_in_use { self.sasm(PHA)?; }
                 self.asm(LDA, left, pos, high_byte)?;
             },
@@ -1162,28 +1154,22 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                                     } else {
                                         return Err(syntax_error(self.compiler_state, "Undefined function", pos));
                                     }
-                                } else {
-                                    if f.bank == self.current_bank {
-                                        self.asm(JSR, &ExprType::Label(*var), pos, false)?;
+                                } else if f.bank == self.current_bank {
+                                    self.asm(JSR, &ExprType::Label(var), pos, false)?;
+                                } else if self.bankswitching_scheme == "3E" {
+                                    if self.current_bank == 0 {
+                                        // Generate bankswitching call
+                                        self.asm(LDA, &ExprType::Immediate((f.bank - 1) as i32), pos, false)?;
+                                        self.asm(STA, &ExprType::Absolute("ROM_SELECT", true, 0), pos, false)?;
+                                        self.asm(JSR, &ExprType::Label(var), pos, false)?;
                                     } else {
-                                        if self.bankswitching_scheme == "3E" {
-                                            if self.current_bank == 0 {
-                                                // Generate bankswitching call
-                                                self.asm(LDA, &ExprType::Immediate((f.bank - 1) as i32), pos, false)?;
-                                                self.asm(STA, &ExprType::Absolute("ROM_SELECT", true, 0), pos, false)?;
-                                                self.asm(JSR, &ExprType::Label(*var), pos, false)?;
-                                            } else {
-                                                return Err(syntax_error(self.compiler_state, "Banked code can only be called from bank 0 or same bank", pos))
-                                            }
-                                        } else {
-                                            if self.current_bank == 0 {
-                                                // Generate bankswitching call
-                                                self.asm(JSR, &ExprType::Label(&format!("Call{}", *var)), pos, false)?;
-                                            } else {
-                                                return Err(syntax_error(self.compiler_state, "Banked code can only be called from bank 0 or same bank", pos))
-                                            }
-                                        }
-                                    } 
+                                        return Err(syntax_error(self.compiler_state, "Banked code can only be called from bank 0 or same bank", pos))
+                                    }
+                                } else if self.current_bank == 0 {
+                                    // Generate bankswitching call
+                                    self.asm(JSR, &ExprType::Label(&format!("Call{}", *var)), pos, false)?;
+                                } else {
+                                    return Err(syntax_error(self.compiler_state, "Banked code can only be called from bank 0 or same bank", pos))
                                 }
                                 if acc_in_use { self.sasm(PLA)?; }
                                 self.flags = FlagsState::Unknown;
@@ -1410,16 +1396,13 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                         let right = self.generate_expr(rhs, pos, high_byte)?;
                         let ret = self.generate_assign(&left, &right, pos, high_byte);
                         if !high_byte {
-                            match left {
-                                ExprType::Absolute(_, eight_bits, _) => {
-                                    if !eight_bits {
-                                        let left = self.generate_expr(lhs, pos, true)?;
-                                        let right = self.generate_expr(rhs, pos, true)?;
-                                        self.generate_assign(&left, &right, pos, true)?;
-                                    }
-                                },
-                                _ => ()
-                            };
+                            if let ExprType::Absolute(_, eight_bits, _) = left {
+                                if !eight_bits {
+                                    let left = self.generate_expr(lhs, pos, true)?;
+                                    let right = self.generate_expr(rhs, pos, true)?;
+                                    self.generate_assign(&left, &right, pos, true)?;
+                                }
+                            }
                         }
                         ret
                     },
@@ -1434,17 +1417,14 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                         let newright = self.generate_arithm(&left, op, &right, pos, high_byte)?;
                         let ret = self.generate_assign(&left, &newright, pos, high_byte);
                         if !high_byte {
-                            match left {
-                                ExprType::Absolute(variable, eight_bits, _) => {
-                                    let v = self.compiler_state.get_variable(variable);
-                                    if v.var_type == VariableType::Short || (v.var_type == VariableType::CharPtr && !eight_bits) {
-                                        let left = self.generate_expr(lhs, pos, true)?;
-                                        let right = self.generate_expr(rhs, pos, true)?;
-                                        let newright = self.generate_arithm(&left, op, &right, pos, true)?;
-                                        self.generate_assign(&left, &newright, pos, true)?;
-                                    }
-                                },
-                                _ => ()
+                            if let ExprType::Absolute(variable, eight_bits, _) = left {
+                                let v = self.compiler_state.get_variable(variable);
+                                if v.var_type == VariableType::Short || (v.var_type == VariableType::CharPtr && !eight_bits) {
+                                    let left = self.generate_expr(lhs, pos, true)?;
+                                    let right = self.generate_expr(rhs, pos, true)?;
+                                    let newright = self.generate_arithm(&left, op, &right, pos, true)?;
+                                    self.generate_assign(&left, &newright, pos, true)?;
+                                }
                             };
                         }
                         ret
@@ -1502,12 +1482,12 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
             },
             Expr::MinusMinus(expr, true) => {
                 let expr_type = self.generate_expr(expr, pos, high_byte)?;
-                self.deferred_plusplus.push((expr_type.clone(), pos, false));
+                self.deferred_plusplus.push((expr_type, pos, false));
                 Ok(expr_type)
             },
             Expr::PlusPlus(expr, true) => {
                 let expr_type = self.generate_expr(expr, pos, high_byte)?;
-                self.deferred_plusplus.push((expr_type.clone(), pos, true));
+                self.deferred_plusplus.push((expr_type, pos, true));
                 Ok(expr_type)
             },
             Expr::Neg(v) => self.generate_neg(v, pos),
@@ -1525,11 +1505,11 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         match op {
             Operation::Neq => {
                 self.asm(BNE, &ExprType::Label(label), 0, false)?;
-                return Ok(());
+                Ok(())
             },
             Operation::Eq => {
                 self.asm(BEQ, &ExprType::Label(label), 0, false)?;
-                return Ok(());
+                Ok(())
             },
             Operation::Lt => {
                 if signed {
@@ -1543,34 +1523,33 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                 let label_here = format!(".ifhere{}", self.local_label_counter_if);
                 self.asm(BEQ, &ExprType::Label(&label_here), 0, false)?;
                 if signed {
-                    self.asm(BPL, &ExprType::Label(&label), 0, false)?;
+                    self.asm(BPL, &ExprType::Label(label), 0, false)?;
                 } else {
-                    self.asm(BCS, &ExprType::Label(&label), 0, false)?;
+                    self.asm(BCS, &ExprType::Label(label), 0, false)?;
                 }
                 self.label(&label_here)?;
                 Ok(())
             },
             Operation::Lte => {
                 if signed {
-                    self.asm(BMI, &ExprType::Label(&label), 0, false)?;
-                    self.asm(BEQ, &ExprType::Label(&label), 0, false)?;
+                    self.asm(BMI, &ExprType::Label(label), 0, false)?;
+                    self.asm(BEQ, &ExprType::Label(label), 0, false)?;
                 } else {
-                    self.asm(BCC, &ExprType::Label(&label), 0, false)?;
-                    self.asm(BEQ, &ExprType::Label(&label), 0, false)?;
+                    self.asm(BCC, &ExprType::Label(label), 0, false)?;
+                    self.asm(BEQ, &ExprType::Label(label), 0, false)?;
                 } 
                 Ok(())
             },
             Operation::Gte => {
                 if signed {
-                    self.asm(BPL, &ExprType::Label(&label), 0, false)?;
+                    self.asm(BPL, &ExprType::Label(label), 0, false)?;
                 } else {
-                    self.asm(BCS, &ExprType::Label(&label), 0, false)?;
+                    self.asm(BCS, &ExprType::Label(label), 0, false)?;
                 } 
                 Ok(())
             },
             _ => Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
         }
-
     }
 
     fn generate_condition_ex(&mut self, l: &ExprType<'a>, op: &Operation, r: &ExprType<'a>, pos: usize, negate: bool, label: &str) -> Result<(), Error>
@@ -1622,7 +1601,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         if let ExprType::Immediate(v) = *right {
             if v == 0 {
                 // Let's see if we can shortcut compare instruction 
-                if flags_ok(&self.flags, &left) {
+                if flags_ok(&self.flags, left) {
                     match operator {
                         Operation::Neq => {
                             self.asm(BNE, &ExprType::Label(label), pos, false)?;
@@ -1822,9 +1801,9 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         let expr = self.generate_expr(condition, pos, false)?;
         if flags_ok(&self.flags, &expr) {
             if negate {
-                self.asm(BEQ, &ExprType::Label(&label), pos, false)?;
+                self.asm(BEQ, &ExprType::Label(label), pos, false)?;
             } else {
-                self.asm(BNE, &ExprType::Label(&label), pos, false)?;
+                self.asm(BNE, &ExprType::Label(label), pos, false)?;
             }
             Ok(())
         } else {
@@ -1833,12 +1812,10 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
                 ExprType::Immediate(v) => {
                     if v != 0 {
                         if !negate {
-                            self.asm(JMP, &ExprType::Label(&label), pos, false)?;
+                            self.asm(JMP, &ExprType::Label(label), pos, false)?;
                         }
-                    } else {
-                        if negate {
-                            self.asm(JMP, &ExprType::Label(&label), pos, false)?;
-                        }
+                    } else if negate {
+                        self.asm(JMP, &ExprType::Label(label), pos, false)?;
                     }
                     return Ok(());
                 },
@@ -2055,7 +2032,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
     {
         let cont_label = match self.loops.last() {
             None => return Err(syntax_error(self.compiler_state, "Continue statement outside loop", pos)),
-            Some((cl, _)) => if cl == "" {
+            Some((cl, _)) => if cl.is_empty() {
                 return Err(syntax_error(self.compiler_state, "Continue statement outside loop", pos));
             } else {cl.clone()}
         };
@@ -2149,11 +2126,7 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         // debug!("{:?}, {}, {}, {}", expr, pos, self.last_included_position, self.last_included_line_number);
         if self.insert_code {
             let included_source_code = self.generate_included_source_code_line(code.pos);
-            let line_to_be_written = if let Some(line) = included_source_code {
-                Some(line.to_string())
-            } else {
-                None
-            };
+            let line_to_be_written = included_source_code.map(|line| line.to_string());
             // debug!("{:?}, {}, {}", line_to_be_written, self.last_included_position, self.last_included_line_number);
             if let Some(l) = line_to_be_written {
                 self.comment(&l)?; // Should include the '\n'
@@ -2172,11 +2145,11 @@ impl<'a, 'b, 'c> GeneratorState<'a> {
         // Generate different kind of statements
         match &code.statement {
             Statement::Expression(expr) => { 
-                self.generate_expr(&expr, code.pos, false)?;
+                self.generate_expr(expr, code.pos, false)?;
             },
             Statement::Block(statements) => {
                 for code in statements {
-                    self.generate_statement(&code)?;
+                    self.generate_statement(code)?;
                 }
             },
             Statement::For { init, condition, update, body } => { 
@@ -2225,7 +2198,7 @@ fn flags_ok(flags: &FlagsState, expr_type: &ExprType) -> bool
     match flags {
         FlagsState::X => *expr_type == ExprType::X,
         FlagsState::Y => *expr_type == ExprType::Y,
-        FlagsState::Absolute(var, eight_bits, offset) => *expr_type == ExprType::Absolute(*var, *eight_bits, *offset),
+        FlagsState::Absolute(var, eight_bits, offset) => *expr_type == ExprType::Absolute(var, *eight_bits, *offset),
         _ => false
     }
 }

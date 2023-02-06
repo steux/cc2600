@@ -54,24 +54,22 @@ impl AsmLine {
             },
             AsmLine::Instruction(inst) => {
                 if cycles {
-                    if inst.dasm_operand.len() > 0 {
-                        s += writer.write(&format!("\t{} {:19}\t; {}\n", inst.mnemonic.to_string(), &inst.dasm_operand, inst.cycles).as_bytes())?;
+                    if !inst.dasm_operand.is_empty() {
+                        s += writer.write(format!("\t{} {:19}\t; {}\n", inst.mnemonic, &inst.dasm_operand, inst.cycles).as_bytes())?;
                     } else {
-                        s += writer.write(&format!("\t{:23}\t; {}\n", inst.mnemonic.to_string(), inst.cycles).as_bytes())?;
+                        s += writer.write(format!("\t{:23}\t; {}\n", inst.mnemonic, inst.cycles).as_bytes())?;
                     }
+                } else if !inst.dasm_operand.is_empty() {
+                    s += writer.write(format!("\t{} {}\n", inst.mnemonic, &inst.dasm_operand).as_bytes())?;
                 } else {
-                    if inst.dasm_operand.len() > 0 {
-                        s += writer.write(&format!("\t{} {}\n", inst.mnemonic.to_string(), &inst.dasm_operand).as_bytes())?;
-                    } else {
-                        s += writer.write(&format!("\t{}\n", inst.mnemonic.to_string()).as_bytes())?;
-                    }
+                    s += writer.write(format!("\t{}\n", inst.mnemonic).as_bytes())?;
                 }
             },
             AsmLine::Inline(inst) => {
-                s += writer.write(&format!("\t{}\n", inst).as_bytes())?;
+                s += writer.write(format!("\t{}\n", inst).as_bytes())?;
             },
             AsmLine::Comment(comment) => {
-                s += writer.write(&format!(";{}\n", comment).as_bytes())?;
+                s += writer.write(format!(";{}\n", comment).as_bytes())?;
             },
             AsmLine::Dummy => (),
         }
@@ -90,20 +88,20 @@ impl AssemblyCode {
             code: Vec::<AsmLine>::new()
         }
     }
-    pub fn append_asm(&mut self, inst: AsmInstruction) -> () {
+    pub fn append_asm(&mut self, inst: AsmInstruction) {
         self.code.push(AsmLine::Instruction(inst));
     }
-    pub fn append_inline(&mut self, s: String) -> () {
+    pub fn append_inline(&mut self, s: String) {
         self.code.push(AsmLine::Inline(s));
     }
-    pub fn append_label(&mut self, s: String) -> () {
+    pub fn append_label(&mut self, s: String) {
         self.code.push(AsmLine::Label(s));
     }
-    pub fn append_comment(&mut self, s: String) -> () {
+    pub fn append_comment(&mut self, s: String) {
         self.code.push(AsmLine::Comment(s));
     }
     // For inlined code: modify local labels in each instruction
-    pub fn append_code(&mut self, code: &AssemblyCode, inline_counter: u32) -> () {
+    pub fn append_code(&mut self, code: &AssemblyCode, inline_counter: u32)  {
         for i in &code.code {
             match i {
                 AsmLine::Label(l) => self.code.push(AsmLine::Label(format!("{}inline{}", l, inline_counter))),
@@ -152,7 +150,7 @@ impl AssemblyCode {
         }
         // Analyze the first instruction to check for a load
         if let Some(AsmLine::Instruction(inst)) = &first {
-            if inst.dasm_operand.starts_with("#") {
+            if inst.dasm_operand.starts_with('#') {
                 if inst.mnemonic == AsmMnemonic::LDA {
                     if let Ok(v) = inst.dasm_operand[1..].parse::<i32>() {
                         accumulator = Some(v);
@@ -197,7 +195,7 @@ impl AssemblyCode {
                         y_register = None;
                         // Analyze the first instruction to check for a load
                         if let Some(AsmLine::Instruction(inst)) = &first {
-                            if inst.dasm_operand.starts_with("#") {
+                            if inst.dasm_operand.starts_with('#') {
                                 if inst.mnemonic == AsmMnemonic::LDA {
                                     if let Ok(v) = inst.dasm_operand[1..].parse::<i32>() {
                                         accumulator = Some(v);
@@ -231,59 +229,50 @@ impl AssemblyCode {
                     }
                     // Check CMP and remove the branck if the result is obvious
                     if let Some(r) = accumulator {
-                        if i1.mnemonic == AsmMnemonic::CMP && i1.dasm_operand.starts_with("#") {
-                            match i1.dasm_operand[1..].parse::<i32>() {
-                                Ok(v) => {
-                                    // The result IS obvious
-                                    match i2.mnemonic {
-                                        AsmMnemonic::BNE => if r == v {
-                                            remove_both = true;
-                                        },
-                                        AsmMnemonic::BEQ => if r != v {
-                                            remove_both = true;
-                                        },
-                                        _ => ()
-                                    }
-                                },
-                                _ => ()
+                        if i1.mnemonic == AsmMnemonic::CMP && i1.dasm_operand.starts_with('#') {
+                            if let Ok(v) = i1.dasm_operand[1..].parse::<i32>() {
+                                // The result IS obvious
+                                match i2.mnemonic {
+                                    AsmMnemonic::BNE => if r == v {
+                                        remove_both = true;
+                                    },
+                                    AsmMnemonic::BEQ => if r != v {
+                                        remove_both = true;
+                                    },
+                                    _ => ()
+                                }
                             }
                         }
                     }
                     if let Some(r) = x_register {
-                        if i1.mnemonic == AsmMnemonic::CPX && i1.dasm_operand.starts_with("#") {
-                            match i1.dasm_operand[1..].parse::<i32>() {
-                                Ok(v) => {
-                                    // The result IS obvious
-                                    match i2.mnemonic {
-                                        AsmMnemonic::BNE => if r == v {
-                                            remove_both = true;
-                                        },
-                                        AsmMnemonic::BEQ => if r != v {
-                                            remove_both = true;
-                                        },
-                                        _ => ()
-                                    }
-                                },
-                                _ => ()
+                        if i1.mnemonic == AsmMnemonic::CPX && i1.dasm_operand.starts_with('#') {
+                            if let Ok(v) =i1.dasm_operand[1..].parse::<i32>() {
+                                // The result IS obvious
+                                match i2.mnemonic {
+                                    AsmMnemonic::BNE => if r == v {
+                                        remove_both = true;
+                                    },
+                                    AsmMnemonic::BEQ => if r != v {
+                                        remove_both = true;
+                                    },
+                                    _ => ()
+                                }
                             }
                         }
                     }
                     if let Some(r) = y_register {
-                        if i1.mnemonic == AsmMnemonic::CPY && i1.dasm_operand.starts_with("#") {
-                            match i1.dasm_operand[1..].parse::<i32>() {
-                                Ok(v) => {
-                                    // The result IS obvious
-                                    match i2.mnemonic {
-                                        AsmMnemonic::BNE => if r == v {
-                                            remove_both = true;
-                                        },
-                                        AsmMnemonic::BEQ => if r != v {
-                                            remove_both = true;
-                                        },
-                                        _ => ()
-                                    }
-                                },
-                                _ => ()
+                        if i1.mnemonic == AsmMnemonic::CPY && i1.dasm_operand.starts_with('#') {
+                            if let Ok(v) = i1.dasm_operand[1..].parse::<i32>() {
+                                // The result IS obvious
+                                match i2.mnemonic {
+                                    AsmMnemonic::BNE => if r == v {
+                                        remove_both = true;
+                                    },
+                                    AsmMnemonic::BEQ => if r != v {
+                                        remove_both = true;
+                                    },
+                                    _ => ()
+                                }
                             }
                         }
                     }
@@ -295,7 +284,7 @@ impl AssemblyCode {
                 if let Some(AsmLine::Instruction(inst)) = &second {
                     match inst.mnemonic {
                         AsmMnemonic::LDA => {
-                            if inst.dasm_operand.starts_with("#") {
+                            if inst.dasm_operand.starts_with('#') {
                                 match inst.dasm_operand[1..].parse::<i32>() {
                                     Ok(v) => {
                                         if let Some(v2) = accumulator {
@@ -316,7 +305,7 @@ impl AssemblyCode {
                             } 
                         },
                         AsmMnemonic::LDX => {
-                            if inst.dasm_operand.starts_with("#") {
+                            if inst.dasm_operand.starts_with('#') {
                                 match inst.dasm_operand[1..].parse::<i32>() {
                                     Ok(v) => {
                                         if let Some(v2) = x_register {
@@ -337,7 +326,7 @@ impl AssemblyCode {
                             } 
                         },
                         AsmMnemonic::LDY => {
-                            if inst.dasm_operand.starts_with("#") {
+                            if inst.dasm_operand.starts_with('#') {
                                 match inst.dasm_operand[1..].parse::<i32>() {
                                     Ok(v) => {
                                         if let Some(v2) = y_register {
@@ -391,7 +380,7 @@ impl AssemblyCode {
                 y_register = None;
                 // Analyze the first instruction to check for a load
                 if let Some(AsmLine::Instruction(inst)) = &first {
-                    if inst.dasm_operand.starts_with("#") {
+                    if inst.dasm_operand.starts_with('#') {
                         if inst.mnemonic == AsmMnemonic::LDA {
                             accumulator = Some(inst.dasm_operand[1..].parse::<i32>().unwrap());
                         }
