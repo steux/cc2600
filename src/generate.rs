@@ -1003,6 +1003,18 @@ impl<'a, 'b> GeneratorState<'a> {
         let mut acc_in_use = self.acc_in_use;
         let signed;
         match left {
+            ExprType::Immediate(l) => {
+                match right {
+                    ExprType::Immediate(r) => {
+                        match op {
+                            Operation::Brs(_) => return Ok(ExprType::Immediate(l >> r)),
+                            Operation::Bls(_) => return Ok(ExprType::Immediate(l << r)),
+                            _ => unreachable!(),
+                        } 
+                    },
+                    _ => return Err(syntax_error(self.compiler_state, "Incorrect right value for shift operation (constants only)", pos))
+                };
+            },
             ExprType::Absolute(varname, _eight_bits, offset) => {
                 let v = self.compiler_state.get_variable(varname);
                 if (v.var_type == VariableType::Short || v.var_type == VariableType::CharPtr) && *op == Operation::Brs(false) {
@@ -1231,6 +1243,12 @@ impl<'a, 'b> GeneratorState<'a> {
                 self.asm(operation, expr_type, pos, false)?;
                 self.flags = FlagsState::Unknown;
                 Ok(ExprType::AbsoluteX(variable))
+            },
+            ExprType::AbsoluteY(_) => {
+                let op = if plusplus { Operation::Add(false) } else { Operation::Sub(false) };
+                let right = ExprType::Immediate(1);
+                let newright = self.generate_arithm(expr_type, &op, &right, pos, false)?;
+                self.generate_assign(expr_type, &newright, pos, false)
             },
             _ => {
                 if plusplus {

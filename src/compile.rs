@@ -797,7 +797,9 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
     let pratt =
         PrattParser::new()
         .op(Op::infix(Rule::comma, Assoc::Left))
-        .op(Op::infix(Rule::assign, Assoc::Right) | Op::infix(Rule::mass, Assoc::Right) | Op::infix(Rule::pass, Assoc::Right))
+        .op(Op::infix(Rule::assign, Assoc::Right) | Op::infix(Rule::mass, Assoc::Right) | Op::infix(Rule::pass, Assoc::Right) |
+            Op::infix(Rule::andass, Assoc::Right) | Op::infix(Rule::orass, Assoc::Right) | Op::infix(Rule::xorass, Assoc::Right) |
+            Op::infix(Rule::blsass, Assoc::Right) | Op::infix(Rule::brsass, Assoc::Right))
         .op(Op::infix(Rule::ternary_cond1, Assoc::Right))
         .op(Op::infix(Rule::ternary_cond2, Assoc::Right))
         .op(Op::infix(Rule::lor, Assoc::Left))
