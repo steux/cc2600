@@ -123,7 +123,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
     gstate.write("cctmp                  \tds 1\n")?; 
     for v in compiler_state.sorted_variables().iter() {
        // debug!("{:?}",v);
-        if !v.1.var_const && v.1.memory == VariableMemory::Zeropage && v.1.def == VariableDefinition::None {
+        if v.1.memory == VariableMemory::Zeropage && v.1.def == VariableDefinition::None {
             if v.1.size > 1 {
                 let s = match v.1.var_type {
                     VariableType::CharPtr => 1,
@@ -147,7 +147,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         gstate.write("\n\tSEG.U SUPERVARS\n\tORG $1000\n\tRORG $1000\n")?;
         // Superchip variables
         for v in compiler_state.sorted_variables().iter() {
-            if !v.1.var_const && v.1.memory == VariableMemory::Superchip && v.1.def == VariableDefinition::None {
+            if v.1.memory == VariableMemory::Superchip && v.1.def == VariableDefinition::None {
                 if v.1.size > 1 {
                     let s = match v.1.var_type {
                         VariableType::CharPtr => 1,
@@ -173,7 +173,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         for bank in 1..=512 { // Max 512ko
             let mut first = true;
             for v in compiler_state.sorted_variables().iter() {
-                if !v.1.var_const && v.1.memory == VariableMemory::MemoryOnChip(bank) && v.1.def == VariableDefinition::None {
+                if v.1.memory == VariableMemory::MemoryOnChip(bank) && v.1.def == VariableDefinition::None {
                     if first {
                         first = false;
                         gstate.write(&format!("\n\tSEG.U RAM_3E_{}\n\tORG $1000\n\tRORG $1000\n", bank))?;
@@ -439,7 +439,7 @@ Call{}
         RORG $1FFA
 
         .word PLUSROM_API + ${:04x}\t
-        .word PLUSROM_API + ${:04x}\t
+        .word {}\t; RESET
         .word {}\t; IRQ
         \n", bank, offset * 0x1000, offset * 0x1000, starting_code))?;
         } else if bankswitching_scheme != "DPC+" && bankswitching_scheme != "3E" {

@@ -382,8 +382,10 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                             }
                             if var_type == VariableType::Char {
                                 var_type = VariableType::CharPtr;
+                                var_const = true;
                             } else if var_type == VariableType::CharPtr {
                                 var_type = VariableType::CharPtrPtr;
+                                var_const = true;
                             } else {
                                 return Err(syntax_error(state, "Array of short integers are not available", start));
                             }
