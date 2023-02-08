@@ -18,7 +18,7 @@ code on the Melody/Harmony cart) development, where the 6507 code is reduced to 
 designed to write code the classical atari way, possibly with DPC or DPC+ accelerators or a superchip for more RAM.
 
 cc2600 should not be a starting point for writing ATARI 2600. You'll first have to learn writing games
-in assembler (I definitely recommand reading "Making Games For The Atari 2600", by Steven Hugg, see http://8bitworkshop.com/docs/book).
+in assembler (I definitely recommand reading "Making Games For The Atari 2600", by Steven Hugg, see https://8bitworkshop.com/docs/books).
 On the other hand, if you're an experienced ASM code writer, you may gain a lot of time using cc2600 for your
 next game developement, since cc2600 will enable you to leverage the use of structural code writing.
 
