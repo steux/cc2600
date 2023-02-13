@@ -1469,17 +1469,17 @@ impl<'a, 'b> GeneratorState<'a> {
                     "Y" => Ok(ExprType::Y),
                     variable => {
                         let v = self.compiler_state.get_variable(variable);
-                        if let VariableDefinition::Value(val) = &v.def {
-                            Ok(ExprType::Immediate(*val))
-                        } else {
-                            let sub_output = self.generate_expr(sub, pos, false)?;
-                            match sub_output {
-                                ExprType::Nothing => Ok(ExprType::Absolute(variable, v.var_type == VariableType::Char, 0)),
-                                ExprType::X => Ok(ExprType::AbsoluteX(variable)),
-                                ExprType::Y => Ok(ExprType::AbsoluteY(variable)),
-                                ExprType::Immediate(val) => Ok(ExprType::Absolute(variable, v.var_type != VariableType::CharPtrPtr, val)),
-                                _ => Err(syntax_error(self.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
-                            }
+                        let sub_output = self.generate_expr(sub, pos, false)?;
+                        match sub_output {
+                            ExprType::Nothing => if let VariableDefinition::Value(val) = &v.def {
+                                Ok(ExprType::Immediate(*val))
+                            } else {
+                                Ok(ExprType::Absolute(variable, v.var_type == VariableType::Char, 0))
+                            },
+                            ExprType::X => Ok(ExprType::AbsoluteX(variable)),
+                            ExprType::Y => Ok(ExprType::AbsoluteY(variable)),
+                            ExprType::Immediate(val) => Ok(ExprType::Absolute(variable, v.var_type != VariableType::CharPtrPtr, val)),
+                            _ => Err(syntax_error(self.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                         }
                     },
                 }
