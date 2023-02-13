@@ -367,7 +367,7 @@ impl<'a, 'b> GeneratorState<'a> {
                             }
                         } else { 0 }
                     } else { 0 };
-                    if v.var_type == VariableType::CharPtr && v.size == 1 {
+                    if v.var_type == VariableType::CharPtr && !v.var_const && v.size == 1 {
                         return Err(syntax_error(self.compiler_state, "Y-Indirect adressing mode not available with X register", pos));
                     }
                     let off = if v.var_type == VariableType::CharPtrPtr {
@@ -2133,7 +2133,11 @@ impl<'a, 'b> GeneratorState<'a> {
 
     fn generate_load_store_statement(&mut self, expr: &ExprType<'a>, pos: usize, load: bool) -> Result<(), Error>
     {
-        self.asm(if load {LDA} else {STA}, expr, pos, false)?;
+        match expr {
+            ExprType::X => self.asm(if load {TXA} else {TAX}, &ExprType::Nothing, pos, false)?,
+            ExprType::Y => self.asm(if load {TYA} else {TAY}, &ExprType::Nothing, pos, false)?,
+            _ => self.asm(if load {LDA} else {STA}, expr, pos, false)?,
+        };
         Ok(())
     }
 
