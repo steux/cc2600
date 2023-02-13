@@ -301,6 +301,9 @@ impl<'a, 'b> GeneratorState<'a> {
                             STX => if v.memory != VariableMemory::Zeropage { return Err(syntax_error(self.compiler_state, "Can't use Y addressing on a non zeropage variable with X storage", pos)) }, 
                             _ => () 
                         }
+                    } else if high_byte {
+                        dasm_operand = "#0".to_string();
+                        nb_bytes = 2;
                     } else if v.var_type == VariableType::CharPtr && !v.var_const {
                         if v.size == 1 {
                             if offset > 0 {
@@ -370,23 +373,28 @@ impl<'a, 'b> GeneratorState<'a> {
                     let off = if v.var_type == VariableType::CharPtrPtr {
                         offset + if high_byte { v.size } else { 0 }
                     } else { offset };
-                    if off > 0 {
-                        dasm_operand = format!("{}+{},X", variable, off);
-                    } else {
-                        dasm_operand = format!("{},X", variable);
-                    }
-                    cycles += 2;
-                    if v.memory == VariableMemory::Zeropage {
+                    if high_byte && v.var_type != VariableType::CharPtrPtr {
+                        dasm_operand = "#0".to_string();
                         nb_bytes = 2;
                     } else {
-                        if mnemonic == STA { cycles += 1; }
-                        nb_bytes = 3;
-                    }
-                    match mnemonic {
-                        STX | LDX | CPX => return Err(syntax_error(self.compiler_state, "Can't use X addressing on X operation", pos)),
-                        CPY => return Err(syntax_error(self.compiler_state, "Can't use X addressing on compare with Y operation", pos)),
-                        STY => if v.memory != VariableMemory::Zeropage { return Err(syntax_error(self.compiler_state, "Can't use X addressing on a non zeropage variable with Y storage", pos)) }, 
-                        _ => () 
+                        if off > 0 {
+                            dasm_operand = format!("{}+{},X", variable, off);
+                        } else {
+                            dasm_operand = format!("{},X", variable);
+                        }
+                        cycles += 2;
+                        if v.memory == VariableMemory::Zeropage {
+                            nb_bytes = 2;
+                        } else {
+                            if mnemonic == STA { cycles += 1; }
+                            nb_bytes = 3;
+                        }
+                        match mnemonic {
+                            STX | LDX | CPX => return Err(syntax_error(self.compiler_state, "Can't use X addressing on X operation", pos)),
+                            CPY => return Err(syntax_error(self.compiler_state, "Can't use X addressing on compare with Y operation", pos)),
+                            STY => if v.memory != VariableMemory::Zeropage { return Err(syntax_error(self.compiler_state, "Can't use X addressing on a non zeropage variable with Y storage", pos)) }, 
+                            _ => () 
+                        }
                     }
                 },
                 _ => unreachable!()
@@ -1815,7 +1823,6 @@ impl<'a, 'b> GeneratorState<'a> {
             _ => ()
         };
 
-        let cmp;
         let expr = self.generate_expr(condition, pos, false)?;
         if flags_ok(&self.flags, &expr) {
             if negate {
@@ -1843,40 +1850,28 @@ impl<'a, 'b> GeneratorState<'a> {
                         return Err(syntax_error(self.compiler_state, "Comparision is not implemented on 16 bits data", pos));
                     }
                     self.asm(LDA, &expr, pos, false)?;
-                    cmp = true;
                 },
                 ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) => {
                     if self.acc_in_use { self.sasm(PHA)?; }
                     self.asm(LDA, &expr, pos, false)?;
-                    cmp = true;
                 },
                 ExprType::A(_) => {
-                    cmp = true;
                     self.acc_in_use = false;
                 },
                 ExprType::Y => {
                     self.asm(CPY, &ExprType::Immediate(0), pos, false)?;
-                    cmp = false;
                 },
                 ExprType::X => {
                     self.asm(CPX, &ExprType::Immediate(0), pos, false)?;
-                    cmp = false;
                 }
                 ExprType::Tmp(_) => {
                     if self.acc_in_use { self.sasm(PHA)?; }
                     self.asm(LDA, &expr, pos, false)?;
-                    cmp = true;
                     self.tmp_in_use = false;
                 },
                 _ => return Err(Error::Unimplemented { feature: "condition statement is partially implemented" })
             }
 
-            if cmp {
-                self.asm(CMP, &ExprType::Immediate(0), pos, false)?;
-                if self.acc_in_use { 
-                    self.sasm(PLA)?; 
-                }
-            }
             if negate {
                 self.asm(BEQ, &ExprType::Label(label), 0, false)?;
             } else {
