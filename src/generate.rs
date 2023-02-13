@@ -1999,17 +1999,21 @@ impl<'a, 'b> GeneratorState<'a> {
 
     fn generate_while(&mut self, condition: &Expr<'a>, body: &StatementLoc<'a>, pos: usize) -> Result<(), Error>
     {
-        self.local_label_counter_while += 1;
-        let while_label = format!(".while{}", self.local_label_counter_while);
-        let whileend_label = format!(".whileend{}", self.local_label_counter_while);
-        self.loops.push((while_label.clone(), whileend_label.clone()));
-        self.label(&while_label)?;
-        self.generate_condition(condition, pos, true, &whileend_label)?;
-        self.generate_statement(body)?;
-        self.asm(JMP, &ExprType::Label(&while_label), pos, false)?;
-        self.label(&whileend_label)?;
-        self.loops.pop();
-        Ok(())
+        if let Statement::Expression(Expr::Nothing) = body.statement {
+            self.generate_do_while(body, condition, pos)
+        } else {
+            self.local_label_counter_while += 1;
+            let while_label = format!(".while{}", self.local_label_counter_while);
+            let whileend_label = format!(".whileend{}", self.local_label_counter_while);
+            self.loops.push((while_label.clone(), whileend_label.clone()));
+            self.label(&while_label)?;
+            self.generate_condition(condition, pos, true, &whileend_label)?;
+            self.generate_statement(body)?;
+            self.asm(JMP, &ExprType::Label(&while_label), pos, false)?;
+            self.label(&whileend_label)?;
+            self.loops.pop();
+            Ok(())
+        }
     }
 
     fn generate_do_while(&mut self, body: &StatementLoc<'a>, condition: &Expr<'a>, pos: usize) -> Result<(), Error>
