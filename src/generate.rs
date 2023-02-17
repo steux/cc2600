@@ -234,7 +234,7 @@ impl<'a, 'b> GeneratorState<'a> {
                                 nb_bytes = 3;
                             }
                         },
-                        VariableType::CharPtrPtr => {
+                        VariableType::CharPtrPtr | VariableType::ShortPtr => {
                             let v = self.compiler_state.get_variable(variable);
                             let off = offset + if high_byte { v.size as i32 } else { 0 };
                             if off > 0 {
@@ -274,7 +274,7 @@ impl<'a, 'b> GeneratorState<'a> {
                             }
                         } else { 0 }
                     } else { 0 };
-                    if v.var_type == VariableType::CharPtrPtr {
+                    if v.var_type == VariableType::CharPtrPtr || v.var_type == VariableType::ShortPtr {
                         let off = offset + if high_byte { v.size } else { 0 };
                         if off > 0 {
                             dasm_operand = format!("{}+{},Y", variable, off);
@@ -370,10 +370,10 @@ impl<'a, 'b> GeneratorState<'a> {
                     if v.var_type == VariableType::CharPtr && !v.var_const && v.size == 1 {
                         return Err(syntax_error(self.compiler_state, "Y-Indirect adressing mode not available with X register", pos));
                     }
-                    let off = if v.var_type == VariableType::CharPtrPtr {
+                    let off = if v.var_type == VariableType::CharPtrPtr || v.var_type == VariableType::ShortPtr {
                         offset + if high_byte { v.size } else { 0 }
                     } else { offset };
-                    if high_byte && v.var_type != VariableType::CharPtrPtr {
+                    if high_byte && v.var_type != VariableType::CharPtrPtr && v.var_type != VariableType::ShortPtr {
                         dasm_operand = "#0".to_string();
                         nb_bytes = 2;
                     } else {
@@ -1023,14 +1023,14 @@ impl<'a, 'b> GeneratorState<'a> {
                     _ => return Err(syntax_error(self.compiler_state, "Incorrect right value for shift operation (constants only)", pos))
                 };
             },
-            ExprType::Absolute(varname, _eight_bits, offset) => {
+            ExprType::Absolute(varname, eight_bits, offset) => {
                 let v = self.compiler_state.get_variable(varname);
-                if (v.var_type == VariableType::Short || v.var_type == VariableType::CharPtr) && *op == Operation::Brs(false) {
+                if (v.var_type == VariableType::Short || v.var_type == VariableType::ShortPtr || (v.var_type == VariableType::CharPtr && !eight_bits)) && *op == Operation::Brs(false) {
                     // Special shift 8 case for extracting higher byte
                     match right {
-                        ExprType::Immediate(v) => {
-                            if *v == 8 {
-                                return Ok(ExprType::Absolute(varname, true, offset + 1));
+                        ExprType::Immediate(value) => {
+                            if *value == 8 {
+                                return Ok(ExprType::Absolute(varname, true, offset + v.size as i32));
                             } else {
                                 return Err(syntax_error(self.compiler_state, "Incorrect right value for right shift operation on short (constant 8 only supported)", pos));
                             } 
@@ -1042,9 +1042,34 @@ impl<'a, 'b> GeneratorState<'a> {
                     signed = self.asm(LDA, left, pos, false)?;
                 }
             },
-            ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) => {
-                if acc_in_use { self.sasm(PHA)?; }
-                signed = self.asm(LDA, left, pos, false)?;
+            ExprType::AbsoluteX(varname) | ExprType::AbsoluteY(varname) => {
+                let v = self.compiler_state.get_variable(varname);
+                if (v.var_type == VariableType::ShortPtr || v.var_type == VariableType::CharPtrPtr) && *op == Operation::Brs(false) {
+                    // Special shift 8 case for extracting higher byte
+                    match right {
+                        ExprType::Immediate(value) => {
+                            if *value == 8 {
+                                if acc_in_use { self.sasm(PHA)?; }
+                                signed = self.asm(LDA, left, pos, true)?;
+                                self.flags = FlagsState::Unknown;
+                                if acc_in_use {
+                                    self.asm(STA, &ExprType::Tmp(signed), pos, false)?;
+                                    self.sasm(PLA)?;
+                                    self.tmp_in_use = true;
+                                    return Ok(ExprType::Tmp(signed));
+                                } else {
+                                    return Ok(ExprType::A(signed));
+                                }
+                            } else {
+                                return Err(syntax_error(self.compiler_state, "Incorrect right value for right shift operation on short (constant 8 only supported)", pos));
+                            } 
+                        },
+                        _ => return Err(syntax_error(self.compiler_state, "Incorrect right value for right shift operation on short (constant 8 only supported)", pos))
+                    };
+                } else {
+                    if acc_in_use { self.sasm(PHA)?; }
+                    signed = self.asm(LDA, left, pos, false)?;
+                }
             },
             ExprType::X => {
                 if acc_in_use { self.sasm(PHA)?; }
@@ -1443,14 +1468,26 @@ impl<'a, 'b> GeneratorState<'a> {
                         let newright = self.generate_arithm(&left, op, &right, pos, high_byte)?;
                         let ret = self.generate_assign(&left, &newright, pos, high_byte);
                         if !high_byte {
-                            if let ExprType::Absolute(variable, eight_bits, _) = left {
-                                let v = self.compiler_state.get_variable(variable);
-                                if v.var_type == VariableType::Short || (v.var_type == VariableType::CharPtr && !eight_bits) {
-                                    let left = self.generate_expr(lhs, pos, true)?;
-                                    let right = self.generate_expr(rhs, pos, true)?;
-                                    let newright = self.generate_arithm(&left, op, &right, pos, true)?;
-                                    self.generate_assign(&left, &newright, pos, true)?;
-                                }
+                            match left {
+                                ExprType::Absolute(variable, eight_bits, _) => {
+                                    let v = self.compiler_state.get_variable(variable);
+                                    if v.var_type == VariableType::Short || v.var_type == VariableType::ShortPtr || (v.var_type == VariableType::CharPtr && !eight_bits) {
+                                        let left = self.generate_expr(lhs, pos, true)?;
+                                        let right = self.generate_expr(rhs, pos, true)?;
+                                        let newright = self.generate_arithm(&left, op, &right, pos, true)?;
+                                        self.generate_assign(&left, &newright, pos, true)?;
+                                    }
+                                },
+                                ExprType::AbsoluteX(variable) | ExprType::AbsoluteY(variable) => {
+                                    let v = self.compiler_state.get_variable(variable);
+                                    if v.var_type == VariableType::ShortPtr || v.var_type == VariableType::CharPtrPtr {
+                                        let left = self.generate_expr(lhs, pos, true)?;
+                                        let right = self.generate_expr(rhs, pos, true)?;
+                                        let newright = self.generate_arithm(&left, op, &right, pos, true)?;
+                                        self.generate_assign(&left, &newright, pos, true)?;
+                                    }
+                                },
+                                _ => (),
                             };
                         }
                         ret
@@ -1486,7 +1523,7 @@ impl<'a, 'b> GeneratorState<'a> {
                             },
                             ExprType::X => Ok(ExprType::AbsoluteX(variable)),
                             ExprType::Y => Ok(ExprType::AbsoluteY(variable)),
-                            ExprType::Immediate(val) => Ok(ExprType::Absolute(variable, v.var_type != VariableType::CharPtrPtr, val)),
+                            ExprType::Immediate(val) => Ok(ExprType::Absolute(variable, v.var_type != VariableType::CharPtrPtr && v.var_type != VariableType::ShortPtr, val)),
                             _ => Err(syntax_error(self.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                         }
                     },

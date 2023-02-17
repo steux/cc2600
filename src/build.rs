@@ -128,6 +128,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                 let s = match v.1.var_type {
                     VariableType::CharPtr => 1,
                     VariableType::CharPtrPtr => 2,
+                    VariableType::ShortPtr => 2,
                     _ => unreachable!()
                 };
                 gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
@@ -137,6 +138,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                     VariableType::Short => 2,
                     VariableType::CharPtr => 2,
                     VariableType::CharPtrPtr => 2,
+                    VariableType::ShortPtr => 2,
                 };
                 gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
             }
@@ -152,6 +154,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                     let s = match v.1.var_type {
                         VariableType::CharPtr => 1,
                         VariableType::CharPtrPtr => 2,
+                        VariableType::ShortPtr => 2,
                         _ => unreachable!()
                     };
                     gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
@@ -161,6 +164,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                         VariableType::Short => 2,
                         VariableType::CharPtr => 2,
                         VariableType::CharPtrPtr => 2,
+                        VariableType::ShortPtr => 2,
                     };
                     gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
                 }
@@ -182,6 +186,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                         let s = match v.1.var_type {
                             VariableType::CharPtr => 1,
                             VariableType::CharPtrPtr => 2,
+                            VariableType::ShortPtr => 2,
                             _ => unreachable!()
                         };
                         gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
@@ -191,6 +196,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                             VariableType::Short => 2,
                             VariableType::CharPtr => 2,
                             VariableType::CharPtrPtr => 2,
+                            VariableType::ShortPtr => 2,
                         };
                         gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
                     }
@@ -330,8 +336,18 @@ Powerup
                                 }
                                 counter += 1;
                                 if counter == 16 { counter = 0; }
-                                gstate.write(&format!("{:02x}", i))?;
+                                gstate.write(&format!("{:02x}", i & 0xff))?;
                             } 
+                            if v.1.var_type == VariableType::ShortPtr {
+                                for i in arr {
+                                    if counter == 0 {
+                                        gstate.write("\n\thex ")?;
+                                    }
+                                    counter += 1;
+                                    if counter == 16 { counter = 0; }
+                                    gstate.write(&format!("{:02x}", (i >> 8) & 0xff))?;
+                                } 
+                            }
                             gstate.write("\n")?;
                         },
                         VariableDefinition::ArrayOfPointers(arr) => {

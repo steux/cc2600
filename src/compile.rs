@@ -40,6 +40,7 @@ pub enum VariableType {
     Short,
     CharPtr,
     CharPtrPtr,
+    ShortPtr,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -386,8 +387,11 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                             } else if var_type == VariableType::CharPtr {
                                 var_type = VariableType::CharPtrPtr;
                                 var_const = true;
+                            } else if var_type == VariableType::Short {
+                                var_type = VariableType::ShortPtr;
+                                var_const = true;
                             } else {
-                                return Err(syntax_error(state, "Array of short integers are not available", start));
+                                return Err(syntax_error(state, "Kind of array not available", start));
                             }
                         },
                         Rule::var_def => {
@@ -406,10 +410,10 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                                         VariableMemory::ROM(_) | VariableMemory::Display | VariableMemory::Frequency => memory,
                                         _ => VariableMemory::ROM(0)
                                     };
-                                    if var_type != VariableType::CharPtr && var_type != VariableType::CharPtrPtr {
+                                    if var_type != VariableType::CharPtr && var_type != VariableType::CharPtrPtr && var_type != VariableType::ShortPtr {
                                         return Err(syntax_error(state, "Array definition provided for something not an array", start));
                                     }
-                                    if var_type == VariableType::CharPtr {
+                                    if var_type == VariableType::CharPtr || var_type == VariableType::ShortPtr {
                                         let mut v = Vec::new();
                                         for pxx in px.into_inner() {
                                             v.push(parse_int(pxx.into_inner().next().unwrap()));
