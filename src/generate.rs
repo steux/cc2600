@@ -1447,13 +1447,22 @@ impl<'a, 'b> GeneratorState<'a> {
                         let right = self.generate_expr(rhs, pos, high_byte)?;
                         let ret = self.generate_assign(&left, &right, pos, high_byte);
                         if !high_byte {
-                            if let ExprType::Absolute(_, eight_bits, _) = left {
-                                if !eight_bits {
+                            match left {
+                                ExprType::Absolute(_, eight_bits, _) =>  if !eight_bits {
                                     let left = self.generate_expr(lhs, pos, true)?;
                                     let right = self.generate_expr(rhs, pos, true)?;
                                     self.generate_assign(&left, &right, pos, true)?;
-                                }
-                            }
+                                },
+                                ExprType::AbsoluteX(variable) | ExprType::AbsoluteY(variable) => {
+                                    let v = self.compiler_state.get_variable(variable);
+                                    if v.var_type == VariableType::ShortPtr || v.var_type == VariableType::CharPtrPtr {
+                                        let left = self.generate_expr(lhs, pos, true)?;
+                                        let right = self.generate_expr(rhs, pos, true)?;
+                                        self.generate_assign(&left, &right, pos, true)?;
+                                    }
+                                },
+                                _ => (),
+                            };
                         }
                         ret
                     },
