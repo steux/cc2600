@@ -526,13 +526,13 @@ Call{}
             ")?;
         
         // Generate display tables
-        gstate.write("\n; Display in ROM\n")?;
+        gstate.write("\n; Display in RAM\n")?;
         for v in compiler_state.sorted_variables().iter() {
             if let VariableMemory::Display = v.1.memory {
+                if v.1.alignment != 1 {
+                    gstate.write(&format!("\n\talign {}\n", v.1.alignment))?;
+                }
                 if let VariableDefinition::Array(arr) = &v.1.def {
-                    if v.1.alignment != 1 {
-                        gstate.write(&format!("\n\talign {}\n", v.1.alignment))?;
-                    }
                     gstate.write(v.0)?;
                     let mut counter = 0;
                     for i in arr {
@@ -544,6 +544,25 @@ Call{}
                         gstate.write(&format!("{:02x}", i))?;
                     } 
                     gstate.write("\n")?;
+                } else {
+                    if v.1.size > 1 {
+                        let s = match v.1.var_type {
+                            VariableType::CharPtr => 1,
+                            VariableType::CharPtrPtr => 2,
+                            VariableType::ShortPtr => 2,
+                            _ => unreachable!()
+                        };
+                        gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
+                    } else {
+                        let s = match v.1.var_type {
+                            VariableType::Char => 1,
+                            VariableType::Short => 2,
+                            VariableType::CharPtr => 2,
+                            VariableType::CharPtrPtr => 2,
+                            VariableType::ShortPtr => 2,
+                        };
+                        gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
+                    }
                 }
             }
         }

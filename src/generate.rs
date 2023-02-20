@@ -1030,7 +1030,21 @@ impl<'a, 'b> GeneratorState<'a> {
                     match right {
                         ExprType::Immediate(value) => {
                             if *value == 8 {
-                                return Ok(ExprType::Absolute(varname, true, offset + v.size as i32));
+                                if v.var_type == VariableType::CharPtr && !eight_bits && v.var_const {
+                                    if acc_in_use { self.sasm(PHA)?; }
+                                    signed = self.asm(LDA, left, pos, true)?;
+                                    self.flags = FlagsState::Unknown;
+                                    if acc_in_use {
+                                        self.asm(STA, &ExprType::Tmp(signed), pos, false)?;
+                                        self.sasm(PLA)?;
+                                        self.tmp_in_use = true;
+                                        return Ok(ExprType::Tmp(signed));
+                                    } else {
+                                        return Ok(ExprType::A(signed));
+                                    }
+                                } else {
+                                    return Ok(ExprType::Absolute(varname, true, offset + v.size as i32));
+                                }
                             } else {
                                 return Err(syntax_error(self.compiler_state, "Incorrect right value for right shift operation on short (constant 8 only supported)", pos));
                             } 
@@ -1592,6 +1606,7 @@ impl<'a, 'b> GeneratorState<'a> {
                 Ok(())
             },
             Operation::Gt => {
+                self.local_label_counter_if += 1;
                 let label_here = format!(".ifhere{}", self.local_label_counter_if);
                 self.asm(BEQ, &ExprType::Label(&label_here), 0, false)?;
                 if signed {
