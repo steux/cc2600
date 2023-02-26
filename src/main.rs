@@ -169,6 +169,17 @@ mod tests {
     }
     
     #[test]
+    fn sixteen_bits_test2() {
+        let args = sargs(1);
+        let input = "unsigned short i; unsigned char j; void main() { i = j; i = j << 8; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA j\n\tSTA i\n\tLDA #0\n\tSTA i+1\n\tSTA i\n\tLDA j\n\tSTA i+1"));
+    }
+    
+    #[test]
     fn if_test1() {
         let args = sargs(1);
         let input = "void main() { if (0) X = 1; }";

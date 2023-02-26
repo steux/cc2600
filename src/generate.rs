@@ -969,7 +969,10 @@ impl<'a, 'b> GeneratorState<'a> {
         };
         let signed;
         match right2 {
-            ExprType::Immediate(_) | ExprType::Absolute(_, _, _) | ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) => {
+            ExprType::Immediate(v) => {
+                signed = if *v == 0 { false } else { self.asm(operation, right2, pos, high_byte)? };
+            },
+            ExprType::Absolute(_, _, _) | ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) => {
                 signed = self.asm(operation, right2, pos, high_byte)?;
             },
             ExprType::X => {
@@ -999,6 +1002,9 @@ impl<'a, 'b> GeneratorState<'a> {
         if acc_in_use {
             self.asm(STA, &ExprType::Tmp(false), pos, high_byte)?;
             self.sasm(PLA)?;
+            if self.tmp_in_use {
+                return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+            }
             self.tmp_in_use = true;
             Ok(ExprType::Tmp(signed))
         } else {
@@ -1006,7 +1012,7 @@ impl<'a, 'b> GeneratorState<'a> {
         }
     }
 
-    fn generate_shift(&mut self, left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+    fn generate_shift(&mut self, left: &ExprType<'a>, op: &Operation, right: &ExprType<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
     {
         let mut acc_in_use = self.acc_in_use;
         let signed;
@@ -1037,6 +1043,9 @@ impl<'a, 'b> GeneratorState<'a> {
                                     if acc_in_use {
                                         self.asm(STA, &ExprType::Tmp(signed), pos, false)?;
                                         self.sasm(PLA)?;
+                                        if self.tmp_in_use {
+                                            return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+                                        }
                                         self.tmp_in_use = true;
                                         return Ok(ExprType::Tmp(signed));
                                     } else {
@@ -1052,6 +1061,28 @@ impl<'a, 'b> GeneratorState<'a> {
                         _ => return Err(syntax_error(self.compiler_state, "Incorrect right value for right shift operation on short (constant 8 only supported)", pos))
                     };
                 } else {
+                    if let ExprType::Immediate(value) = right {
+                        if *value == 8 && *op == Operation::Bls(false) {
+                            if high_byte {
+                                if acc_in_use { self.sasm(PHA)?; }
+                                signed = self.asm(LDA, left, pos, false)?;
+                                self.flags = FlagsState::Unknown;
+                                if acc_in_use {
+                                    self.asm(STA, &ExprType::Tmp(signed), pos, false)?;
+                                    self.sasm(PLA)?;
+                                    if self.tmp_in_use {
+                                        return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+                                    }
+                                    self.tmp_in_use = true;
+                                    return Ok(ExprType::Tmp(signed));
+                                } else {
+                                    return Ok(ExprType::A(signed));
+                                }
+                            } else {
+                                return Ok(ExprType::Immediate(0));
+                            }
+                        }
+                    }
                     if acc_in_use { self.sasm(PHA)?; }
                     signed = self.asm(LDA, left, pos, false)?;
                 }
@@ -1069,6 +1100,9 @@ impl<'a, 'b> GeneratorState<'a> {
                                 if acc_in_use {
                                     self.asm(STA, &ExprType::Tmp(signed), pos, false)?;
                                     self.sasm(PLA)?;
+                                    if self.tmp_in_use {
+                                        return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+                                    }
                                     self.tmp_in_use = true;
                                     return Ok(ExprType::Tmp(signed));
                                 } else {
@@ -1081,6 +1115,28 @@ impl<'a, 'b> GeneratorState<'a> {
                         _ => return Err(syntax_error(self.compiler_state, "Incorrect right value for right shift operation on short (constant 8 only supported)", pos))
                     };
                 } else {
+                    if let ExprType::Immediate(value) = right {
+                        if *value == 8 && *op == Operation::Bls(false) {
+                            if high_byte {
+                                if acc_in_use { self.sasm(PHA)?; }
+                                signed = self.asm(LDA, left, pos, false)?;
+                                self.flags = FlagsState::Unknown;
+                                if acc_in_use {
+                                    self.asm(STA, &ExprType::Tmp(signed), pos, false)?;
+                                    self.sasm(PLA)?;
+                                    if self.tmp_in_use {
+                                        return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+                                    }
+                                    self.tmp_in_use = true;
+                                    return Ok(ExprType::Tmp(signed));
+                                } else {
+                                    return Ok(ExprType::A(signed));
+                                }
+                            } else {
+                                return Ok(ExprType::Immediate(0));
+                            }
+                        }
+                    }
                     if acc_in_use { self.sasm(PHA)?; }
                     signed = self.asm(LDA, left, pos, false)?;
                 }
@@ -1133,6 +1189,9 @@ impl<'a, 'b> GeneratorState<'a> {
         if acc_in_use {
             self.asm(STA, &ExprType::Tmp(signed), pos, false)?;
             self.sasm(PLA)?;
+            if self.tmp_in_use {
+                return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+            }
             self.tmp_in_use = true;
             Ok(ExprType::Tmp(signed))
         } else {
@@ -1451,7 +1510,7 @@ impl<'a, 'b> GeneratorState<'a> {
 
     fn generate_expr(&mut self, expr: &Expr<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
     {
-        //debug!("Expression: {:?}", expr);
+        debug!("Expression: {:?}", expr);
         match expr {
             Expr::Integer(i) => Ok(ExprType::Immediate(*i)),
             Expr::BinOp {lhs, op, rhs} => {
@@ -1519,13 +1578,13 @@ impl<'a, 'b> GeneratorState<'a> {
                     Operation::Bls(true) | Operation::Brs(true) => {
                         let left = self.generate_expr(lhs, pos, false)?;
                         let right = self.generate_expr(rhs,pos, false)?;
-                        let newright = self.generate_shift(&left, op, &right, pos)?;
+                        let newright = self.generate_shift(&left, op, &right, pos, high_byte)?;
                         self.generate_assign(&left, &newright, pos, false)
                     },
                     Operation::Bls(false) | Operation::Brs(false) => {
                         let left = self.generate_expr(lhs, pos, false)?;
                         let right = self.generate_expr(rhs, pos, false)?;
-                        self.generate_shift(&left, op, &right, pos)
+                        self.generate_shift(&left, op, &right, pos, high_byte)
                     },
                     Operation::TernaryCond1 => self.generate_ternary(lhs, rhs, pos),
                     Operation::TernaryCond2 => unreachable!(),
