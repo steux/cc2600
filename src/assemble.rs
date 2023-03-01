@@ -224,7 +224,7 @@ impl AssemblyCode {
                         remove_both = true;
                     }
                     // Remove STA followed by LDA
-                    if i1.mnemonic == AsmMnemonic::STA && i2.mnemonic == AsmMnemonic::LDA && i1.dasm_operand == i2.dasm_operand {
+                    if i1.mnemonic == AsmMnemonic::STA && i2.mnemonic == AsmMnemonic::LDA && i1.dasm_operand == i2.dasm_operand && !i2.protected {
                         remove_second = true;
                     }
                     // Check CMP and remove the branck if the result is obvious
@@ -289,8 +289,8 @@ impl AssemblyCode {
                                     Ok(v) => {
                                         if let Some(v2) = accumulator {
                                             if v == v2 {
-                                                remove_second = true;
                                                 // Remove this instruction
+                                                remove_second = !inst.protected;
                                             } else {
                                                 accumulator = Some(v);
                                             }
@@ -310,8 +310,8 @@ impl AssemblyCode {
                                     Ok(v) => {
                                         if let Some(v2) = x_register {
                                             if v == v2 {
-                                                remove_second = true;
                                                 // Remove this instruction
+                                                remove_second = !inst.protected;
                                             } else {
                                                 x_register = Some(v);
                                             }
@@ -331,8 +331,8 @@ impl AssemblyCode {
                                     Ok(v) => {
                                         if let Some(v2) = y_register {
                                             if v == v2 {
-                                                remove_second = true;
                                                 // Remove this instruction
+                                                remove_second = !inst.protected;
                                             } else {
                                                 y_register = Some(v);
                                             }

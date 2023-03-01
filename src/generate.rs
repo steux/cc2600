@@ -66,6 +66,7 @@ pub struct GeneratorState<'a> {
     pub functions_code: HashMap<String, AssemblyCode>,
     pub current_function: Option<String>,
     bankswitching_scheme: &'a str,
+    protected: bool,
 }
 
 impl<'a, 'b> GeneratorState<'a> {
@@ -90,6 +91,7 @@ impl<'a, 'b> GeneratorState<'a> {
             functions_code: HashMap::new(),
             current_function: None,
             bankswitching_scheme,
+            protected: false,
         }
     }
     
@@ -100,7 +102,10 @@ impl<'a, 'b> GeneratorState<'a> {
 
     fn sasm_protected(&mut self, mnemonic: AsmMnemonic) -> Result<bool, Error>
     {
-        self.asm(mnemonic, &ExprType::Nothing, 0, true)
+        self.protected = true;
+        let ret = self.asm(mnemonic, &ExprType::Nothing, 0, false);
+        self.protected = false;
+        ret
     }
 
     fn asm(&mut self, mnemonic: AsmMnemonic, operand: &ExprType<'b>, pos: usize, high_byte: bool) -> Result<bool, Error>
@@ -108,7 +113,6 @@ impl<'a, 'b> GeneratorState<'a> {
         let dasm_operand: String;
         let signed;
         let nb_bytes;
-        let protected;
 
         let mut cycles = match mnemonic {
             PHA | PLA => 3,
@@ -117,106 +121,73 @@ impl<'a, 'b> GeneratorState<'a> {
             _ => 2 
         };
 
-        if *operand != ExprType::Nothing { 
-            match operand {
-                ExprType::Label(l) => {
-                    nb_bytes = match mnemonic {
-                        JMP | JSR => 3,
-                        _ => 2,
-                    };
-                    cycles = match mnemonic {
-                        JMP => 3,
-                        JSR => 6,
-                        _ => 2,
-                    };
-                    signed = false;
-                    dasm_operand = (*l).to_string();
-                },
-                ExprType::Immediate(v) => {
-                    nb_bytes = 2;
-                    let vx = match high_byte {
-                        false => v & 0xff,
-                        true => (v >> 8) & 0xff,
-                    };
-                    signed = false;
-                    dasm_operand = format!("#{}", vx);
-                },
-                ExprType::Tmp(s) => {
-                    dasm_operand = "cctmp".to_string();
-                    cycles += 1;
-                    nb_bytes = 2;
-                    signed = *s;
-                },
-                ExprType::Absolute(variable, eight_bits, off) => {
-                    let v = self.compiler_state.get_variable(variable);
-                    signed = v.signed;
-                    let offset = if v.memory == VariableMemory::Superchip {
+        match operand {
+            ExprType::Label(l) => {
+                nb_bytes = match mnemonic {
+                    JMP | JSR => 3,
+                    _ => 2,
+                };
+                cycles = match mnemonic {
+                    JMP => 3,
+                    JSR => 6,
+                    _ => 2,
+                };
+                signed = false;
+                dasm_operand = (*l).to_string();
+            },
+            ExprType::Immediate(v) => {
+                nb_bytes = 2;
+                let vx = match high_byte {
+                    false => v & 0xff,
+                    true => (v >> 8) & 0xff,
+                };
+                signed = false;
+                dasm_operand = format!("#{}", vx);
+            },
+            ExprType::Tmp(s) => {
+                dasm_operand = "cctmp".to_string();
+                cycles += 1;
+                nb_bytes = 2;
+                signed = *s;
+            },
+            ExprType::Absolute(variable, eight_bits, off) => {
+                let v = self.compiler_state.get_variable(variable);
+                signed = v.signed;
+                let offset = if v.memory == VariableMemory::Superchip {
+                    match mnemonic {
+                        STA | STX | STY => *off,
+                        _ => off + 0x80
+                    }
+                } else if let VariableMemory::MemoryOnChip(_) = v.memory {
+                    if self.bankswitching_scheme == "3E" {
                         match mnemonic {
-                            STA | STX | STY => *off,
-                            _ => off + 0x80
+                            STA | STX | STY => off + 0x400,
+                            _ => *off
                         }
-                    } else if let VariableMemory::MemoryOnChip(_) = v.memory {
-                        if self.bankswitching_scheme == "3E" {
-                            match mnemonic {
-                                STA | STX | STY => off + 0x400,
-                                _ => *off
-                            }
-                        } else { *off }
-                    } else { *off };
-                    match v.var_type {
-                        VariableType::Char => {
-                            if high_byte {
-                                dasm_operand = "#0".to_string();
-                                nb_bytes = 2;
-                            } else {
-                                if offset > 0 {
-                                    dasm_operand = format!("{}+{}", variable, offset);
-                                } else {
-                                    dasm_operand = variable.to_string();
-                                }
-                                if v.memory == VariableMemory::Zeropage {
-                                    cycles += 1;
-                                    nb_bytes = 2;
-                                } else {
-                                    cycles += 2;
-                                    nb_bytes = 3;
-                                }
-                            }
-                        },
-                        VariableType::Short => {
-                            if *eight_bits && high_byte {
-                                dasm_operand = "#0".to_string();
-                                nb_bytes = 2;
-                            } else {
-                                let off = if high_byte { offset + 1 } else { offset };
-                                if off != 0 {
-                                    dasm_operand = format!("{}+{}", variable, off);
-                                } else {
-                                    dasm_operand = variable.to_string();
-                                }
-                                if v.memory == VariableMemory::Zeropage {
-                                    cycles += 1;
-                                    nb_bytes = 2;
-                                } else {
-                                    cycles += 2;
-                                    nb_bytes = 3;
-                                }
-                            }
-                        },
-                        VariableType::CharPtr => if !*eight_bits && v.var_const {
-                            if high_byte {
-                                if offset != 0 {
-                                    dasm_operand = format!("#>{}+{}", variable, offset);
-                                } else {
-                                    dasm_operand = format!("#>{}", variable);
-                                }
-                            } else if offset != 0 {
-                                dasm_operand = format!("#<{}+{}", variable, offset);
-                            } else {
-                                dasm_operand = format!("#<{}", variable);
-                            }
+                    } else { *off }
+                } else { *off };
+                match v.var_type {
+                    VariableType::Char => {
+                        if high_byte {
+                            dasm_operand = "#0".to_string();
                             nb_bytes = 2;
-                        } else if high_byte && *eight_bits {
+                        } else {
+                            if offset > 0 {
+                                dasm_operand = format!("{}+{}", variable, offset);
+                            } else {
+                                dasm_operand = variable.to_string();
+                            }
+                            if v.memory == VariableMemory::Zeropage {
+                                cycles += 1;
+                                nb_bytes = 2;
+                            } else {
+                                cycles += 2;
+                                nb_bytes = 3;
+                            }
+                        }
+                    },
+                    VariableType::Short => {
+                        if *eight_bits && high_byte {
                             dasm_operand = "#0".to_string();
                             nb_bytes = 2;
                         } else {
@@ -233,180 +204,210 @@ impl<'a, 'b> GeneratorState<'a> {
                                 cycles += 2;
                                 nb_bytes = 3;
                             }
-                        },
-                        VariableType::CharPtrPtr | VariableType::ShortPtr => {
-                            let v = self.compiler_state.get_variable(variable);
-                            let off = offset + if high_byte { v.size as i32 } else { 0 };
-                            if off > 0 {
-                                dasm_operand = format!("{}+{}", variable, off);
+                        }
+                    },
+                    VariableType::CharPtr => if !*eight_bits && v.var_const {
+                        if high_byte {
+                            if offset != 0 {
+                                dasm_operand = format!("#>{}+{}", variable, offset);
                             } else {
-                                dasm_operand = variable.to_string();
+                                dasm_operand = format!("#>{}", variable);
                             }
+                        } else if offset != 0 {
+                            dasm_operand = format!("#<{}+{}", variable, offset);
+                        } else {
+                            dasm_operand = format!("#<{}", variable);
+                        }
+                        nb_bytes = 2;
+                    } else if high_byte && *eight_bits {
+                        dasm_operand = "#0".to_string();
+                        nb_bytes = 2;
+                    } else {
+                        let off = if high_byte { offset + 1 } else { offset };
+                        if off != 0 {
+                            dasm_operand = format!("{}+{}", variable, off);
+                        } else {
+                            dasm_operand = variable.to_string();
+                        }
+                        if v.memory == VariableMemory::Zeropage {
+                            cycles += 1;
+                            nb_bytes = 2;
+                        } else {
                             cycles += 2;
-                            if v.memory == VariableMemory::Zeropage {
-                                match mnemonic {
-                                    STA | LDA => {
-                                        nb_bytes = 3;
-                                    },
-                                    _ => {
-                                        nb_bytes = 2;
-                                    }
+                            nb_bytes = 3;
+                        }
+                    },
+                    VariableType::CharPtrPtr | VariableType::ShortPtr => {
+                        let v = self.compiler_state.get_variable(variable);
+                        let off = offset + if high_byte { v.size as i32 } else { 0 };
+                        if off > 0 {
+                            dasm_operand = format!("{}+{}", variable, off);
+                        } else {
+                            dasm_operand = variable.to_string();
+                        }
+                        cycles += 2;
+                        if v.memory == VariableMemory::Zeropage {
+                            match mnemonic {
+                                STA | LDA => {
+                                    nb_bytes = 3;
+                                },
+                                _ => {
+                                    nb_bytes = 2;
                                 }
-                            } else {
+                            }
+                        } else {
+                            nb_bytes = 3;
+                        }
+                    }
+                }
+            },
+            ExprType::AbsoluteY(variable) => {
+                let v = self.compiler_state.get_variable(variable);
+                signed = v.signed;
+                let offset = if v.memory == VariableMemory::Superchip {
+                    match mnemonic {
+                        STA | STX | STY => 0,
+                        _ => 0x80
+                    }
+                } else if let VariableMemory::MemoryOnChip(_) = v.memory {
+                    if self.bankswitching_scheme == "3E" {
+                        match mnemonic {
+                            STA | STX | STY => 0x400,
+                            _ => 0 
+                        }
+                    } else { 0 }
+                } else { 0 };
+                if v.var_type == VariableType::CharPtrPtr || v.var_type == VariableType::ShortPtr {
+                    let off = offset + if high_byte { v.size } else { 0 };
+                    if off > 0 {
+                        dasm_operand = format!("{}+{},Y", variable, off);
+                    } else {
+                        dasm_operand = format!("{},Y", variable);
+                    }
+                    cycles += 2;
+                    if v.memory == VariableMemory::Zeropage {
+                        match mnemonic {
+                            STA | LDA => {
                                 nb_bytes = 3;
+                            },
+                            _ => {
+                                nb_bytes = 2;
                             }
-                        }
-                    }
-                },
-                ExprType::AbsoluteY(variable) => {
-                    let v = self.compiler_state.get_variable(variable);
-                    signed = v.signed;
-                    let offset = if v.memory == VariableMemory::Superchip {
-                        match mnemonic {
-                            STA | STX | STY => 0,
-                            _ => 0x80
-                        }
-                    } else if let VariableMemory::MemoryOnChip(_) = v.memory {
-                        if self.bankswitching_scheme == "3E" {
-                            match mnemonic {
-                                STA | STX | STY => 0x400,
-                                _ => 0 
-                            }
-                        } else { 0 }
-                    } else { 0 };
-                    if v.var_type == VariableType::CharPtrPtr || v.var_type == VariableType::ShortPtr {
-                        let off = offset + if high_byte { v.size } else { 0 };
-                        if off > 0 {
-                            dasm_operand = format!("{}+{},Y", variable, off);
-                        } else {
-                            dasm_operand = format!("{},Y", variable);
-                        }
-                        cycles += 2;
-                        if v.memory == VariableMemory::Zeropage {
-                            match mnemonic {
-                                STA | LDA => {
-                                    nb_bytes = 3;
-                                },
-                                _ => {
-                                    nb_bytes = 2;
-                                }
-                            }
-                        } else {
-                            nb_bytes = 3;
-                        }
-                        match mnemonic {
-                            STA => cycles += 1,
-                            STY | LDY | CPY => return Err(syntax_error(self.compiler_state, "Can't use Y addressing on Y operation", pos)),
-                            CPX => return Err(syntax_error(self.compiler_state, "Can't use Y addressing on compare with X operation", pos)),
-                            STX => if v.memory != VariableMemory::Zeropage { return Err(syntax_error(self.compiler_state, "Can't use Y addressing on a non zeropage variable with X storage", pos)) }, 
-                            _ => () 
-                        }
-                    } else if high_byte {
-                        dasm_operand = "#0".to_string();
-                        nb_bytes = 2;
-                    } else if v.var_type == VariableType::CharPtr && !v.var_const {
-                        if v.size == 1 {
-                            if offset > 0 {
-                                dasm_operand = format!("({}+{}),Y", variable, offset);
-                            } else {
-                                dasm_operand = format!("({}),Y", variable);
-                            }
-                            if v.memory != VariableMemory::Zeropage {
-                                return Err(syntax_error(self.compiler_state, "Y indirect addressing works only on zeropage variables", pos))
-                            }
-                            nb_bytes = 2;
-                            cycles = if mnemonic == STA {6} else {5};
-                            match mnemonic {
-                                STX | STY | LDX | LDY | CPX | CPY => return Err(syntax_error(self.compiler_state, "Can't use Y indirect addressing on X or Y operation", pos)),
-                                _ => () 
-                            }
-                        } else {
-                            return Err(syntax_error(self.compiler_state, "X-Indirect adressing mode not available with Y register", pos));
                         }
                     } else {
+                        nb_bytes = 3;
+                    }
+                    match mnemonic {
+                        STA => cycles += 1,
+                        STY | LDY | CPY => return Err(syntax_error(self.compiler_state, "Can't use Y addressing on Y operation", pos)),
+                        CPX => return Err(syntax_error(self.compiler_state, "Can't use Y addressing on compare with X operation", pos)),
+                        STX => if v.memory != VariableMemory::Zeropage { return Err(syntax_error(self.compiler_state, "Can't use Y addressing on a non zeropage variable with X storage", pos)) }, 
+                        _ => () 
+                    }
+                } else if high_byte {
+                    dasm_operand = "#0".to_string();
+                    nb_bytes = 2;
+                } else if v.var_type == VariableType::CharPtr && !v.var_const {
+                    if v.size == 1 {
                         if offset > 0 {
-                            dasm_operand = format!("{}+{},Y", variable, offset);
+                            dasm_operand = format!("({}+{}),Y", variable, offset);
                         } else {
-                            dasm_operand = format!("{},Y", variable);
+                            dasm_operand = format!("({}),Y", variable);
                         }
-                        cycles += 2;
-                        if v.memory == VariableMemory::Zeropage {
-                            match mnemonic {
-                                STA | LDA => {
-                                    nb_bytes = 3;
-                                },
-                                _ => {
-                                    nb_bytes = 2;
-                                }
-                            }
-                        } else {
-                            nb_bytes = 3;
+                        if v.memory != VariableMemory::Zeropage {
+                            return Err(syntax_error(self.compiler_state, "Y indirect addressing works only on zeropage variables", pos))
                         }
+                        nb_bytes = 2;
+                        cycles = if mnemonic == STA {6} else {5};
                         match mnemonic {
-                            STA => cycles += 1,
-                            STY | LDY | CPY => return Err(syntax_error(self.compiler_state, "Can't use Y addressing on Y operation", pos)),
-                            CPX => return Err(syntax_error(self.compiler_state, "Can't use Y addressing on compare with X operation", pos)),
-                            STX => if v.memory != VariableMemory::Zeropage { return Err(syntax_error(self.compiler_state, "Can't use Y addressing on a non zeropage variable with X storage", pos)) }, 
+                            STX | STY | LDX | LDY | CPX | CPY => return Err(syntax_error(self.compiler_state, "Can't use Y indirect addressing on X or Y operation", pos)),
                             _ => () 
                         }
+                    } else {
+                        return Err(syntax_error(self.compiler_state, "X-Indirect adressing mode not available with Y register", pos));
                     }
-                },
-                ExprType::AbsoluteX(variable) => {
-                    let v = self.compiler_state.get_variable(variable);
-                    signed = v.signed;
-                    let offset = if v.memory == VariableMemory::Superchip {
+                } else {
+                    if offset > 0 {
+                        dasm_operand = format!("{}+{},Y", variable, offset);
+                    } else {
+                        dasm_operand = format!("{},Y", variable);
+                    }
+                    cycles += 2;
+                    if v.memory == VariableMemory::Zeropage {
                         match mnemonic {
-                            STA | STX | STY => 0,
-                            _ => 0x80
-                        }
-                    } else if let VariableMemory::MemoryOnChip(_) = v.memory {
-                        if self.bankswitching_scheme == "3E" {
-                            match mnemonic {
-                                STA | STX | STY => 0x400,
-                                _ => 0 
+                            STA | LDA => {
+                                nb_bytes = 3;
+                            },
+                            _ => {
+                                nb_bytes = 2;
                             }
-                        } else { 0 }
-                    } else { 0 };
-                    if v.var_type == VariableType::CharPtr && !v.var_const && v.size == 1 {
-                        return Err(syntax_error(self.compiler_state, "Y-Indirect adressing mode not available with X register", pos));
+                        }
+                    } else {
+                        nb_bytes = 3;
                     }
-                    let off = if v.var_type == VariableType::CharPtrPtr || v.var_type == VariableType::ShortPtr {
-                        offset + if high_byte { v.size } else { 0 }
-                    } else { offset };
-                    if high_byte && v.var_type != VariableType::CharPtrPtr && v.var_type != VariableType::ShortPtr {
-                        dasm_operand = "#0".to_string();
+                    match mnemonic {
+                        STA => cycles += 1,
+                        STY | LDY | CPY => return Err(syntax_error(self.compiler_state, "Can't use Y addressing on Y operation", pos)),
+                        CPX => return Err(syntax_error(self.compiler_state, "Can't use Y addressing on compare with X operation", pos)),
+                        STX => if v.memory != VariableMemory::Zeropage { return Err(syntax_error(self.compiler_state, "Can't use Y addressing on a non zeropage variable with X storage", pos)) }, 
+                        _ => () 
+                    }
+                }
+            },
+            ExprType::AbsoluteX(variable) => {
+                let v = self.compiler_state.get_variable(variable);
+                signed = v.signed;
+                let offset = if v.memory == VariableMemory::Superchip {
+                    match mnemonic {
+                        STA | STX | STY => 0,
+                        _ => 0x80
+                    }
+                } else if let VariableMemory::MemoryOnChip(_) = v.memory {
+                    if self.bankswitching_scheme == "3E" {
+                        match mnemonic {
+                            STA | STX | STY => 0x400,
+                            _ => 0 
+                        }
+                    } else { 0 }
+                } else { 0 };
+                if v.var_type == VariableType::CharPtr && !v.var_const && v.size == 1 {
+                    return Err(syntax_error(self.compiler_state, "Y-Indirect adressing mode not available with X register", pos));
+                }
+                let off = if v.var_type == VariableType::CharPtrPtr || v.var_type == VariableType::ShortPtr {
+                    offset + if high_byte { v.size } else { 0 }
+                } else { offset };
+                if high_byte && v.var_type != VariableType::CharPtrPtr && v.var_type != VariableType::ShortPtr {
+                    dasm_operand = "#0".to_string();
+                    nb_bytes = 2;
+                } else {
+                    if off > 0 {
+                        dasm_operand = format!("{}+{},X", variable, off);
+                    } else {
+                        dasm_operand = format!("{},X", variable);
+                    }
+                    cycles += 2;
+                    if v.memory == VariableMemory::Zeropage {
                         nb_bytes = 2;
                     } else {
-                        if off > 0 {
-                            dasm_operand = format!("{}+{},X", variable, off);
-                        } else {
-                            dasm_operand = format!("{},X", variable);
-                        }
-                        cycles += 2;
-                        if v.memory == VariableMemory::Zeropage {
-                            nb_bytes = 2;
-                        } else {
-                            if mnemonic == STA { cycles += 1; }
-                            nb_bytes = 3;
-                        }
-                        match mnemonic {
-                            STX | LDX | CPX => return Err(syntax_error(self.compiler_state, "Can't use X addressing on X operation", pos)),
-                            CPY => return Err(syntax_error(self.compiler_state, "Can't use X addressing on compare with Y operation", pos)),
-                            STY => if v.memory != VariableMemory::Zeropage { return Err(syntax_error(self.compiler_state, "Can't use X addressing on a non zeropage variable with Y storage", pos)) }, 
-                            _ => () 
-                        }
+                        if mnemonic == STA { cycles += 1; }
+                        nb_bytes = 3;
                     }
-                },
-                _ => unreachable!()
-            }
-            protected = false;
-        } else {
-            dasm_operand = "".to_string();
-            signed = false;
-            nb_bytes = 1;
-            protected = high_byte; // high byte in that case is used as a placeholder
+                    match mnemonic {
+                        STX | LDX | CPX => return Err(syntax_error(self.compiler_state, "Can't use X addressing on X operation", pos)),
+                        CPY => return Err(syntax_error(self.compiler_state, "Can't use X addressing on compare with Y operation", pos)),
+                        STY => if v.memory != VariableMemory::Zeropage { return Err(syntax_error(self.compiler_state, "Can't use X addressing on a non zeropage variable with Y storage", pos)) }, 
+                        _ => () 
+                    }
+                }
+            },
+            ExprType::Nothing => {
+                dasm_operand = "".to_string();
+                signed = false;
+                nb_bytes = 1;
+            },
+            _ => unreachable!()
         }
-        
+
         let mut s = mnemonic.to_string();
         if !dasm_operand.is_empty() {
             s += " ";
@@ -416,7 +417,7 @@ impl<'a, 'b> GeneratorState<'a> {
         if let Some(f) = &self.current_function {
             let code : &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
             let instruction = AsmInstruction {
-                mnemonic, dasm_operand, cycles, nb_bytes, protected,
+                mnemonic, dasm_operand, cycles, nb_bytes, protected: self.protected,
             };
             code.append_asm(instruction);
         }
@@ -2251,13 +2252,16 @@ impl<'a, 'b> GeneratorState<'a> {
         Ok(())
     }
 
+    // Load/Store statements are protected, and thus cannot be optmized out
     fn generate_load_store_statement(&mut self, expr: &ExprType<'a>, pos: usize, load: bool) -> Result<(), Error>
     {
+        self.protected = true;
         match expr {
             ExprType::X => self.asm(if load {TXA} else {TAX}, &ExprType::Nothing, pos, false)?,
             ExprType::Y => self.asm(if load {TYA} else {TAY}, &ExprType::Nothing, pos, false)?,
             _ => self.asm(if load {LDA} else {STA}, expr, pos, false)?,
         };
+        self.protected = false;
         Ok(())
     }
 
