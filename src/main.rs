@@ -63,13 +63,21 @@ pub struct Args {
 
     /// Insert C code as comments
     #[arg(long, default_value="true")]
-    insert_code: bool
+    insert_code: bool,
+
+    /// Set char signedness to signed
+    #[arg(long("fsigned_char"), default_value = "false")]
+    signed_chars: bool,
+    
+    /// Set char signedness to unsigned (default)
+    #[arg(long("funsigned_char"), default_value = "true")]
+    unsigned_chars: bool
 }
 
 fn main() {
     env_logger::init();
     let args = Args::parse();
-
+    
     let f = match File::open(&args.input) {
         Ok(file) => file,
         Err(err) => {
@@ -110,6 +118,8 @@ mod tests {
             insert_code: false,
             verbose: false,
             optimization_level,
+            signed_chars: false,
+            unsigned_chars: true,
         }
     }
 

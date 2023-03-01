@@ -18,6 +18,8 @@
     Contact info: bruno.steux@gmail.com
 */
 
+// TODO: Implement specific pratt parser for constants
+
 use std::collections::HashMap;
 
 use log::debug;
@@ -178,6 +180,7 @@ pub struct CompilerState<'a> {
     pub preprocessed_utf8: &'a str,
     pub included_assembler: Vec<String>,
     pub context: cpp::Context,
+    signed_chars: bool,
 }
 
 impl<'a> CompilerState<'a> {
@@ -336,7 +339,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
 {
     let mut var_type = VariableType::Char;
     let mut var_const = false;
-    let mut signed = true;
+    let mut signed = state.signed_chars;
     let mut memory = VariableMemory::Zeropage;
     let mut alignment = 1;
     for pair in pairs {
@@ -844,7 +847,8 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
         mapped_lines: &mapped_lines,
         preprocessed_utf8,
         included_assembler: Vec::<String>::new(),
-        context
+        context,
+        signed_chars: args.signed_chars
     };
 
     let r = Cc2600Parser::parse(Rule::program, preprocessed_utf8);
