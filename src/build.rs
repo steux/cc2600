@@ -457,7 +457,7 @@ Call{}
         .word PLUSROM_API + ${:04x}\t
         .word {}\t; RESET
         .word {}\t; IRQ
-        \n", bank, offset * 0x1000, offset * 0x1000, starting_code))?;
+        \n", bank, offset * 0x1000, starting_code, starting_code))?;
         } else if bankswitching_scheme != "DPC+" && bankswitching_scheme != "3E" {
             gstate.write(&format!("
         ORG ${}FFA
