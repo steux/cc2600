@@ -339,6 +339,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
 {
     let mut var_type = VariableType::Char;
     let mut var_const = false;
+    let mut signedness_specified = false;
     let mut signed = state.signed_chars;
     let mut memory = VariableMemory::Zeropage;
     let mut alignment = 1;
@@ -353,11 +354,13 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                         Rule::superchip => memory = VariableMemory::Superchip,
                         Rule::display => memory = VariableMemory::Display,
                         Rule::frequency => memory = VariableMemory::Frequency,
-                        Rule::var_sign => if p.as_str().eq("unsigned") {
-                            signed = false;
+                        Rule::var_sign => {
+                            signed = p.as_str().eq("signed");
+                            signedness_specified = true;
                         },
                         Rule::var_simple_type => if p.as_str().eq("short") {
                             var_type = VariableType::Short;
+                            if !signedness_specified { signed = true; }
                         },
                         Rule::aligned => alignment = p.into_inner().next().unwrap().as_str().parse::<usize>().unwrap(),
                         _ => unreachable!()
