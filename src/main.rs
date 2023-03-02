@@ -63,13 +63,21 @@ pub struct Args {
 
     /// Insert C code as comments
     #[arg(long, default_value="true")]
-    insert_code: bool
+    insert_code: bool,
+
+    /// Set char signedness to signed
+    #[arg(long("fsigned_char"), default_value = "false")]
+    signed_chars: bool,
+    
+    /// Set char signedness to unsigned (default)
+    #[arg(long("funsigned_char"), default_value = "true")]
+    unsigned_chars: bool
 }
 
 fn main() {
     env_logger::init();
     let args = Args::parse();
-
+    
     let f = match File::open(&args.input) {
         Ok(file) => file,
         Err(err) => {
@@ -110,6 +118,8 @@ mod tests {
             insert_code: false,
             verbose: false,
             optimization_level,
+            signed_chars: false,
+            unsigned_chars: true,
         }
     }
 
@@ -166,6 +176,17 @@ mod tests {
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
         assert!(result.contains("LDA i\n\tCLC\n\tADC j\n\tSTA k\n\tLDA i+1\n\tADC j+1\n\tSTA k+1"));
+    }
+    
+    #[test]
+    fn sixteen_bits_test2() {
+        let args = sargs(1);
+        let input = "unsigned short i; unsigned char j; void main() { i = j; i = j << 8; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA j\n\tSTA i\n\tLDA #0\n\tSTA i+1\n\tSTA i\n\tLDA j\n\tSTA i+1"));
     }
     
     #[test]
@@ -395,7 +416,7 @@ void main()
         assert!(result.contains("LDA s1\n\tSTA ss\n\tLDA s1+1\n\tSTA ss+2\n\tLDA s2\n\tSTA ss+1\n\tLDA s2+1\n\tSTA ss+3\n\tLDA ss+1\n\tSTA ptr\n\tLDA ss+3\n\tSTA ptr+1\n\tLDA (ptr),Y\n\tSTA v"));
     }
     
-#[test]
+    #[test]
     fn longbranch_test() {
         let args = sargs(1);
         let mut input: String = "void main() { do {".to_string();
@@ -410,4 +431,14 @@ void main()
         assert!(result.contains("NOP\n.dowhilecondition1\n\tCPY #0\n\tBEQ .fix1\n\tJMP .dowhile1\n.fix1\n.dowhileend1"));
     }
 
+    #[test]
+    fn load_test() {
+        let args = sargs(1);
+        let input = "char i; void main() { i = 0; load(0); }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA #0\n\tSTA i\n\tLDA #0"));
+    }
 }

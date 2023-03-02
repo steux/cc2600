@@ -18,6 +18,8 @@
     Contact info: bruno.steux@gmail.com
 */
 
+// TODO: Implement specific pratt parser for constants
+
 use std::collections::HashMap;
 
 use log::debug;
@@ -40,6 +42,7 @@ pub enum VariableType {
     Short,
     CharPtr,
     CharPtrPtr,
+    ShortPtr,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -177,6 +180,7 @@ pub struct CompilerState<'a> {
     pub preprocessed_utf8: &'a str,
     pub included_assembler: Vec<String>,
     pub context: cpp::Context,
+    signed_chars: bool,
 }
 
 impl<'a> CompilerState<'a> {
@@ -204,10 +208,7 @@ pub fn syntax_error<'a>(state: &CompilerState<'a>, message: &str, loc: usize) ->
         char_number += 1;
         if char_number == loc { break; }
     }
-    let included_in = match &state.mapped_lines[line_number].2 {
-        None => None,
-        Some(iin) => Some((iin.0.to_string(), iin.1))
-    };
+    let included_in = state.mapped_lines[line_number].2.as_ref().map(|iin| (iin.0.to_string(), iin.1));
     Error::Syntax {
         filename: state.mapped_lines[line_number].0.to_string(),
         line: state.mapped_lines[line_number].1,
@@ -230,7 +231,7 @@ fn parse_int(p: Pair<Rule>) -> i32
 
 fn parse_identifier<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<(&'a str, Box<Expr<'a>>), Error>
 {
-    let mut p = pairs.into_iter();
+    let mut p = pairs;
     let px = p.next().unwrap();
     let varname = px.as_str();
     let subscript = match p.next() {
@@ -255,8 +256,8 @@ fn parse_identifier<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Re
             match state.functions.get(varname) {
                 Some(_var) => {
                     match *subscript {
-                        Expr::Nothing => return Ok((varname, subscript)),
-                        _ => return Err(syntax_error(state, "No subscript for functions", px.as_span().start())),
+                        Expr::Nothing => Ok((varname, subscript)),
+                        _ => Err(syntax_error(state, "No subscript for functions", px.as_span().start())),
                     }
                 },
                 None => Err(syntax_error(state, &format!("Unknown identifier {}", varname), px.as_span().start()))
@@ -338,7 +339,8 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
 {
     let mut var_type = VariableType::Char;
     let mut var_const = false;
-    let mut signed = true;
+    let mut signedness_specified = false;
+    let mut signed = state.signed_chars;
     let mut memory = VariableMemory::Zeropage;
     let mut alignment = 1;
     for pair in pairs {
@@ -348,15 +350,17 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                     //debug!("{:?}", p);
                     match p.as_rule() {
                         Rule::var_const => memory = VariableMemory::ROM(0),
-                        Rule::bank => memory = VariableMemory::ROM(u32::from_str_radix(p.into_inner().next().unwrap().as_str(), 10).unwrap()),
+                        Rule::bank => memory = VariableMemory::ROM(p.into_inner().next().unwrap().as_str().parse::<u32>().unwrap()),
                         Rule::superchip => memory = VariableMemory::Superchip,
                         Rule::display => memory = VariableMemory::Display,
                         Rule::frequency => memory = VariableMemory::Frequency,
-                        Rule::var_sign => if p.as_str().eq("unsigned") {
-                            signed = false;
+                        Rule::var_sign => {
+                            signed = p.as_str().eq("signed");
+                            signedness_specified = true;
                         },
                         Rule::var_simple_type => if p.as_str().eq("short") {
                             var_type = VariableType::Short;
+                            if !signedness_specified { signed = true; }
                         },
                         Rule::aligned => alignment = p.into_inner().next().unwrap().as_str().parse::<usize>().unwrap(),
                         _ => unreachable!()
@@ -374,22 +378,26 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                         Rule::id_name => {
                             name = p.as_str();
                             let start = p.as_span().start();
-                            if !state.variables.get(name).is_none() {
+                            if state.variables.get(name).is_some() {
                                 return Err(syntax_error(state, &format!("Variable {} already defined", &name), start));
                             }
                         },
                         Rule::array_spec => {
                             let start = p.as_span().start();
-                            match p.into_inner().next() {
-                                Some(px) => size = Some(px.as_str().parse::<usize>().unwrap()),
-                                _ => ()
+                            if let Some(px) = p.into_inner().next() {
+                                size = Some(px.as_str().parse::<usize>().unwrap());
                             }
                             if var_type == VariableType::Char {
                                 var_type = VariableType::CharPtr;
+                                var_const = true;
                             } else if var_type == VariableType::CharPtr {
                                 var_type = VariableType::CharPtrPtr;
+                                var_const = true;
+                            } else if var_type == VariableType::Short {
+                                var_type = VariableType::ShortPtr;
+                                var_const = true;
                             } else {
-                                return Err(syntax_error(state, "Array of short integers are not available", start));
+                                return Err(syntax_error(state, "Kind of array not available", start));
                             }
                         },
                         Rule::var_def => {
@@ -408,10 +416,10 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                                         VariableMemory::ROM(_) | VariableMemory::Display | VariableMemory::Frequency => memory,
                                         _ => VariableMemory::ROM(0)
                                     };
-                                    if var_type != VariableType::CharPtr && var_type != VariableType::CharPtrPtr {
+                                    if var_type != VariableType::CharPtr && var_type != VariableType::CharPtrPtr && var_type != VariableType::ShortPtr {
                                         return Err(syntax_error(state, "Array definition provided for something not an array", start));
                                     }
-                                    if var_type == VariableType::CharPtr {
+                                    if var_type == VariableType::CharPtr || var_type == VariableType::ShortPtr {
                                         let mut v = Vec::new();
                                         for pxx in px.into_inner() {
                                             v.push(parse_int(pxx.into_inner().next().unwrap()));
@@ -428,12 +436,12 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                                         for pxx in px.into_inner() {
                                             let s = pxx.as_str().to_string();
                                             let var = state.variables.get(&s);
-                                            if var.is_none() {
-                                                return Err(syntax_error(state, &format!("Unknown identifier {}", s), start));
-                                            } else {
-                                                if var.unwrap().var_type != VariableType::CharPtr {
+                                            if let Some(vx) = var {
+                                                if vx.var_type != VariableType::CharPtr {
                                                     return Err(syntax_error(state, &format!("Reference {} should be a pointer", s), start));
                                                 }
+                                            } else {
+                                                return Err(syntax_error(state, &format!("Unknown identifier {}", s), start));
                                             }
                                             v.push(s);
                                         }
@@ -451,23 +459,20 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                                     let s = px.into_inner().next().unwrap().as_str();
                                     let mut i = s.chars();
                                     let mut v = Vec::new();
-                                    loop {
-                                        match i.next() {
-                                            Some(c) => if c == '\\' {
-                                                match i.next() {
-                                                    Some('0') => v.push(0),
-                                                    Some('n') => v.push(10),
-                                                    Some('r') => v.push(13),
-                                                    _ => (),
-                                                }
-                                            } else {
-                                                let mut b = [0;4];
-                                                let s = c.encode_utf8(&mut b);
-                                                for byte in s.as_bytes() {
-                                                    v.push(*byte as i32);
-                                                }
-                                            },
-                                            _ => break,
+                                    while let Some(c) = i.next() {
+                                        if c == '\\' {
+                                            match i.next() {
+                                                Some('0') => v.push(0),
+                                                Some('n') => v.push(10),
+                                                Some('r') => v.push(13),
+                                                _ => (),
+                                            }
+                                        } else {
+                                            let mut b = [0;4];
+                                            let s = c.encode_utf8(&mut b);
+                                            for byte in s.as_bytes() {
+                                                v.push(*byte as i32);
+                                            }
                                         }
                                     };
                                     v.push(0);
@@ -719,14 +724,14 @@ fn compile_func_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) 
 {
     let mut inline = false;
     let mut bank = 0u32;
-    let mut p = pairs.into_iter();
+    let mut p = pairs;
     let mut pair = p.next().unwrap();
     if pair.as_rule() == Rule::inline { 
         inline = true; 
         pair = p.next().unwrap();
     }
     if pair.as_rule() == Rule::bank { 
-        bank = u32::from_str_radix(pair.into_inner().next().unwrap().as_str(), 10).unwrap();
+        bank = pair.into_inner().next().unwrap().as_str().parse::<u32>().unwrap();
         pair = p.next().unwrap();
     }
     if bank != 0 && inline {
@@ -739,13 +744,10 @@ fn compile_func_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) 
             match pair.as_rule() {
                 Rule::block => {
                     let n = name.to_string();
-                    match state.functions.get(&n) {
-                        Some(f) => {
-                            if !f.code.is_none() {
-                                return Err(syntax_error(state, &format!("Function {} already defined", n), pair.as_span().start()));
-                            }
-                        },
-                        None => ()
+                    if let Some(f) = state.functions.get(&n) {
+                        if f.code.is_some() {
+                            return Err(syntax_error(state, &format!("Function {} already defined", n), pair.as_span().start()));
+                        }
                     }
                     let code = compile_block(state, pair)?;
                     state.functions.insert(n, Function {
@@ -757,16 +759,13 @@ fn compile_func_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) 
                 },
                 _ => {
                     let n = name.to_string();
-                    match state.functions.get(&n) {
-                        None => {
-                            state.functions.insert(n, Function {
-                                order: state.functions.len(),
-                                inline,
-                                bank,
-                                code: None 
-                            });
-                        },
-                        _ => ()
+                    if state.functions.get(&n).is_none() {
+                        state.functions.insert(n, Function {
+                            order: state.functions.len(),
+                            inline,
+                            bank,
+                            code: None 
+                        });
                     }
                 }
             }
@@ -808,7 +807,9 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
     let pratt =
         PrattParser::new()
         .op(Op::infix(Rule::comma, Assoc::Left))
-        .op(Op::infix(Rule::assign, Assoc::Right) | Op::infix(Rule::mass, Assoc::Right) | Op::infix(Rule::pass, Assoc::Right))
+        .op(Op::infix(Rule::assign, Assoc::Right) | Op::infix(Rule::mass, Assoc::Right) | Op::infix(Rule::pass, Assoc::Right) |
+            Op::infix(Rule::andass, Assoc::Right) | Op::infix(Rule::orass, Assoc::Right) | Op::infix(Rule::xorass, Assoc::Right) |
+            Op::infix(Rule::blsass, Assoc::Right) | Op::infix(Rule::brsass, Assoc::Right))
         .op(Op::infix(Rule::ternary_cond1, Assoc::Right))
         .op(Op::infix(Rule::ternary_cond2, Assoc::Right))
         .op(Op::infix(Rule::lor, Assoc::Left))
@@ -828,7 +829,7 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
     context.include_directories = args.include_directories.clone();
     context.define("__ATARI2600__", "1");
     for i in &args.defines {
-        let mut s = i.splitn(2, "=");
+        let mut s = i.splitn(2, '=');
         let def = s.next().unwrap();
         let value = s.next().unwrap_or("1");
         context.define(def, value);
@@ -849,10 +850,11 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
         mapped_lines: &mapped_lines,
         preprocessed_utf8,
         included_assembler: Vec::<String>::new(),
-        context
+        context,
+        signed_chars: args.signed_chars
     };
 
-    let r = Cc2600Parser::parse(Rule::program, &preprocessed_utf8);
+    let r = Cc2600Parser::parse(Rule::program, preprocessed_utf8);
     match r {
         Err(e) => {
             let mut ex = e.clone();
@@ -902,7 +904,7 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
         var_type: VariableType::Char, size: 1});
 
     // Generate assembly code from compilation output (abstract syntax tree)
-    build_cartridge(&mut state, output, &args)?;
+    build_cartridge(&state, output, args)?;
     Ok(())
 }
 

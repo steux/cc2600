@@ -156,15 +156,13 @@ impl Context {
 
     pub fn replace_all(&self, s: &str) -> String {
         let mut res = String::from(s);
-        let mut i = 0;
-        for set in &self.regex_sets {
+        for (i, set) in self.regex_sets.iter().enumerate() {
             for idx in set.matches(s).into_iter() {
                 let x = self.regexes[i][idx].0.replace_all(&res, &self.regexes[i][idx].1);
                 if let Cow::Owned(z) = x {
                     res = z.to_string();
                 }
             }
-            i += 1;
         }
         res
     }
@@ -186,23 +184,17 @@ impl Context {
             .next()
             .ok_or_else(|| { 
                 let filename = self.current_filename.clone();
-                let included_in = match self.includes_stack.last() {
-                    Some(s) => Some(s.clone()),
-                    None => None,
-                };
+                let included_in = self.includes_stack.last().cloned();
                 Error::Syntax {
                     filename, included_in, line,
                     msg: "Expected term, found nothing".to_string() }
             })?
-        .is_digit(10)
+        .is_ascii_digit()
         {
             Ok(term == "1")
         } else {
             let filename = self.current_filename.clone();
-            let included_in = match self.includes_stack.last() {
-                Some(s) => Some(s.clone()),
-                None => None,
-            };
+            let included_in = self.includes_stack.last().cloned();
             Err(Error::Syntax {
                 filename, included_in, line,
                 msg: "Undefined identifier".to_string(),
@@ -212,7 +204,7 @@ impl Context {
     fn eval_unary(&self, expr: &mut &str, line: u32) -> Result<bool, Error> {
         let mut negate = false;
         self.skip_whitespace(expr);
-        while expr.starts_with("!") {
+        while expr.starts_with('!') {
             *expr = &expr[1..];
             negate = !negate;
             self.skip_whitespace(expr);
@@ -235,10 +227,7 @@ impl Context {
         self.skip_whitespace(&mut expr);
         if !expr.is_empty() {
             let filename = self.current_filename.clone();
-            let included_in = match self.includes_stack.last() {
-                Some(s) => Some(s.clone()),
-                None => None,
-            };
+            let included_in = self.includes_stack.last().cloned();
             return Err(Error::Syntax {
                 filename, included_in, line,
                 msg: "Expected end-of-line".to_string(),
@@ -326,17 +315,17 @@ pub fn process<I: BufRead, O: Write>(
     let mut in_multiline_comments = false;
 
     let (included_in, included_in_rc) = match context.includes_stack.last() {
-        Some(s) => (Some(s.clone()), Some((std::rc::Rc::<String>::new(s.0.clone()), s.1.clone()))),
+        Some(s) => (Some(s.clone()), Some((std::rc::Rc::<String>::new(s.0.clone()), s.1))),
         None => (None, None),
     };
 
     while input.read_line(&mut buf)? > 0 {
         line += 1;
-        let has_lf = buf.ends_with("\n");
+        let has_lf = buf.ends_with('\n');
         let mut remaining: &str = &buf;
         let mut insert_it = !in_multiline_comments;
         uncommented_buf.clear();
-        while remaining.len() > 0 {
+        while !remaining.is_empty() {
             if in_multiline_comments {
                 let mut s = remaining.splitn(2, "*/");
                 s.next().unwrap();
@@ -344,7 +333,7 @@ pub fn process<I: BufRead, O: Write>(
                     Some(string) => {
                         in_multiline_comments = false;
                         remaining = string;
-                        if remaining.len() > 0 { 
+                        if !remaining.is_empty() { 
                             if remaining.eq("\n") {
                                 remaining = "";
                             } else {
@@ -355,7 +344,7 @@ pub fn process<I: BufRead, O: Write>(
                     _ => break
                 }
             } else {
-                let mut s = remaining.splitn(2, "//").next().unwrap().splitn(2, "/*");
+                let mut s = remaining.split("//").next().unwrap().splitn(2, "/*");
                 uncommented_buf.push_str(s.next().unwrap());
                 if uncommented_buf.is_empty() { insert_it = false; }
                 match s.next() {
@@ -372,7 +361,7 @@ pub fn process<I: BufRead, O: Write>(
             let substr = uncommented_buf.trim();
             // Before substitution, test the #ifdef
             if substr.starts_with("#ifdef") {
-                let mut parts = substr.splitn(2, "//").next().unwrap().splitn(2, " ");
+                let mut parts = substr.split("//").next().unwrap().splitn(2, ' ');
                 parts.next().unwrap();
                 let maybe_expr = parts.next().map(|s| s.trim()).and_then(|s| {
                     if s.is_empty() {
@@ -399,7 +388,7 @@ pub fn process<I: BufRead, O: Write>(
                     state = State::Skip;
                 }
             } else if substr.starts_with("#ifndef") {
-                let mut parts = substr.splitn(2, "//").next().unwrap().splitn(2, " ");
+                let mut parts = substr.split("//").next().unwrap().splitn(2, ' ');
                 parts.next().unwrap();
                 let maybe_expr = parts.next().map(|s| s.trim()).and_then(|s| {
                     if s.is_empty() {
@@ -426,7 +415,7 @@ pub fn process<I: BufRead, O: Write>(
                 }
             } else if substr.starts_with("#undef") {
                 if state == State::Active {
-                    let mut parts = substr.splitn(2, "//").next().unwrap().splitn(2, " ");
+                    let mut parts = substr.split("//").next().unwrap().splitn(2, ' ');
                     parts.next().unwrap();
                     let maybe_expr = parts.next().map(|s| s.trim()).and_then(|s| {
                         if s.is_empty() {
@@ -453,7 +442,7 @@ pub fn process<I: BufRead, O: Write>(
                 } 
             } else if substr.starts_with("#define") {
                 if state == State::Active {
-                    let mut parts = substr.splitn(2, "//").next().unwrap().splitn(2, " ");
+                    let mut parts = substr.split("//").next().unwrap().splitn(2, ' ');
                     parts.next().unwrap();
                     let maybe_expr = parts.next().map(|s| s.trim()).and_then(|s| {
                         if s.is_empty() {
@@ -481,11 +470,11 @@ pub fn process<I: BufRead, O: Write>(
                         context.define(mcro, value);
                     } else {
                         let mut rex = format!("\\b{}\\(", mcro);
-                        for v in caps.get(2).unwrap().as_str().split(",") {
+                        for v in caps.get(2).unwrap().as_str().split(',') {
                             value = value.replace(v, &format!("${}",v));
                             rex += &format!("(?P<{}>[^,]*),", v);
                         }
-                        rex = rex.strip_suffix(",").unwrap().to_string();
+                        rex = rex.strip_suffix(',').unwrap().to_string();
                         rex += "\\)";
                         debug!("regex:{}", &rex);
                         context.define_ex(mcro, (rex, value));
@@ -494,8 +483,8 @@ pub fn process<I: BufRead, O: Write>(
             } else { 
                 let new_line = context.replace_all(&uncommented_buf);
                 let substr = new_line.trim();
-                if substr.starts_with("#") {
-                    let mut parts = substr.splitn(2, "//").next().unwrap().splitn(2, " ");
+                if substr.starts_with('#') {
+                    let mut parts = substr.split("//").next().unwrap().splitn(2, ' ');
                     let name = parts.next().unwrap();
                     let maybe_expr = parts.next().map(|s| s.trim()).and_then(|s| {
                         if s.is_empty() {
@@ -627,7 +616,7 @@ pub fn process<I: BufRead, O: Write>(
                 } else if state == State::Active {
                     lines.push((filename_rc.clone(), line, included_in_rc.clone()));
                     output.write_all(new_line.as_bytes())?;
-                    if !new_line.ends_with("\n") && has_lf { output.write(b"\n")?; }
+                    if !new_line.ends_with('\n') && has_lf { output.write_all(b"\n")?; }
                 }
             } 
         }

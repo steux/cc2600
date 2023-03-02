@@ -57,7 +57,7 @@ void main()
         *DF0TOP = sprite0 - 1;
         *DF0BOT = sprite0 + sizeof(sprite0);
         
-        // Set up second sprite
+        // Set up color data stream 
         color_ptr = colors0 - ypos;
         *DF1HI = color_ptr >> 8;
         *DF1LOW = color_ptr;

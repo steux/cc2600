@@ -1,0 +1,7 @@
+v0.1.7 (03/02/2023) :
+    - Solved an issue with variables signedness
+
+v0.1.6 (03/01/2023) :
+    - Set char signedness to unsigned as default
+    - Corrected a bug in cart generation with ROMPLUS
+

@@ -123,11 +123,12 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
     gstate.write("cctmp                  \tds 1\n")?; 
     for v in compiler_state.sorted_variables().iter() {
        // debug!("{:?}",v);
-        if !v.1.var_const && v.1.memory == VariableMemory::Zeropage && v.1.def == VariableDefinition::None {
+        if v.1.memory == VariableMemory::Zeropage && v.1.def == VariableDefinition::None {
             if v.1.size > 1 {
                 let s = match v.1.var_type {
                     VariableType::CharPtr => 1,
                     VariableType::CharPtrPtr => 2,
+                    VariableType::ShortPtr => 2,
                     _ => unreachable!()
                 };
                 gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
@@ -137,6 +138,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                     VariableType::Short => 2,
                     VariableType::CharPtr => 2,
                     VariableType::CharPtrPtr => 2,
+                    VariableType::ShortPtr => 2,
                 };
                 gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
             }
@@ -147,11 +149,12 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         gstate.write("\n\tSEG.U SUPERVARS\n\tORG $1000\n\tRORG $1000\n")?;
         // Superchip variables
         for v in compiler_state.sorted_variables().iter() {
-            if !v.1.var_const && v.1.memory == VariableMemory::Superchip && v.1.def == VariableDefinition::None {
+            if v.1.memory == VariableMemory::Superchip && v.1.def == VariableDefinition::None {
                 if v.1.size > 1 {
                     let s = match v.1.var_type {
                         VariableType::CharPtr => 1,
                         VariableType::CharPtrPtr => 2,
+                        VariableType::ShortPtr => 2,
                         _ => unreachable!()
                     };
                     gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
@@ -161,6 +164,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                         VariableType::Short => 2,
                         VariableType::CharPtr => 2,
                         VariableType::CharPtrPtr => 2,
+                        VariableType::ShortPtr => 2,
                     };
                     gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
                 }
@@ -173,7 +177,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         for bank in 1..=512 { // Max 512ko
             let mut first = true;
             for v in compiler_state.sorted_variables().iter() {
-                if !v.1.var_const && v.1.memory == VariableMemory::MemoryOnChip(bank) && v.1.def == VariableDefinition::None {
+                if v.1.memory == VariableMemory::MemoryOnChip(bank) && v.1.def == VariableDefinition::None {
                     if first {
                         first = false;
                         gstate.write(&format!("\n\tSEG.U RAM_3E_{}\n\tORG $1000\n\tRORG $1000\n", bank))?;
@@ -182,6 +186,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                         let s = match v.1.var_type {
                             VariableType::CharPtr => 1,
                             VariableType::CharPtrPtr => 2,
+                            VariableType::ShortPtr => 2,
                             _ => unreachable!()
                         };
                         gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
@@ -191,6 +196,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                             VariableType::Short => 2,
                             VariableType::CharPtr => 2,
                             VariableType::CharPtrPtr => 2,
+                            VariableType::ShortPtr => 2,
                         };
                         gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
                     }
@@ -297,7 +303,7 @@ Powerup
 
             // Generate included assembler
             for asm in &compiler_state.included_assembler {
-                gstate.write(&asm)?;
+                gstate.write(asm)?;
             }
         }
         
@@ -330,8 +336,18 @@ Powerup
                                 }
                                 counter += 1;
                                 if counter == 16 { counter = 0; }
-                                gstate.write(&format!("{:02x}", i))?;
+                                gstate.write(&format!("{:02x}", i & 0xff))?;
                             } 
+                            if v.1.var_type == VariableType::ShortPtr {
+                                for i in arr {
+                                    if counter == 0 {
+                                        gstate.write("\n\thex ")?;
+                                    }
+                                    counter += 1;
+                                    if counter == 16 { counter = 0; }
+                                    gstate.write(&format!("{:02x}", (i >> 8) & 0xff))?;
+                                } 
+                            }
                             gstate.write("\n")?;
                         },
                         VariableDefinition::ArrayOfPointers(arr) => {
@@ -372,9 +388,9 @@ Powerup
         // Epilogue code
         if bankswitching_scheme == "3E" {
             if bank == 0 {
-                gstate.write(&format!("
+                gstate.write("
         ECHO ([$1FF0-.]d), \"bytes free in bank 0\"
-        "))?;
+        ")?;
             } else {
                 gstate.write(&format!("
         ECHO ([$1800-.]d), \"bytes free in bank {}\"
@@ -439,12 +455,11 @@ Call{}
         RORG $1FFA
 
         .word PLUSROM_API + ${:04x}\t
-        .word PLUSROM_API + ${:04x}\t
+        .word {}\t; RESET
         .word {}\t; IRQ
-        \n", bank, offset * 0x1000, offset * 0x1000, starting_code))?;
-        } else {
-            if bankswitching_scheme != "DPC+" && bankswitching_scheme != "3E" {
-                gstate.write(&format!("
+        \n", bank, offset * 0x1000, starting_code, starting_code))?;
+        } else if bankswitching_scheme != "DPC+" && bankswitching_scheme != "3E" {
+            gstate.write(&format!("
         ORG ${}FFA
         RORG $1FFA
 
@@ -452,9 +467,9 @@ Call{}
         .word {}\t; RESET
         .word {}\t; IRQ
         \n", 
-                bank, starting_code, starting_code, starting_code))?;
-            } else if b == maxbank {
-                gstate.write(&format!("
+        bank, starting_code, starting_code, starting_code))?;
+        } else if b == maxbank {
+            gstate.write(&format!("
         ORG ${:04x}
         RORG $1FFA
 
@@ -462,124 +477,133 @@ Call{}
         .word {}\t; RESET
         .word {}\t; IRQ
         \n", 
-            (b + 1) * banksize - 6, starting_code, starting_code, starting_code))?;
-            }
+        (b + 1) * banksize - 6, starting_code, starting_code, starting_code))?;
         }
     }
 
     if bankswitching_scheme == "DPC" {
-        gstate.write(&format!("
+        gstate.write("
             SEG DISPLAY
             ORG $2000
             RORG $0000
-            "))?;
+            ")?;
         
         // Generate display tables
         gstate.write("\n; Display in ROM\n")?;
         for v in compiler_state.sorted_variables().iter() {
             if let VariableMemory::Display = v.1.memory {
-                match &v.1.def {
-                    VariableDefinition::Array(arr) => {
-                        if v.1.alignment != 1 {
-                            gstate.write(&format!("\n\talign {}\n", v.1.alignment))?;
+                if let VariableDefinition::Array(arr) = &v.1.def {
+                    if v.1.alignment != 1 {
+                        gstate.write(&format!("\n\talign {}\n", v.1.alignment))?;
+                    }
+                    gstate.write(v.0)?;
+                    let mut counter = 0;
+                    for i in arr {
+                        if counter == 0 || counter == 16 {
+                            gstate.write("\n\thex ")?;
                         }
-                        gstate.write(v.0)?;
-                        let mut counter = 0;
-                        for i in arr {
-                            if counter == 0 || counter == 16 {
-                                gstate.write("\n\thex ")?;
-                            }
-                            counter += 1;
-                            if counter == 16 { counter = 0; }
-                            gstate.write(&format!("{:02x}", i))?;
-                        } 
-                        gstate.write("\n")?;
-                    },
-                    _ => ()
-                };
+                        counter += 1;
+                        if counter == 16 { counter = 0; }
+                        gstate.write(&format!("{:02x}", i))?;
+                    } 
+                    gstate.write("\n")?;
+                }
             }
         }
-        gstate.write(&format!("
+        gstate.write("
             ECHO ([$800-.]d), \"bytes free in DPC display memory\"
 
             ORG $27FF
             DS 1, 0x81
-            "))?;
+            ")?;
     }
  
     if bankswitching_scheme == "DPC+" {
-        gstate.write(&format!("
+        gstate.write("
             SEG DISPLAY
             ORG $6000
             RORG $0000
-            "))?;
+            ")?;
         
         // Generate display tables
-        gstate.write("\n; Display in ROM\n")?;
+        gstate.write("\n; Display in RAM\n")?;
         for v in compiler_state.sorted_variables().iter() {
             if let VariableMemory::Display = v.1.memory {
-                match &v.1.def {
-                    VariableDefinition::Array(arr) => {
-                        if v.1.alignment != 1 {
-                            gstate.write(&format!("\n\talign {}\n", v.1.alignment))?;
+                if v.1.alignment != 1 {
+                    gstate.write(&format!("\n\talign {}\n", v.1.alignment))?;
+                }
+                if let VariableDefinition::Array(arr) = &v.1.def {
+                    gstate.write(v.0)?;
+                    let mut counter = 0;
+                    for i in arr {
+                        if counter == 0 || counter == 16 {
+                            gstate.write("\n\thex ")?;
                         }
-                        gstate.write(v.0)?;
-                        let mut counter = 0;
-                        for i in arr {
-                            if counter == 0 || counter == 16 {
-                                gstate.write("\n\thex ")?;
-                            }
-                            counter += 1;
-                            if counter == 16 { counter = 0; }
-                            gstate.write(&format!("{:02x}", i))?;
-                        } 
-                        gstate.write("\n")?;
-                    },
-                    _ => ()
-                };
+                        counter += 1;
+                        if counter == 16 { counter = 0; }
+                        gstate.write(&format!("{:02x}", i))?;
+                    } 
+                    gstate.write("\n")?;
+                } else {
+                    if v.1.size > 1 {
+                        let s = match v.1.var_type {
+                            VariableType::CharPtr => 1,
+                            VariableType::CharPtrPtr => 2,
+                            VariableType::ShortPtr => 2,
+                            _ => unreachable!()
+                        };
+                        gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
+                    } else {
+                        let s = match v.1.var_type {
+                            VariableType::Char => 1,
+                            VariableType::Short => 2,
+                            VariableType::CharPtr => 2,
+                            VariableType::CharPtrPtr => 2,
+                            VariableType::ShortPtr => 2,
+                        };
+                        gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
+                    }
+                }
             }
         }
-        gstate.write(&format!("
+        gstate.write("
             ECHO ([$1000-.]d), \"bytes free in DPC+ display memory\"
-            "))?;
+            ")?;
         
-        gstate.write(&format!("
+        gstate.write("
             SEG FREQUENCIES
             ORG $7000
             RORG $0000
-            "))?;
+            ")?;
         
         // Generate display tables
         gstate.write("\n; Frequencies in ROM\n")?;
         for v in compiler_state.sorted_variables().iter() {
             if let VariableMemory::Frequency = v.1.memory {
-                match &v.1.def {
-                    VariableDefinition::Array(arr) => {
-                        if v.1.alignment != 1 {
-                            gstate.write(&format!("\n\talign {}\n", v.1.alignment))?;
+                if let  VariableDefinition::Array(arr) = &v.1.def {
+                    if v.1.alignment != 1 {
+                        gstate.write(&format!("\n\talign {}\n", v.1.alignment))?;
+                    }
+                    gstate.write(v.0)?;
+                    let mut counter = 0;
+                    for i in arr {
+                        if counter == 0 || counter == 16 {
+                            gstate.write("\n\thex ")?;
                         }
-                        gstate.write(v.0)?;
-                        let mut counter = 0;
-                        for i in arr {
-                            if counter == 0 || counter == 16 {
-                                gstate.write("\n\thex ")?;
-                            }
-                            counter += 1;
-                            if counter == 16 { counter = 0; }
-                            gstate.write(&format!("{:02x}", i))?;
-                        } 
-                        gstate.write("\n")?;
-                    },
-                    _ => ()
-                };
+                        counter += 1;
+                        if counter == 16 { counter = 0; }
+                        gstate.write(&format!("{:02x}", i))?;
+                    } 
+                    gstate.write("\n")?;
+                }
             }
         }
-        gstate.write(&format!("
+        gstate.write("
             ECHO ([$400-.]d), \"bytes free in DPC+ frequency memory\"
 
             ORG $73FF
             DS 1, 0x81
-            "))?;
+            ")?;
     }
     gstate.write("\tEND\n")?;
     
