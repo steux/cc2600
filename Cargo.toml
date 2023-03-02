@@ -4,6 +4,7 @@ version = "0.1.1"
 edition = "2021"
 authors = ["Bruno STEUX <bruno.steux@gmail.com>"]
 license = "GPL-3.0-or-later"
+license-file = "LICENSE"
 description = "a subset of C compiler for Atari 2600"
 readme = "README.md"
 homepage = "https://github.com/steux/cc2600"
