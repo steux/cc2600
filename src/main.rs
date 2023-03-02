@@ -441,4 +441,15 @@ void main()
         print!("{:?}", result);
         assert!(result.contains("LDA #0\n\tSTA i\n\tLDA #0"));
     }
+    
+    #[test]
+    fn calc_test() {
+        let args = sargs(1);
+        let input = "const char tab[1 + 1] = {3 * 5, 4 << 2};";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("hex 0f10"));
+    }
 }

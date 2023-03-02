@@ -176,6 +176,7 @@ pub struct CompilerState<'a> {
     pub variables: HashMap<String, Variable>,
     pub functions: HashMap<String, Function<'a>>,
     pratt: PrattParser<Rule>,
+    calculator: PrattParser<Rule>,
     mapped_lines: &'a Vec::<(std::rc::Rc::<String>,u32,Option<(std::rc::Rc::<String>,u32)>)>,
     pub preprocessed_utf8: &'a str,
     pub included_assembler: Vec<String>,
@@ -245,7 +246,6 @@ fn parse_identifier<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Re
         match *subscript {
             Expr::Nothing => return Ok((varname, subscript)),
             _ => return Err(syntax_error(state, &format!("No subscript for {} index", varname), px.as_span().start())),
-
         }
     }
     match state.variables.get(varname) {
@@ -335,6 +335,47 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
         .parse(pairs)
 }
 
+fn parse_calc<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<i32, Error>
+{
+    state.calculator
+        .map_primary(|primary| -> Result<i32, Error> {
+            match primary.as_rule() {
+                Rule::int => Ok(parse_int(primary.into_inner().next().unwrap())),
+                Rule::calc_expr => Ok(parse_calc(state, primary.into_inner())?),
+                rule => unreachable!("parse_calc expected atom, found {:?}", rule),
+            }
+        })
+        .map_infix(|lhs, op, rhs| {
+            let res = match op.as_rule() {
+                Rule::mul => lhs.unwrap() * rhs.unwrap(),
+                Rule::div => {
+                    let d = rhs.unwrap();
+                    if d == 0 {
+                        let start = op.as_span().start();
+                        return Err(syntax_error(state, "Division by zero", start));
+                    }
+                    lhs.unwrap() / d
+                },
+                Rule::add => lhs.unwrap() + rhs.unwrap(),
+                Rule::sub => lhs.unwrap() - rhs.unwrap(),
+                Rule::and => lhs.unwrap() & rhs.unwrap(),
+                Rule::or => lhs.unwrap() | rhs.unwrap(),
+                Rule::xor => lhs.unwrap() ^ rhs.unwrap(),
+                Rule::brs => lhs.unwrap() >> rhs.unwrap(),
+                Rule::bls => lhs.unwrap() << rhs.unwrap(),
+                rule => unreachable!("parse_calc expected infix operation, found {:?}", rule),
+            };
+            Ok(res)
+        })
+        .map_prefix(|op, rhs| match op.as_rule() {
+            Rule::neg => Ok(-rhs?),
+            Rule::not => Ok(!rhs?),
+            Rule::bnot => Ok(!rhs?),
+            _ => unreachable!(),
+        })
+        .parse(pairs)
+}
+
 fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(), Error>
 {
     let mut var_type = VariableType::Char;
@@ -385,7 +426,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                         Rule::array_spec => {
                             let start = p.as_span().start();
                             if let Some(px) = p.into_inner().next() {
-                                size = Some(px.as_str().parse::<usize>().unwrap());
+                                size = Some(parse_calc(state, px.into_inner())? as usize);
                             }
                             if var_type == VariableType::Char {
                                 var_type = VariableType::CharPtr;
@@ -403,8 +444,8 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                         Rule::var_def => {
                             let px = p.into_inner().next().unwrap();
                             match px.as_rule() {
-                                Rule::int => {
-                                    let v = parse_int(px.into_inner().next().unwrap());
+                                Rule::calc_expr => {
+                                    let v = parse_calc(state, px.into_inner())?;
                                     def = VariableDefinition::Value(v);
                                     if var_type == VariableType::CharPtr && v > 255 {
                                         memory = VariableMemory::MemoryOnChip(0);
@@ -422,7 +463,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                                     if var_type == VariableType::CharPtr || var_type == VariableType::ShortPtr {
                                         let mut v = Vec::new();
                                         for pxx in px.into_inner() {
-                                            v.push(parse_int(pxx.into_inner().next().unwrap()));
+                                            v.push(parse_calc(state, pxx.into_inner())?);
                                         }
                                         if let Some(s) = size {
                                             if s != v.len() {
@@ -823,7 +864,19 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
         .op(Op::infix(Rule::mul, Assoc::Left) | Op::infix(Rule::div, Assoc::Left))
         .op(Op::prefix(Rule::neg) | Op::prefix(Rule::not) | Op::prefix(Rule::bnot) | Op::prefix(Rule::mmp) | Op::prefix(Rule::ppp) | Op::prefix(Rule::deref) | Op::prefix(Rule::sizeof))
         .op(Op::postfix(Rule::call) | Op::postfix(Rule::mm) | Op::postfix(Rule::pp));
-    
+   
+    let calculator = 
+        PrattParser::new()
+        .op(Op::infix(Rule::lor, Assoc::Left))
+        .op(Op::infix(Rule::land, Assoc::Left))
+        .op(Op::infix(Rule::or, Assoc::Left))
+        .op(Op::infix(Rule::xor, Assoc::Left))
+        .op(Op::infix(Rule::and, Assoc::Left))
+        .op(Op::infix(Rule::brs, Assoc::Left) | Op::infix(Rule::bls, Assoc::Left))
+        .op(Op::infix(Rule::add, Assoc::Left) | Op::infix(Rule::sub, Assoc::Left))
+        .op(Op::infix(Rule::mul, Assoc::Left) | Op::infix(Rule::div, Assoc::Left))
+        .op(Op::prefix(Rule::neg) | Op::prefix(Rule::not) | Op::prefix(Rule::bnot));
+
     // Prepare the context
     let mut context = cpp::Context::new(&args.input);
     context.include_directories = args.include_directories.clone();
@@ -846,7 +899,7 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
     let mut state = CompilerState {
         variables: HashMap::new(),
         functions: HashMap::new(),
-        pratt,
+        pratt, calculator,
         mapped_lines: &mapped_lines,
         preprocessed_utf8,
         included_assembler: Vec::<String>::new(),

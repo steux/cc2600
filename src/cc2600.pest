@@ -36,9 +36,9 @@ var_sign = { "signed" | "unsigned" }
 var_simple_type = { "char" | "short" }
 id_name = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 id_name_ex = { pointer? ~ var_const? ~ id_name ~ array_spec? ~ ("=" ~ var_def)? }
-array_spec = { "[" ~ int? ~ "]" }
-var_def = { int | array_def | quoted_string }
-array_def = { "{" ~ ((int | id_name) ~ ",")* ~ (int | id_name) ~ "}" }
+array_spec = { "[" ~ calc_expr? ~ "]" }
+var_def = { calc_expr | array_def | quoted_string }
+array_def = { "{" ~ ((calc_expr | id_name) ~ ",")* ~ (calc_expr | id_name) ~ "}" }
 pointer = { "*" }
 
 func_decl = { inline? ~ bank? ~ "void" ~ id_name ~ "(" ~ ("void")? ~ ")" ~ (";" | block) ~ ";"*}
@@ -151,3 +151,8 @@ character   = @{ ANY }
 quoted_character   = ${ "'" ~ character ~ "'" }
 string      = @{ (!"\"" ~ character)* } 
 quoted_string      = ${ "\"" ~ string ~ "\""}
+
+calc_expr       =   { calc_prefix* ~ calc_primary ~ (calc_infix ~ calc_prefix* ~ calc_primary)* }
+    calc_infix    =  _{ mul | div | add | sub | bls | brs | land | lor | and | xor | or }
+    calc_prefix   =  _{ neg | not | bnot }
+    calc_primary  =  _{ int | "(" ~ calc_expr ~ ")" }
