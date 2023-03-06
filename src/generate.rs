@@ -971,7 +971,7 @@ impl<'a, 'b> GeneratorState<'a> {
         let signed;
         match right2 {
             ExprType::Immediate(v) => {
-                signed = if *v == 0 { false } else { self.asm(operation, right2, pos, high_byte)? };
+                signed = if *v == 0 && !high_byte { false } else { self.asm(operation, right2, pos, high_byte)? };
             },
             ExprType::Absolute(_, _, _) | ExprType::AbsoluteX(_) | ExprType::AbsoluteY(_) => {
                 signed = self.asm(operation, right2, pos, high_byte)?;
@@ -1425,6 +1425,9 @@ impl<'a, 'b> GeneratorState<'a> {
             },
             _ => {
                 if self.acc_in_use {
+                    if self.tmp_in_use {
+                        return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+                    }
                     self.sasm(PHA)?; 
                     self.local_label_counter_if += 1;
                     let ifend_label = format!(".ifend{}", self.local_label_counter_if);
@@ -1603,11 +1606,39 @@ impl<'a, 'b> GeneratorState<'a> {
                             ExprType::Nothing => if let VariableDefinition::Value(val) = &v.def {
                                 Ok(ExprType::Immediate(*val))
                             } else {
-                                Ok(ExprType::Absolute(variable, v.var_type == VariableType::Char, 0))
+                                if high_byte && v.var_type == VariableType::Char && v.signed {
+                                    self.generate_sign_extend(ExprType::Absolute(variable, v.var_type == VariableType::Char, 0), pos)
+                                } else {
+                                    Ok(ExprType::Absolute(variable, v.var_type == VariableType::Char, 0))
+                                }
                             },
-                            ExprType::X => Ok(ExprType::AbsoluteX(variable)),
-                            ExprType::Y => Ok(ExprType::AbsoluteY(variable)),
-                            ExprType::Immediate(val) => Ok(ExprType::Absolute(variable, v.var_type != VariableType::CharPtrPtr && v.var_type != VariableType::ShortPtr, val)),
+                            ExprType::X => if v.var_type != VariableType::Char && v.var_type != VariableType::Short {
+                                if high_byte && v.var_type == VariableType::CharPtr && v.signed {
+                                    self.generate_sign_extend(ExprType::AbsoluteX(variable), pos)
+                                } else {
+                                    Ok(ExprType::AbsoluteX(variable))
+                                }
+                            } else {
+                                Err(syntax_error(self.compiler_state, "Subscript not allowed on variables", pos))
+                            },
+                            ExprType::Y => if v.var_type != VariableType::Char && v.var_type != VariableType::Short {
+                                if high_byte && v.var_type == VariableType::CharPtr && v.signed {
+                                    self.generate_sign_extend(ExprType::AbsoluteY(variable), pos)
+                                } else {
+                                    Ok(ExprType::AbsoluteY(variable))
+                                }
+                            } else {
+                                Err(syntax_error(self.compiler_state, "Subscript not allowed on variables", pos))
+                            },
+                            ExprType::Immediate(val) => if v.var_type != VariableType::Char && v.var_type != VariableType::Short {
+                                if high_byte && v.var_type == VariableType::CharPtr && v.signed {
+                                    self.generate_sign_extend(ExprType::Absolute(variable, true, val), pos)
+                                } else {
+                                    Ok(ExprType::Absolute(variable, v.var_type != VariableType::CharPtrPtr && v.var_type != VariableType::ShortPtr, val))
+                                }
+                            } else {
+                                Err(syntax_error(self.compiler_state, "Subscript not allowed on variables", pos))
+                            },
                             _ => Err(syntax_error(self.compiler_state, "Subscript not allowed (only X, Y and constants are allowed)", pos))
                         }
                     },
@@ -1643,6 +1674,43 @@ impl<'a, 'b> GeneratorState<'a> {
             Expr::Deref(v) => self.generate_deref(v, pos),
             Expr::Sizeof(v) => self.generate_sizeof(v, pos),
             Expr::Nothing => Ok(ExprType::Nothing),
+        }
+    }
+    
+    fn generate_sign_extend(&mut self, expr: ExprType<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+    {
+        if self.acc_in_use { self.sasm(PHA)?; }
+        #[cfg(constant_time)]
+        {
+            self.sasm(PHP)?;
+            self.asm(LDA, &expr, pos, false)?;
+            self.asm(ASL, &ExprType::Nothing, pos, false)?;  
+            self.asm(LDA, &ExprType::Immediate(0), pos, false)?;
+            self.asm(ADC, &ExprType::Immediate(0xFF), pos, false)?;
+            self.asm(EOR, &ExprType::Immediate(0xff), pos, false)?;
+            self.sasm(PLP)?;
+        }
+        #[cfg(not(constant_time))]
+        {
+            self.asm(LDA, &expr, pos, false)?;
+            self.local_label_counter_if += 1;
+            let ifneg_label = format!(".ifneg{}", self.local_label_counter_if);
+            self.asm(ORA, &ExprType::Immediate(0x7F), pos, false)?;
+            self.asm(BMI, &ExprType::Label(&ifneg_label), 0, false)?;
+            self.asm(LDA, &ExprType::Immediate(0), pos, false)?;
+            self.label(&ifneg_label)?;
+        }
+        self.flags = FlagsState::Unknown;
+        if self.acc_in_use {
+            self.asm(STA, &ExprType::Tmp(false), pos, false)?;
+            self.sasm(PLA)?;
+            if self.tmp_in_use {
+                return Err(syntax_error(self.compiler_state, "Code too complex for the compiler", pos))
+            }
+            self.tmp_in_use = true;
+            Ok(ExprType::Tmp(true))
+        } else {
+            Ok(ExprType::A(true))
         }
     }
 

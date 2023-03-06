@@ -17,6 +17,10 @@ pub enum AsmMnemonic {
     DEC, DEX, DEY,
     JMP, JSR, RTS,
     PHA, PLA,
+    #[cfg(constant_time)]
+    PHP, 
+    #[cfg(constant_time)]
+    PLP,
     NOP
 }
 
