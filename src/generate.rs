@@ -1327,24 +1327,25 @@ impl<'a, 'b> GeneratorState<'a> {
             },
             ExprType::Absolute(variable, eight_bits, offset) => {
                 let v = self.compiler_state.get_variable(variable);
-                match v.memory {
-                    VariableMemory::Superchip | VariableMemory::MemoryOnChip(_) => {
-                        let op = if plusplus { Operation::Add(false) } else { Operation::Sub(false) };
-                        let right = ExprType::Immediate(1);
-                        let newright = self.generate_arithm(expr_type, &op, &right, pos, false)?;
-                        let ret = self.generate_assign(expr_type, &newright, pos, false);
-                        if v.var_type == VariableType::Short || (v.var_type == VariableType::CharPtr && !eight_bits) {
-                            let newright = self.generate_arithm(expr_type, &op, &right, pos, true)?;
-                            self.generate_assign(expr_type, &newright, pos, true)?;
-                        }
-                        ret
-                    },
-                    _ => {
-                        self.asm(operation, expr_type, pos, false)?;
-                        self.flags = FlagsState::Absolute(variable, *eight_bits, *offset);
-                        Ok(ExprType::Absolute(variable, *eight_bits, *offset))
+                let use_inc = match v.memory {
+                    VariableMemory::Superchip | VariableMemory::MemoryOnChip(_) => false,
+                    _ => v.var_type == VariableType::Char,
+                }; 
+                if use_inc {
+                    self.asm(operation, expr_type, pos, false)?;
+                    self.flags = FlagsState::Absolute(variable, *eight_bits, *offset);
+                    Ok(ExprType::Absolute(variable, *eight_bits, *offset))
+                } else {
+                    let op = if plusplus { Operation::Add(false) } else { Operation::Sub(false) };
+                    let right = ExprType::Immediate(1);
+                    let newright = self.generate_arithm(expr_type, &op, &right, pos, false)?;
+                    let ret = self.generate_assign(expr_type, &newright, pos, false);
+                    if v.var_type == VariableType::Short || (v.var_type == VariableType::CharPtr && !eight_bits) {
+                        let newright = self.generate_arithm(expr_type, &op, &right, pos, true)?;
+                        self.generate_assign(expr_type, &newright, pos, true)?;
                     }
-                } 
+                    ret
+                }
             },
             ExprType::AbsoluteX(variable) => {
                 self.asm(operation, expr_type, pos, false)?;

@@ -463,4 +463,26 @@ void main()
         print!("{:?}", result);
         assert!(result.contains("LDX i\n\tLDA #0\n\tSTA c,X"));
     }
+    
+    #[test]
+    fn sixteen_bits_minusminus_test() {
+        let args = sargs(1);
+        let input = "short i; void main() { i--; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA i\n\tSEC\n\tSBC #1\n\tSTA i\n\tLDA i+1\n\tSBC #0\n\tSTA i+1"));
+    }
+    
+    #[test]
+    fn sixteen_bits_increment_test() {
+        let args = sargs(1);
+        let input = "short i; void main() { i += -1; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA i\n\tCLC\n\tADC #255\n\tSTA i\n\tLDA i+1\n\tADC #255\n\tSTA i+1"));
+    }
 }
