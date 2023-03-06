@@ -452,4 +452,15 @@ void main()
         print!("{:?}", result);
         assert!(result.contains("hex 0f10"));
     }
+    
+    #[test]
+    fn array_indexing_test() {
+        let args = sargs(1);
+        let input = "char c[2]; char i; void main() { c[X = i] = 0; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDX i\n\tLDA #0\n\tSTA c,X"));
+    }
 }
