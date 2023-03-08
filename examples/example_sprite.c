@@ -41,7 +41,7 @@ void main()
     init();
 
     while(1) {
-        *VBLANK = 2; // Enable VBLANK
+        *VBLANK = 2; // Disable VBLANK
         *VSYNC = 2; // Set VSYNC
         strobe(WSYNC); // Hold it for 3 scanlines
         strobe(WSYNC);
@@ -54,7 +54,7 @@ void main()
 
         // Set up sprite pointer
         sprite_ptr = sprite0 - 1 - ypos;
-        mask_ptr = sprite_mask + 191 - ypos;
+        mask_ptr = sprite_mask + KERNAL - 1 - ypos;
         // Set up color pointer 
         color_ptr = colors0 - 1 - ypos;
        
@@ -62,7 +62,7 @@ void main()
         if (!(*SWCHA & 0x80)) { *HMP0 = 0xF0; *REFP0 = 0; } // Right
         if (!(*SWCHA & 0x40)) { *HMP0 = 0x10; *REFP0 = 8; } // Left
         if (!(*SWCHA & 0x20) && ypos > 0) ypos--; // Down
-        if (!(*SWCHA & 0x10) && ypos < 193 - sizeof(sprite0)) ypos++; // Up
+        if (!(*SWCHA & 0x10) && ypos < 192 - sizeof(sprite0)) ypos++; // Up
        
         // Apply movement 
         strobe(WSYNC);
@@ -72,7 +72,7 @@ void main()
         strobe(WSYNC);
         strobe(HMCLR);
 
-        Y = KERNAL + 1; // Initialize line counter
+        Y = KERNAL; // Initialize line counter
         X = sprite_ptr[Y] & mask_ptr[Y]; // Preload sprite data for the first line
         // Load TIA registers for first line
         *GRP0 = X;
@@ -99,7 +99,7 @@ void main()
         strobe(WSYNC);
         // Overscan
         *VBLANK = 2; // Enable VBLANK
-        *TIM64T = (OVERSCAN * 76) / 64;
+        *TIM64T = (OVERSCAN * 76) / 64 + 2;
         // Do some logic here
         while (*INTIM);
     }
