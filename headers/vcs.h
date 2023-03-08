@@ -56,37 +56,36 @@ unsigned char * const CXCLR       = 0x2C; //  ---- ----   Clear Collision Latche
  
 //-------------------------------------------------------------------------------
 
-unsigned char * const CXM0P       = 0x30; // xx00 0000       Read Collision  M0-P1   M0-P0
-unsigned char * const CXM1P       = 0x31; // xx00 0000                       M1-P0   M1-P1
-unsigned char * const CXP0FB      = 0x32; // xx00 0000                       P0-PF   P0-BL
-unsigned char * const CXP1FB      = 0x33; // xx00 0000                       P1-PF   P1-BL
-unsigned char * const CXM0FB      = 0x34; // xx00 0000                       M0-PF   M0-BL
-unsigned char * const CXM1FB      = 0x35; // xx00 0000                       M1-PF   M1-BL
-unsigned char * const CXBLPF      = 0x36; // x000 0000                       BL-PF   -----
-unsigned char * const CXPPMM      = 0x37; // xx00 0000                       P0-P1   M0-M1
-unsigned char * const INPT0       = 0x38; // x000 0000       Read Pot Port 0
-unsigned char * const INPT1       = 0x39; // x000 0000       Read Pot Port 1
-unsigned char * const INPT2       = 0x3A; // x000 0000       Read Pot Port 2
-unsigned char * const INPT3       = 0x3B; // x000 0000       Read Pot Port 3
-unsigned char * const INPT4       = 0x3C; // x000 0000       Read Input (Trigger) 0
-unsigned char * const INPT5       = 0x3D; // x000 0000       Read Input (Trigger) 1
+signed char * const CXM0P         = 0x30; // xx00 0000       Read Collision  M0-P1   M0-P0
+signed char * const CXM1P         = 0x31; // xx00 0000                       M1-P0   M1-P1
+signed char * const CXP0FB        = 0x32; // xx00 0000                       P0-PF   P0-BL
+signed char * const CXP1FB        = 0x33; // xx00 0000                       P1-PF   P1-BL
+signed char * const CXM0FB        = 0x34; // xx00 0000                       M0-PF   M0-BL
+signed char * const CXM1FB        = 0x35; // xx00 0000                       M1-PF   M1-BL
+signed char * const CXBLPF        = 0x36; // x000 0000                       BL-PF   -----
+signed char * const CXPPMM        = 0x37; // xx00 0000                       P0-P1   M0-M1
+signed char * const INPT0         = 0x38; // x000 0000       Read Pot Port 0
+signed char * const INPT1         = 0x39; // x000 0000       Read Pot Port 1
+signed char * const INPT2         = 0x3A; // x000 0000       Read Pot Port 2
+signed char * const INPT3         = 0x3B; // x000 0000       Read Pot Port 3
+signed char * const INPT4         = 0x3C; // x000 0000       Read Input (Trigger) 0
+signed char * const INPT5         = 0x3D; // x000 0000       Read Input (Trigger) 1
 
 //------------------------------------------------------------------------------
 //
 // RIOT MEMORY MAP
 
 unsigned char * const SWCHA       = 0x280; //   Port A data register for joysticks:
-
 unsigned char * const SWACNT      = 0x281; //   Port A data direction register (DDR)
-unsigned char * const SWCHB       = 0x282; //		Port B data (console switches)
+unsigned char * const SWCHB       = 0x282; //	Port B data (console switches)
 unsigned char * const SWBCNT      = 0x283; //   Port B DDR
-unsigned char * const INTIM       = 0x284; //		Timer output
+unsigned char * const INTIM       = 0x284; //	Timer output
 
 unsigned char * const TIMINT  	  = 0x285;
 
-unsigned char * const TIM1T       = 0x294; //		set 1 clock interval
+unsigned char * const TIM1T       = 0x294; //	set 1 clock interval
 unsigned char * const TIM8T       = 0x295; //   set 8 clock interval
 unsigned char * const TIM64T      = 0x296; //   set 64 clock interval
 unsigned char * const T1024T      = 0x297; //   set 1024 clock interval
-                                           //
+
 #endif // __VCS_H__
