@@ -2,6 +2,7 @@ v0.1.8 :
     - Added first sign extension implementation
     - Corrected 16 bits ++ and -- (not using INC anymore)
     - Calculations can be used for constants in variables/array definitions
+    - Bug corrected when adding constants to constant pointer in ROM
 
 v0.1.7 (03/02/2023) :
     - Solved an issue with variables signedness

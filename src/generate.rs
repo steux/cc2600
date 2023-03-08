@@ -209,12 +209,12 @@ impl<'a, 'b> GeneratorState<'a> {
                     VariableType::CharPtr => if !*eight_bits && v.var_const {
                         if high_byte {
                             if offset != 0 {
-                                dasm_operand = format!("#>{}+{}", variable, offset);
+                                dasm_operand = format!("#>({}+{})", variable, offset);
                             } else {
                                 dasm_operand = format!("#>{}", variable);
                             }
                         } else if offset != 0 {
-                            dasm_operand = format!("#<{}+{}", variable, offset);
+                            dasm_operand = format!("#<({}+{})", variable, offset);
                         } else {
                             dasm_operand = format!("#<{}", variable);
                         }
