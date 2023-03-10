@@ -18,8 +18,6 @@
     Contact info: bruno.steux@gmail.com
 */
 
-// TODO: Implement specific pratt parser for constants
-
 use std::collections::HashMap;
 
 use log::debug;

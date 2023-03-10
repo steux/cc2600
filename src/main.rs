@@ -18,6 +18,10 @@
     Contact info: bruno.steux@gmail.com
 */
 
+// TODO: Implemented better quoted strings
+// TODO: Accept const strings in assignement of char*
+// TODO: Escaped line breaks (splices) in preprocessor
+
 mod cpp;
 mod error;
 mod compile;
