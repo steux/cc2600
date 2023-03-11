@@ -4,8 +4,8 @@
 void main(int argc, char *argv[])
 {
     int i, sprite_height = atoi(argv[1]);
-    printf("const char sprite_mask[%d] = {\n\t", 192 + sprite_height + 192);
-    for (i = 0; i != 192; i++) {
+    printf("const char sprite_mask[%d] = {\n\t", 192 * 2 - sprite_height);
+    for (i = 0; i != 192 - sprite_height; i++) {
         printf("0, ");
     }
     printf("\n\t");
@@ -13,7 +13,7 @@ void main(int argc, char *argv[])
         printf("0xff, ");
     }
     printf("\n\t");
-    for (i = 0; i != 191; i++) {
+    for (i = 0; i != 191 - sprite_height; i++) {
         printf("0, ");
     }
     printf("0\n};\n");

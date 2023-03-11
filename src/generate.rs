@@ -150,6 +150,10 @@ impl<'a, 'b> GeneratorState<'a> {
                 nb_bytes = 2;
                 signed = *s;
             },
+            ExprType::A(s) => {
+                if mnemonic == LDA { return Ok(*s); }
+                return Err(syntax_error(self.compiler_state, "Unexpected expression type", pos));           
+            },
             ExprType::Absolute(variable, eight_bits, off) => {
                 let v = self.compiler_state.get_variable(variable);
                 signed = v.signed;

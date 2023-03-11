@@ -1,3 +1,6 @@
+v0.1.9 :
+    - Corrected a bug in load expression processing
+
 v0.1.8 :
     - Added first sign extension implementation
     - Corrected 16 bits ++ and -- (not using INC anymore)
