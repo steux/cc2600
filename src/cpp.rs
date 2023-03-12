@@ -321,6 +321,24 @@ pub fn process<I: BufRead, O: Write>(
 
     while input.read_line(&mut buf)? > 0 {
         line += 1;
+
+        // Process splices by removing them...
+        loop {
+            if buf.ends_with("\\\n") {
+                buf.pop();
+                buf.pop();
+                let mut buf2 = String::new();
+                if input.read_line(&mut buf2)? > 0 {
+                    buf.push_str(&buf2);
+                    line += 1;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
         let has_lf = buf.ends_with('\n');
         let mut remaining: &str = &buf;
         let mut insert_it = !in_multiline_comments;

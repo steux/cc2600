@@ -500,4 +500,17 @@ void main()
         print!("{:?}", result);
         assert!(result.contains("LDA i\n\tCLC\n\tADC x\n\tSTA i\n\tLDA x\n\tORA #127\n\tBMI .ifneg1\n\tLDA #0\n.ifneg1\n\tADC i+1\n\tSTA i+1"));
     }
+    
+    #[test]
+    fn splices_test() {
+        let args = sargs(1);
+        let input = "#define one \\
+1
+char i; void main() { i = one; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA #1\n\tSTA i"));
+    }
 }
