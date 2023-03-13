@@ -68,12 +68,14 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
     } else if compiler_state.context.get_macro("__3E__").is_some() {
         bankswitching_scheme = "3E";
         maxbank = ((maxbank / 8) + 1) * 8 - 1;
+    } else if compiler_state.context.get_macro("__3E_PLUS__").is_some() {
+        bankswitching_scheme = "3EP";
     }
 
     let bankswitching_address: u32;
     if bankswitching_scheme == "DPC+" {
         bankswitching_address = 0x1FF6;
-    } else if bankswitching_scheme != "3E" {
+    } else if bankswitching_scheme != "3E" && bankswitching_scheme != "3EP" {
         if maxbank > 0 {
             bankswitching_address = match maxbank {
                 1 => {
@@ -205,7 +207,42 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         }
     }
 
-    if maxbank > 0 && bankswitching_scheme != "3E" {
+    // Generate RAM for 3E+ bankswitching scheme
+    if bankswitching_scheme == "3EP" {
+        for bank in 0..64 { // Max 32ko
+            let mut first = true;
+            for v in compiler_state.sorted_variables().iter() {
+                if v.1.memory == VariableMemory::MemoryOnChip(bank) && v.1.def == VariableDefinition::None {
+                    if first {
+                        first = false;
+                        let segment = 3 - (bank & 3);
+                        let address = 0x1000 + segment * 0x400;
+                        gstate.write(&format!("\n\tSEG.U RAM_3E_{}\n\tORG ${:04x}\n\tRORG ${:04x}\n", bank, address, address))?;
+                    }
+                    if v.1.size > 1 {
+                        let s = match v.1.var_type {
+                            VariableType::CharPtr => 1,
+                            VariableType::CharPtrPtr => 2,
+                            VariableType::ShortPtr => 2,
+                            _ => unreachable!()
+                        };
+                        gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
+                    } else {
+                        let s = match v.1.var_type {
+                            VariableType::Char => 1,
+                            VariableType::Short => 2,
+                            VariableType::CharPtr => 2,
+                            VariableType::CharPtrPtr => 2,
+                            VariableType::ShortPtr => 2,
+                        };
+                        gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
+                    }
+                }
+            }
+        }
+    }
+
+    if maxbank > 0 && bankswitching_scheme != "3E" && bankswitching_scheme != "3EP" {
         gstate.write(&format!("
 ; Macro that implements Bank Switching trampoline
 ; X = bank number
@@ -253,6 +290,8 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         
         let (bank, banksize, rorg) = if bankswitching_scheme == "3E" { 
             if b == maxbank { (0, 0x0800, 0x1800) } else { (b + 1, 0x0800, 0x1000) }
+        } else if bankswitching_scheme == "3EP" { 
+            (b, 0x0400, 0x1000 + (3 - b & 3) * 0x400) 
         } else {(b, 0x1000, 0x1000)};
 
         // Prelude code for each bank
@@ -266,7 +305,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
             gstate.write("\n\tDS 128, $00\n")?;
         }
 
-        if maxbank > 0 && bankswitching_scheme != "3E" {
+        if maxbank > 0 && bankswitching_scheme != "3E" && bankswitching_scheme != "3EP" {
             // Generate trampoline code
             gstate.write("
 ;----The following code is the same on all banks----
@@ -396,7 +435,18 @@ Powerup
         ECHO ([$1800-.]d), \"bytes free in bank {}\"
         ", bank))?;
             }
-        } else {
+        } else if bankswitching_scheme == "3EP" {
+            if bank == 0 {
+                gstate.write("
+        ECHO ([$1FF0-.]d), \"bytes free in bank 0\"
+        ")?;
+            } else {
+                gstate.write(&format!("
+        ECHO ([${:04x}-.]d), \"bytes free in bank {}\"
+        ", rorg + 0x400, bank))?;
+            }
+        }
+        else {
             gstate.write(&format!("
         ECHO ([${:04x}-.]d), \"bytes free in bank {}\"
         ", 0x1FEF - nb_banked_functions * 10, bank))?;
@@ -458,6 +508,22 @@ Call{}
         .word {}\t; RESET
         .word {}\t; IRQ
         \n", bank, offset * 0x1000, starting_code, starting_code))?;
+        } else if bankswitching_scheme == "3EP" {
+            if bank == 0 {
+                gstate.write("
+        ORG $03FA
+        RORG $1FFA
+
+        .word Powerup\t; NMI
+        .word Powerup\t; RESET
+        .word Powerup\t; IRQ
+        \n")?; 
+            } else if bank == maxbank {
+                gstate.write(&format!("
+            ORG ${:04x} 
+            DS 1, 0x81
+            ", bank * 0x400 + 0x3ff))?;
+            }
         } else if bankswitching_scheme != "DPC+" && bankswitching_scheme != "3E" {
             gstate.write(&format!("
         ORG ${}FFA

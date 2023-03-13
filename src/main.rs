@@ -18,7 +18,6 @@
     Contact info: bruno.steux@gmail.com
 */
 
-// TODO: Add stdint.h
 // TODO: Add 3E+ bankswitching scheme support
 
 mod cpp;

@@ -518,7 +518,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                                 Rule::calc_expr => {
                                     let v = parse_calc(state, px.into_inner())?;
                                     def = VariableDefinition::Value(v);
-                                    if var_type == VariableType::CharPtr && v > 255 {
+                                    if var_type == VariableType::CharPtr && v > 1023 {
                                         memory = VariableMemory::MemoryOnChip(0);
                                     } 
                                 },

@@ -168,6 +168,11 @@ impl<'a, 'b> GeneratorState<'a> {
                             STA | STX | STY => off + 0x400,
                             _ => *off
                         }
+                    } else if self.bankswitching_scheme == "3EP" {
+                        match mnemonic {
+                            STA | STX | STY => off + 0x200,
+                            _ => *off
+                        }
                     } else { *off }
                 } else { *off };
                 match v.var_type {
@@ -279,6 +284,11 @@ impl<'a, 'b> GeneratorState<'a> {
                             STA | STX | STY => 0x400,
                             _ => 0 
                         }
+                    } else if self.bankswitching_scheme == "3EP" {
+                        match mnemonic {
+                            STA | STX | STY => 0x200,
+                            _ => 0 
+                        }
                     } else { 0 }
                 } else { 0 };
                 if v.var_type == VariableType::CharPtrPtr || v.var_type == VariableType::ShortPtr {
@@ -370,6 +380,11 @@ impl<'a, 'b> GeneratorState<'a> {
                     if self.bankswitching_scheme == "3E" {
                         match mnemonic {
                             STA | STX | STY => 0x400,
+                            _ => 0 
+                        }
+                    } else if self.bankswitching_scheme == "3EP" {
+                        match mnemonic {
+                            STA | STX | STY => 0x200,
                             _ => 0 
                         }
                     } else { 0 }
@@ -1288,7 +1303,13 @@ impl<'a, 'b> GeneratorState<'a> {
                                     } else {
                                         return Err(syntax_error(self.compiler_state, "Banked code can only be called from bank 0 or same bank", pos))
                                     }
-                                } else if self.current_bank == 0 {
+                                } else if self.bankswitching_scheme == "3EP" {
+                                    // Generate bankswitching call
+                                    let segment = 3 - (f.bank & 3);
+                                    self.asm(LDA, &ExprType::Immediate(((segment << 6) | f.bank) as i32), pos, false)?;
+                                    self.asm(STA, &ExprType::Absolute("ROM_SELECT", true, 0), pos, false)?;
+                                    self.asm(JSR, &ExprType::Label(var), pos, false)?;
+                                }  else if self.current_bank == 0 {
                                     // Generate bankswitching call
                                     self.asm(JSR, &ExprType::Label(&format!("Call{}", *var)), pos, false)?;
                                 } else {
@@ -2410,7 +2431,6 @@ fn generate_expr_cond(&mut self, expr: &'a Expr<'a>, pos: usize) -> Result<ExprT
         Ok(())
     }
 }
-
 
 fn flags_ok(flags: &FlagsState, expr_type: &ExprType) -> bool
 {

@@ -44,7 +44,7 @@ pointer = { "*" }
 func_decl = { inline? ~ bank? ~ "void" ~ id_name ~ "(" ~ ("void")? ~ ")" ~ (";" | block) ~ ";"*}
 inline = { "inline" }
 bank = ${ "bank" ~ bank_number }
-bank_number = { ASCII_NONZERO_DIGIT }
+bank_number = { ASCII_DIGIT }
 
 included_assembler = ${ "=== ASSEMBLER BEGIN ===" ~ assembler_code ~ "==== ASSEMBLER END ====" }
 assembler_code = ${(!"==== ASSEMBLER END ===="~ ANY)*} 
