@@ -1204,7 +1204,7 @@ impl<'a, 'b> GeneratorState<'a> {
         }
     }
 
-    fn generate_ternary(&mut self, condition: &Expr<'a>, alternatives: &Expr<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+    fn generate_ternary(&mut self, condition: &'a Expr<'a>, alternatives: &'a Expr<'a>, pos: usize) -> Result<ExprType<'a>, Error>
     {
         match alternatives {
             Expr::BinOp {lhs, op, rhs} => {
@@ -1372,7 +1372,7 @@ impl<'a, 'b> GeneratorState<'a> {
         }
     }
 
-    fn generate_neg(&mut self, expr: &Expr<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+    fn generate_neg(&mut self, expr: &'a Expr<'a>, pos: usize) -> Result<ExprType<'a>, Error>
     {
         match expr {
             Expr::Integer(i) => Ok(ExprType::Immediate(-*i)),
@@ -1384,7 +1384,7 @@ impl<'a, 'b> GeneratorState<'a> {
         }
     }
 
-    fn generate_expr_cond(&mut self, expr: &Expr<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+fn generate_expr_cond(&mut self, expr: &'a Expr<'a>, pos: usize) -> Result<ExprType<'a>, Error>
     {
         if self.acc_in_use {
             self.sasm(PHA)?; 
@@ -1419,7 +1419,7 @@ impl<'a, 'b> GeneratorState<'a> {
         }
     }
 
-    fn generate_not(&mut self, expr: &Expr<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+    fn generate_not(&mut self, expr: &'a Expr<'a>, pos: usize) -> Result<ExprType<'a>, Error>
     {
         match expr {
             Expr::Integer(i) => if *i != 0 {
@@ -1462,7 +1462,7 @@ impl<'a, 'b> GeneratorState<'a> {
         }
     }
 
-    fn generate_bnot(&mut self, expr: &Expr<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+    fn generate_bnot(&mut self, expr: &'a Expr<'a>, pos: usize) -> Result<ExprType<'a>, Error>
     {
         match expr {
             Expr::Integer(i) => Ok(ExprType::Immediate(!*i)),
@@ -1474,7 +1474,7 @@ impl<'a, 'b> GeneratorState<'a> {
         }
     }
 
-    fn generate_deref(&mut self, expr: &Expr<'a>, pos: usize) -> Result<ExprType<'a>, Error>
+    fn generate_deref(&mut self, expr: &'a Expr<'a>, pos: usize) -> Result<ExprType<'a>, Error>
     {
         match expr {
             Expr::Identifier((var, sub)) => {
@@ -1517,7 +1517,7 @@ impl<'a, 'b> GeneratorState<'a> {
         }
     }
 
-    fn generate_expr(&mut self, expr: &Expr<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
+    fn generate_expr(&mut self, expr: &'a Expr<'a>, pos: usize, high_byte: bool) -> Result<ExprType<'a>, Error>
     {
         debug!("Expression: {:?}", expr);
         match expr {
@@ -1678,6 +1678,7 @@ impl<'a, 'b> GeneratorState<'a> {
             Expr::Deref(v) => self.generate_deref(v, pos),
             Expr::Sizeof(v) => self.generate_sizeof(v, pos),
             Expr::Nothing => Ok(ExprType::Nothing),
+            Expr::TmpId(s) => Ok(ExprType::Absolute(s, false, 0)),
         }
     }
     
@@ -1966,7 +1967,7 @@ impl<'a, 'b> GeneratorState<'a> {
         self.generate_branch_instruction(&operator, signed, label)
     }
 
-    fn generate_condition(&mut self, condition: &Expr<'a>, pos: usize, negate: bool, label: &str) -> Result<(), Error>
+    fn generate_condition(&mut self, condition: &'a Expr<'a>, pos: usize, negate: bool, label: &str) -> Result<(), Error>
     {
         //debug!("Condition: {:?}", condition);
         match condition {
@@ -2075,7 +2076,7 @@ impl<'a, 'b> GeneratorState<'a> {
         }
     }
 
-    fn generate_for_loop(&mut self, init: &Expr<'a>, condition: &Expr<'a>, update: &Expr<'a>, body: &StatementLoc<'a>, pos: usize) -> Result<(), Error>
+    fn generate_for_loop(&mut self, init: &'a Expr<'a>, condition: &'a Expr<'a>, update: &'a Expr<'a>, body: &'a StatementLoc<'a>, pos: usize) -> Result<(), Error>
     {
         self.local_label_counter_for += 1;
         let for_label = format!(".for{}", self.local_label_counter_for);
@@ -2095,7 +2096,7 @@ impl<'a, 'b> GeneratorState<'a> {
         Ok(())
     }
 
-    fn generate_if(&mut self, condition: &Expr<'a>, body: &StatementLoc<'a>, else_body: Option<&StatementLoc<'a>>, pos: usize) -> Result<(), Error>
+    fn generate_if(&mut self, condition: &'a Expr<'a>, body: &'a StatementLoc<'a>, else_body: Option<&'a StatementLoc<'a>>, pos: usize) -> Result<(), Error>
     {
         self.local_label_counter_if += 1;
         let ifend_label = format!(".ifend{}", self.local_label_counter_if);
@@ -2143,7 +2144,7 @@ impl<'a, 'b> GeneratorState<'a> {
         Ok(())
     }
 
-    fn generate_switch(&mut self, expr: &Expr<'a>, cases: &Vec<(Vec<i32>, Vec<StatementLoc<'a>>)>, pos: usize) -> Result<(), Error>
+    fn generate_switch(&mut self, expr: &'a Expr<'a>, cases: &'a Vec<(Vec<i32>, Vec<StatementLoc<'a>>)>, pos: usize) -> Result<(), Error>
     {
         let e = self.generate_expr(expr, pos, false)?;
         self.local_label_counter_if += 1;
@@ -2191,7 +2192,7 @@ impl<'a, 'b> GeneratorState<'a> {
         Ok(())
     }
 
-    fn generate_while(&mut self, condition: &Expr<'a>, body: &StatementLoc<'a>, pos: usize) -> Result<(), Error>
+    fn generate_while(&mut self, condition: &'a Expr<'a>, body: &'a StatementLoc<'a>, pos: usize) -> Result<(), Error>
     {
         if let Statement::Expression(Expr::Nothing) = body.statement {
             self.generate_do_while(body, condition, pos)
@@ -2210,7 +2211,7 @@ impl<'a, 'b> GeneratorState<'a> {
         }
     }
 
-    fn generate_do_while(&mut self, body: &StatementLoc<'a>, condition: &Expr<'a>, pos: usize) -> Result<(), Error>
+    fn generate_do_while(&mut self, body: &'a StatementLoc<'a>, condition: &'a Expr<'a>, pos: usize) -> Result<(), Error>
     {
         self.local_label_counter_while += 1;
         let dowhile_label = format!(".dowhile{}", self.local_label_counter_while);
@@ -2338,7 +2339,7 @@ impl<'a, 'b> GeneratorState<'a> {
         Ok(())
     }
 
-    pub fn generate_statement(&mut self, code: &StatementLoc<'a>) -> Result<(), Error>
+    pub fn generate_statement(&mut self, code: &'a StatementLoc<'a>) -> Result<(), Error>
     {
         // Include C source code into generated asm
         // debug!("{:?}, {}, {}, {}", expr, pos, self.last_included_position, self.last_included_line_number);

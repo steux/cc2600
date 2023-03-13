@@ -132,8 +132,9 @@ X and Y are `unsigned char` typed, BUT in order to optimize the loops, they are 
 
 - [ ] Provide more examples
 - [ ] Fix 16 bits arithmetics so that it becomes more usable...
-- [ ] Implement sign extend (for 8 bit to 16 bits variable assignment)
+- [X] Implement sign extend (for 8 bit to 16 bits variable assignment)
 - [ ] DWARF data output for debugging with Gopher2600
+- [ ] Add 3E+ bankswitching scheme support 
 
 <p align="center">
   In Memoriam</br>

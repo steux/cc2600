@@ -38,7 +38,7 @@ id_name = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 id_name_ex = { pointer? ~ var_const? ~ id_name ~ array_spec? ~ ("=" ~ var_def)? }
 array_spec = { "[" ~ calc_expr? ~ "]" }
 var_def = { calc_expr | array_def | quoted_string }
-array_def = { "{" ~ ((calc_expr | id_name) ~ ",")* ~ (calc_expr | id_name) ~ "}" }
+array_def = { "{" ~ ((calc_expr | id_name | quoted_string) ~ ",")* ~ (calc_expr | id_name | quoted_string) ~ "}" }
 pointer = { "*" }
 
 func_decl = { inline? ~ bank? ~ "void" ~ id_name ~ "(" ~ ("void")? ~ ")" ~ (";" | block) ~ ";"*}
@@ -138,7 +138,7 @@ expr       =   { prefix* ~ primary ~ postfix* ~ (infix ~ prefix* ~ primary ~ pos
       pp     =   { "++" } // Increment
       mm     =   { "--" } // Decrement
       call   =   { "()" } // Function call
-    primary  =  _{ int | identifier | "(" ~ expr ~ ")" }
+    primary  =  _{ int | identifier | "(" ~ expr ~ ")" | quoted_string }
 
 identifier  = { id_name ~ subscript? }
 subscript   = { "[" ~ expr ~ "]" }
@@ -147,7 +147,8 @@ int = { hexadecimal | octal | decimal | quoted_character }
 decimal     = @{ ("-")* ~ (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT+ | ASCII_DIGIT) }
 hexadecimal = @{ "0x" ~ ASCII_HEX_DIGIT+ }
 octal       = @{ "0" ~ ASCII_OCT_DIGIT+ }
-character   = @{ ANY }
+escaped_character = @{ "\\" ~ ANY }
+character   = @{ escaped_character | ANY }
 quoted_character   = ${ "'" ~ character ~ "'" }
 string      = @{ (!"\"" ~ character)* } 
 quoted_string      = ${ "\"" ~ string ~ "\""}

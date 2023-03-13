@@ -115,6 +115,7 @@ pub enum Expr<'a> {
     PlusPlus(Box<Expr<'a>>, bool),
     Deref(Box<Expr<'a>>),
     Sizeof(Box<Expr<'a>>),
+    TmpId(String),
 }
 
 #[derive(Debug, Clone)]
@@ -180,6 +181,7 @@ pub struct CompilerState<'a> {
     pub included_assembler: Vec<String>,
     pub context: cpp::Context,
     signed_chars: bool,
+    literal_counter: usize,
 }
 
 impl<'a> CompilerState<'a> {
@@ -235,8 +237,8 @@ fn parse_identifier<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Re
     let varname = px.as_str();
     let subscript = match p.next() {
         Some(pair) => {
-            let expr = parse_expr(state, pair.into_inner())?;
-            Box::new(expr)
+            let expr = parse_expr_ex(state, pair.into_inner())?;
+            Box::new(expr.0)
         },
         None => Box::new(Expr::Nothing), 
     };
@@ -264,14 +266,55 @@ fn parse_identifier<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Re
     }
 }
 
-fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<Expr<'a>, Error>
+fn parse_expr<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<Expr<'a>, Error>
 {
-    state.pratt
+    let res = parse_expr_ex(state, pairs)?;
+    
+    // Create collected literal variables in memory
+    for k in &res.1 {
+        let vb = k.1.as_bytes();
+        let mut v = Vec::<i32>::new();
+        for c in vb.iter() {
+            v.push(*c as i32);
+        }
+        let size = v.len();
+        state.variables.insert(k.0.clone(), Variable {
+            order: state.variables.len(),
+            signed: false,
+            memory: VariableMemory::ROM(0),
+            var_const: true,
+            alignment: 1,
+            def: VariableDefinition::Array(v),
+            var_type: VariableType::CharPtr, size});
+    }
+    Ok(res.0)
+}
+
+fn parse_expr_ex<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<(Expr<'a>, HashMap<String, String>), Error>
+{
+    let mut literal_counter = state.literal_counter;
+    let mut literal_strings = HashMap::<String, String>::new(); 
+    let res = state.pratt
         .map_primary(|primary| -> Result<Expr<'a>, Error> {
             match primary.as_rule() {
                 Rule::int => Ok(Expr::Integer(parse_int(primary.into_inner().next().unwrap()))),
-                Rule::expr => Ok(parse_expr(state, primary.into_inner())?),
+                Rule::expr => {
+                    let res = parse_expr_ex(state, primary.into_inner())?;
+                    for k in &res.1 {
+                        literal_strings.insert(k.0.clone(), k.1.clone());
+                    }
+                    literal_counter += res.1.len();
+                    Ok(res.0) 
+                },
                 Rule::identifier => Ok(Expr::Identifier(parse_identifier(state, primary.into_inner())?)),
+                Rule::quoted_string => {
+                    // Create a temp variable pointing to this quoted_string
+                    let v = compile_quoted_string(primary.into_inner().next().unwrap().as_str());
+                    let name = format!("cctmp{}", literal_counter);
+                    literal_counter += 1;
+                    literal_strings.insert(name.clone(), v);
+                    Ok(Expr::TmpId(name))
+                },
                 rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
             }
         })
@@ -330,7 +373,11 @@ fn parse_expr<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<E
             Rule::call =>Ok(Expr::FunctionCall(Box::new(lhs?))),             
             _ => unreachable!(),
         })
-        .parse(pairs)
+        .parse(pairs);
+    match res {
+        Ok(r) => Ok((r, literal_strings)),
+        Err(x) => Err(x),
+    }
 }
 
 fn parse_calc<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<i32, Error>
@@ -372,6 +419,32 @@ fn parse_calc<'a>(state: &CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Result<i
             _ => unreachable!(),
         })
         .parse(pairs)
+}
+
+fn compile_quoted_string(s: &str) -> String 
+{
+    let mut i = s.chars();
+    let mut v = String::new();
+    while let Some(c) = i.next() {
+        if c == '\\' {
+            match i.next() {
+                Some('0') => v.push(char::from_u32(0).unwrap()),
+                Some('n') => v.push(char::from_u32(10).unwrap()),
+                Some('r') => v.push(char::from_u32(13).unwrap()),
+                Some('a') => v.push(char::from_u32(7).unwrap()), // Bell
+                Some('b') => v.push(char::from_u32(8).unwrap()), // Backspace
+                Some('t') => v.push(char::from_u32(9).unwrap()), // Tab
+                Some('f') => v.push(char::from_u32(14).unwrap()), // Form feed
+                Some('v') => v.push(char::from_u32(11).unwrap()), // Vertical tab
+                Some(a) => v.push(a),
+                _ => (),
+            }
+        } else {
+            v.push(c);
+        }
+    }
+    v.push(char::from_u32(0).unwrap());
+    v
 }
 
 fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(), Error>
@@ -473,16 +546,41 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                                     } else {
                                         let mut v = Vec::new();
                                         for pxx in px.into_inner() {
-                                            let s = pxx.as_str().to_string();
-                                            let var = state.variables.get(&s);
-                                            if let Some(vx) = var {
-                                                if vx.var_type != VariableType::CharPtr {
-                                                    return Err(syntax_error(state, &format!("Reference {} should be a pointer", s), start));
-                                                }
-                                            } else {
-                                                return Err(syntax_error(state, &format!("Unknown identifier {}", s), start));
+                                            match pxx.as_rule() {
+                                                Rule::id_name => {
+                                                    let s = pxx.as_str().to_string();
+                                                    let var = state.variables.get(&s);
+                                                    if let Some(vx) = var {
+                                                        if vx.var_type != VariableType::CharPtr {
+                                                            return Err(syntax_error(state, &format!("Reference {} should be a pointer", s), start));
+                                                        }
+                                                    } else {
+                                                        return Err(syntax_error(state, &format!("Unknown identifier {}", s), start));
+                                                    }
+                                                    v.push(s);
+                                                },
+                                                Rule::quoted_string => {
+                                                    let k = compile_quoted_string(pxx.into_inner().next().unwrap().as_str());
+                                                    let name = format!("cctmp{}", state.literal_counter);
+                                                    state.literal_counter += 1;
+                                                    let vb = k.as_bytes();
+                                                    let mut arr = Vec::<i32>::new();
+                                                    for c in vb.iter() {
+                                                        arr.push(*c as i32);
+                                                    }
+                                                    let size = v.len();
+                                                    state.variables.insert(name.clone(), Variable {
+                                                        order: state.variables.len(),
+                                                        signed: false,
+                                                        memory,
+                                                        var_const: true,
+                                                        alignment: 1,
+                                                        def: VariableDefinition::Array(arr),
+                                                        var_type: VariableType::CharPtr, size});
+                                                    v.push(name);
+                                                },
+                                                _ => return Err(syntax_error(state, "Unexpected array value", start)),
                                             }
-                                            v.push(s);
                                         }
                                         if let Some(s) = size {
                                             if s != v.len() {
@@ -495,26 +593,21 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                                     var_const = true;
                                 },
                                 Rule::quoted_string => {
-                                    let s = px.into_inner().next().unwrap().as_str();
-                                    let mut i = s.chars();
-                                    let mut v = Vec::new();
-                                    while let Some(c) = i.next() {
-                                        if c == '\\' {
-                                            match i.next() {
-                                                Some('0') => v.push(0),
-                                                Some('n') => v.push(10),
-                                                Some('r') => v.push(13),
-                                                _ => (),
-                                            }
-                                        } else {
-                                            let mut b = [0;4];
-                                            let s = c.encode_utf8(&mut b);
-                                            for byte in s.as_bytes() {
-                                                v.push(*byte as i32);
-                                            }
-                                        }
+                                    let start = px.as_span().start();
+                                    memory = match memory {
+                                        VariableMemory::ROM(_) | VariableMemory::Display | VariableMemory::Frequency => memory,
+                                        _ => VariableMemory::ROM(0)
                                     };
-                                    v.push(0);
+                                    if var_type != VariableType::CharPtr {
+                                        return Err(syntax_error(state, "String provided for something not a char*", start));
+                                    }
+                                    let s = px.into_inner().next().unwrap().as_str();
+                                    let string = compile_quoted_string(s);
+                                    let vb = string.as_bytes();
+                                    let mut v = Vec::<i32>::new();
+                                    for c in vb.iter() {
+                                        v.push(*c as i32);
+                                    }
                                     size = Some(v.len());
                                     def = VariableDefinition::Array(v);
                                     var_const = true;
@@ -552,7 +645,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
     Ok(())
 }
 
-fn compile_statement<'a>(state: &CompilerState<'a>, p: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
+fn compile_statement<'a>(state: &mut CompilerState<'a>, p: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
 {
     let mut inner = p.into_inner();
     let pair = inner.next().unwrap();
@@ -569,7 +662,7 @@ fn compile_statement<'a>(state: &CompilerState<'a>, p: Pair<'a, Rule>) -> Result
     }
 }
 
-fn compile_statement_ex<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
+fn compile_statement_ex<'a>(state: &mut CompilerState<'a>, pair: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
 {
     let pos = pair.as_span().start();
     match pair.as_rule() {
@@ -739,7 +832,7 @@ fn compile_statement_ex<'a>(state: &CompilerState<'a>, pair: Pair<'a, Rule>) -> 
     }
 }
 
-fn compile_block<'a>(state: &CompilerState<'a>, p: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
+fn compile_block<'a>(state: &mut CompilerState<'a>, p: Pair<'a, Rule>) -> Result<StatementLoc<'a>, Error>
 {
     let pos = p.as_span().start();
     let mut statements = Vec::<StatementLoc>::new();
@@ -839,7 +932,7 @@ fn compile_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) -> Re
     }
     Ok(())
 }
-
+    
 pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> Result<(), Error> {
     let mut preprocessed = Vec::new();
     
@@ -902,7 +995,8 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
         preprocessed_utf8,
         included_assembler: Vec::<String>::new(),
         context,
-        signed_chars: args.signed_chars
+        signed_chars: args.signed_chars,
+        literal_counter: 0,
     };
 
     let r = Cc2600Parser::parse(Rule::program, preprocessed_utf8);
@@ -944,7 +1038,7 @@ pub fn compile<I: BufRead, O: Write>(input: I, output: &mut O, args: &Args) -> R
             }
         }
     };
-    
+
     state.variables.insert("DUMMY".to_string(), Variable {
         order: state.variables.len(),
         signed: false,

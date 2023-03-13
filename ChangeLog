@@ -1,8 +1,11 @@
 v0.1.9 :
+    - Added support for quoted strings assignment to char*
+    - Added better support for quoted string (escaped characters)
     - Preprocessor: removed splices (Backslash-Newline)
     - Corrected a bug in load expression processing
+    - Modified vcs.h so that paddle and collision registers are signed (to ease code optimization by sign comparison)
 
-v0.1.8 :
+v0.1.8 (03/06/2023) :
     - Added first sign extension implementation
     - Corrected 16 bits ++ and -- (not using INC anymore)
     - Calculations can be used for constants in variables/array definitions

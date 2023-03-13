@@ -18,9 +18,8 @@
     Contact info: bruno.steux@gmail.com
 */
 
-// TODO: Implemented better quoted strings
-// TODO: Accept const strings in assignement of char*
-// TODO: Escaped line breaks (splices) in preprocessor
+// TODO: Add stdint.h
+// TODO: Add 3E+ bankswitching scheme support
 
 mod cpp;
 mod error;
@@ -512,5 +511,38 @@ char i; void main() { i = one; }";
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
         assert!(result.contains("LDA #1\n\tSTA i"));
+    }
+    
+    #[test]
+    fn quoted_string_test1() {
+        let args = sargs(1);
+        let input = "char *s; void main() { s = \"zobi\\\"\\\\\"; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("cctmp0\n\thex 7a6f6269225c0"));
+    }
+    
+    #[test]
+    fn quoted_string_test2() {
+        let args = sargs(1);
+        let input = "char *s = \"\tzobi\\\"\\\\\";";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("s\n\thex 097a6f6269225c00"));
+    }
+    
+    #[test]
+    fn quoted_string_test3() {
+        let args = sargs(1);
+        let input = "char *s[2] = {\"zobi\", \"zoba\"};";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("cctmp0\n\thex 7a6f626900\ncctmp1\n\thex 7a6f626100\ns\n\t.byte <cctmp0, <cctmp1, >cctmp0, >cctmp1"));
     }
 }
