@@ -240,7 +240,6 @@ void game_logic()
 
 const char nusiz_for_lives[4] = {0, 0, 1, 3};
 
-/*
 void display_remaining_lives()
 {
     // Set up left lives positions 
@@ -250,10 +249,6 @@ void display_remaining_lives()
     do { Y--; } while (Y);
     strobe(RESP0);
     *HMP0 = sprite_hm[4];
-    // In the mean time, prepare first sprite pointer
-    sprite_ptr = tank_models[3]; // Take higher byte of position
-    DF0HI[Y] = sprite_ptr >> 8;
-    DF0LOW[Y] = sprite_ptr;
     // Right lives display
     X = 160 + 4 - (lives[1] << 4); // 4 pixels margin on the right
     Y = sprite_wait[X];
@@ -261,25 +256,24 @@ void display_remaining_lives()
     strobe(HMOVE);
     do { Y--; } while (Y);
     strobe(RESP1);
+    *HMP1 = sprite_hm[X];
     *HMP0 = 0; // Stop motion of player 0
     strobe(WSYNC);
     strobe(HMOVE);
-    *HMP1 = sprite_hm[X];
     *NUSIZ0 = nusiz_for_lives[X = lives[0]];
     *NUSIZ1 = nusiz_for_lives[X = lives[1]];
-    DF1HI[Y] = sprite_ptr >> 8;
-    DF1LOW[Y] = sprite_ptr;
     *REFP1 = 8;
     *REFP0 = 0;
     strobe(HMCLR);
-    *GRP0 = *DF0DATA; // DF0DATAW fetch (note the *)
-    for (Y = sizeof(tank0); Y != 0; Y--) {
+    *VDELP1 = 0;
+    for (Y = sizeof(tank0) - 1; Y >= 0; Y--) {
         strobe(WSYNC);
-        *GRP1 = *DF1DATA; // DF1DATAW fetch
-        *GRP0 = *DF0DATA; // DF0DATAW fetch (note the *)
+        *GRP0 = tank10[Y]; 
+        *GRP1 = tank10[Y];
     }
+    strobe(WSYNC);
+    *VDELP1 = 1;
 }
-*/
 
 void prepare_drawing()
 {
@@ -393,7 +387,7 @@ void main()
         
         *COLUBK = VCS_BLACK;
         // Display remaining lives
-        //display_remaining_lives();
+        display_remaining_lives();
 
         // Overscan
         *VBLANK = 2; // Enable VBLANK
