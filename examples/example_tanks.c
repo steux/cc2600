@@ -16,7 +16,6 @@ char i, j;
 char *sprite_ptr0, *sprite_ptr1;
 char *mask_ptr0, *mask_ptr1;
 char *missile_mask_ptr;
-char *second_tank_mask0, *second_tank_mask1;
 char *second_tank_nusiz0, *second_tank_nusiz1;
 char *playfield_valreg_ptr;
 char joystick[2]; // Joystick inputs (bit7 is button)
@@ -44,8 +43,8 @@ const char tank_mask[KERNAL + 12 + KERNAL] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 const unsigned char second_tank_nusiz[14 + KERNAL] = { 
-    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x30, 0x30, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    0x20, 0x20, 0x2f, 0x2f, 0x2f, 0x2f, 0x3f, 0x3f, 0x2f, 0x2f, 0x2f, 0x2f, 0x20, 0x20,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 }; 
 const char missile_mask[4 + KERNAL] = {
     0xff, 0xff, 0xff, 0xff, 
@@ -184,7 +183,7 @@ void init()
     xpos_second_tank[0] = 30 + 4;
     xpos_second_tank[1] = (160 - 30 - 4);
     for (X = 1; X >= 0; X--) {
-        ypos_second_tank[X] = KERNAL / 2 + 8;
+        ypos_second_tank[X] = KERNAL / 2 + 8 + (1 - X);
         direction_second_tank[X] = direction[X];
         lives[X] = 3; 
     }
@@ -227,7 +226,7 @@ void game_logic()
                 xpos_second_tank[Y] = i;
                 i = ypos[Y] >> 8;
                 ypos[Y] = ypos_second_tank[Y] << 8;
-                ypos_second_tank[Y] = i;
+                ypos_second_tank[Y] = (i & 0xFE) | Y;
             } 
             tank_switch_counter[Y] = 60; // 1 second delay between two tank switches
         }
@@ -313,13 +312,11 @@ void prepare_drawing()
         if (Y) {
             sprite_ptr1 = tank_models[X] - 1 - i; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
             mask_ptr1 = tank_mask + KERNAL - 1 - i; // Same offset as sprite_ptr
-            second_tank_mask1 = tank_mask + KERNAL - 1 - ypos_second_tank[Y];
-            second_tank_nusiz1 = second_tank_nusiz + 1 - ypos_second_tank[Y];
+            second_tank_nusiz1 = second_tank_nusiz - ypos_second_tank[Y];
         } else {
             sprite_ptr0 = tank_models[X] - 1 - i; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
             mask_ptr0 = tank_mask + KERNAL - 1 - i; // Same offset as sprite_ptr
-            second_tank_mask0 = tank_mask + KERNAL - 1 - ypos_second_tank[Y];
-            second_tank_nusiz0 = second_tank_nusiz + 1 - ypos_second_tank[Y];
+            second_tank_nusiz0 = second_tank_nusiz - ypos_second_tank[Y];
         }
         REFP0[Y] = sprite_reflect[X];
     }
@@ -395,18 +392,16 @@ void main()
             *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y];
             i = playfield_valreg_ptr[Y];
             X = sprite_ptr0[Y] & mask_ptr0[Y];
-            *NUSIZ0 = second_tank_nusiz0[Y];
-            *ENAM0 = second_tank_mask0[Y];
+            *NUSIZ0 = (*ENAM0 = second_tank_nusiz0[Y]) & 0xf0;
             Y--;
             load(playfield_valreg_ptr[Y]);
-            //strobe(WSYNC); // Not necessary, and even possibly failing, since we are between 70 and 77 clock cycles due to the 7 accesses than can cross 256 bytes boundaries
+            strobe(WSYNC);
             *GRP0 = X;
             store(X); // Transfer accumulator to X (TAX)
             VSYNC[X] = i; // Change one of the TIA registers, programatically
             *ENABL = missile_mask_ptr[Y];
             *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y];
-            *NUSIZ1 = second_tank_nusiz1[Y];
-            *ENAM1 = second_tank_mask1[Y];
+            *NUSIZ1 = (*ENAM1 = second_tank_nusiz1[Y]) & 0xf0;
             load(sprite_ptr0[Y] & mask_ptr0[Y]);
             Y--;
         } while (Y); 
