@@ -334,9 +334,24 @@ Powerup
 
         LDA #0
 .loop	  STA $00,X	
-        DEX	
+        DEX
+        CPX #$40	
         BNE .loop
+        ")?;
 
+            if bankswitching_scheme == "3EP" {
+                gstate.write("
+        LDA #$81 ; ROM Bank 1 to segment 2
+        STA ROM_SELECT
+        LDA #$42 ; ROM Bank 2 to segment 1
+        STA ROM_SELECT
+        LDA #$03 ; ROM Bank 3 to segment 0
+        STA ROM_SELECT
+        ")?;
+
+            }
+            
+            gstate.write("
         JMP main
         ")?;
 

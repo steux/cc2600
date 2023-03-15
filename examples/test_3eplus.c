@@ -1,5 +1,5 @@
-#include "vcs.h"
 #include "3eplus.h"
+#include "vcs.h"
 
 unsigned char Y;
 

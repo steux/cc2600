@@ -1292,7 +1292,7 @@ impl<'a, 'b> GeneratorState<'a> {
                                     } else {
                                         return Err(syntax_error(self.compiler_state, "Undefined function", pos));
                                     }
-                                } else if f.bank == self.current_bank {
+                                } else if f.bank == self.current_bank || self.bankswitching_scheme == "3EP" {
                                     self.asm(JSR, &ExprType::Label(var), pos, false)?;
                                 } else if self.bankswitching_scheme == "3E" {
                                     if self.current_bank == 0 {
@@ -1303,13 +1303,7 @@ impl<'a, 'b> GeneratorState<'a> {
                                     } else {
                                         return Err(syntax_error(self.compiler_state, "Banked code can only be called from bank 0 or same bank", pos))
                                     }
-                                } else if self.bankswitching_scheme == "3EP" {
-                                    // Generate bankswitching call
-                                    let segment = 3 - (f.bank & 3);
-                                    self.asm(LDA, &ExprType::Immediate(((segment << 6) | f.bank) as i32), pos, false)?;
-                                    self.asm(STA, &ExprType::Absolute("ROM_SELECT", true, 0), pos, false)?;
-                                    self.asm(JSR, &ExprType::Label(var), pos, false)?;
-                                }  else if self.current_bank == 0 {
+                                } else if self.current_bank == 0 {
                                     // Generate bankswitching call
                                     self.asm(JSR, &ExprType::Label(&format!("Call{}", *var)), pos, false)?;
                                 } else {

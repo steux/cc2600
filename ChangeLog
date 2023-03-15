@@ -1,4 +1,6 @@
 v0.1.9 :
+    - Modified startup code
+    - Added preliminrary support for 3E+ bankswitching scheme
     - Added support for quoted strings assignment to char*
     - Added better support for quoted string (escaped characters)
     - Preprocessor: removed splices (Backslash-Newline)
