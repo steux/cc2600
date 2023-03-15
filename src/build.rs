@@ -70,6 +70,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         maxbank = ((maxbank / 8) + 1) * 8 - 1;
     } else if compiler_state.context.get_macro("__3E_PLUS__").is_some() {
         bankswitching_scheme = "3EP";
+        maxbank = ((maxbank / 4) + 1) * 4 - 1;
     }
 
     let bankswitching_address: u32;

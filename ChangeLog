@@ -1,4 +1,5 @@
 v0.1.9 :
+    - 3E+ minimum 4 banks (solves the Stella execution issue)
     - Modified startup code
     - Added preliminrary support for 3E+ bankswitching scheme
     - Added support for quoted strings assignment to char*
