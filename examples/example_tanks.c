@@ -43,8 +43,8 @@ const char tank_mask[KERNAL + 12 + KERNAL] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
-const unsigned char second_tank_nusiz[12 + KERNAL] = { 
-    0x20, 0x20, 0x20, 0x20, 0x20, 0x30, 0x30, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+const unsigned char second_tank_nusiz[14 + KERNAL] = { 
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x30, 0x30, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 }; 
 const char missile_mask[4 + KERNAL] = {
@@ -88,7 +88,11 @@ const char sprite_wait[153] = {1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4
 const char sprite_hm[153] = {0x70, 0x60, 0x50, 0x40, 0x30, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0};
 
 #define REG_COLUBK 0x09
-aligned(256) const char playfield_valregs[192] = {
+aligned(256) const char playfield_valregs[256] = {
+    VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, 
+    VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, 
+    VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, 
+    VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, 
     VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, 
     VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, 
     VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, 
@@ -165,13 +169,13 @@ void init()
     *VDELP1 = 1; // Delay P0 update
     *VDELBL = 1; // Delay ball update
     *CTRLPF = 0x11; // 2 pixels wide ball + Reflective playfield, for this tutorial
-    *COLUPF = VCS_GREEN; 
+    *COLUPF = VCS_BLACK; 
     
     // Init game state
     ypos[0] = ypos[1] = (KERNAL / 2 - 20) * 256;
     xpos[0] = 30 * 256;
     xpos[1] = (160 - 30 - 8) * 256;
-    direction[0] = 6; 
+    direction[0] = 0; 
     direction[1] = 12;
     direction_missile[0] = -1;
     direction_missile[1] = -1;
@@ -292,6 +296,8 @@ void display_remaining_lives()
     }
     strobe(WSYNC);
     *VDELP1 = 1;
+    *NUSIZ0 = 0;
+    *NUSIZ1 = 0;
 }
 
 void prepare_drawing()
@@ -308,12 +314,12 @@ void prepare_drawing()
             sprite_ptr1 = tank_models[X] - 1 - i; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
             mask_ptr1 = tank_mask + KERNAL - 1 - i; // Same offset as sprite_ptr
             second_tank_mask1 = tank_mask + KERNAL - 1 - ypos_second_tank[Y];
-            second_tank_nusiz1 = second_tank_nusiz - ypos_second_tank[Y];
+            second_tank_nusiz1 = second_tank_nusiz + 1 - ypos_second_tank[Y];
         } else {
             sprite_ptr0 = tank_models[X] - 1 - i; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
             mask_ptr0 = tank_mask + KERNAL - 1 - i; // Same offset as sprite_ptr
             second_tank_mask0 = tank_mask + KERNAL - 1 - ypos_second_tank[Y];
-            second_tank_nusiz0 = second_tank_nusiz - ypos_second_tank[Y];
+            second_tank_nusiz0 = second_tank_nusiz + 1 - ypos_second_tank[Y];
         }
         REFP0[Y] = sprite_reflect[X];
     }
@@ -361,11 +367,17 @@ void main()
         *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y];
         *GRP0 = sprite_ptr0[Y] & mask_ptr0[Y];
         Y--;
+        i = playfield_valreg_ptr[Y];
         // Load TIA registers for the second line
         *ENABL = missile_mask_ptr[Y]; // This is not active until GRP0 is loaded
         *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y]; // This is not active until GRP0 is loaded
         j = sprite_ptr0[Y] & mask_ptr0[Y];
         Y--;
+        X = playfield_valreg_ptr[Y];
+        VSYNC[X] = i; // Change one of the TIA registers, programatically
+    
+        *ENAM0 = 0;
+        *ENAM1 = 0; // Just to make sure
 
         while (*INTIM); // Wait for the end of Vertical blank
         
@@ -381,15 +393,15 @@ void main()
             store(*GRP0);    // loads GRP0, GRP1 and ENABL1 (due to VDEL registers) 
             *ENABL = missile_mask_ptr[Y];
             *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y];
-            *NUSIZ0 = second_tank_nusiz0[Y];
-            *ENAM0 = second_tank_mask0[Y];
             i = playfield_valreg_ptr[Y];
             X = sprite_ptr0[Y] & mask_ptr0[Y];
+            *NUSIZ0 = second_tank_nusiz0[Y];
+            *ENAM0 = second_tank_mask0[Y];
             Y--;
             load(playfield_valreg_ptr[Y]);
-            //strobe(WSYNC); // Not strictly necessary, since we are between 70 and 77 clock cycles due to the 7 accesses than can cross 256 bytes boundaries
+            //strobe(WSYNC); // Not necessary, and even possibly failing, since we are between 70 and 77 clock cycles due to the 7 accesses than can cross 256 bytes boundaries
             *GRP0 = X;
-            store(X);
+            store(X); // Transfer accumulator to X (TAX)
             VSYNC[X] = i; // Change one of the TIA registers, programatically
             *ENABL = missile_mask_ptr[Y];
             *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y];
