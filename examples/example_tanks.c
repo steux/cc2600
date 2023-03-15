@@ -4,18 +4,20 @@
 unsigned char X, Y;
 
 #define BLANK 40
-#define KERNAL 192
+#define KERNAL 192 
 #define OVERSCAN 30
 
 #define ROTATION_DELAY 5
 #define MAX_DISTANCE_MISSILE 100 
 
-#define OUT_OF_SCREEN 192 
+#define OUT_OF_SCREEN KERNAL 
 
 char i, j;
 char *sprite_ptr0, *sprite_ptr1;
 char *mask_ptr0, *mask_ptr1;
 char *missile_mask_ptr;
+char *second_tank_mask0, *second_tank_mask1;
+char *second_tank_nusiz0, *second_tank_nusiz1;
 char joystick[2]; // Joystick inputs (bit7 is button)
 char odd; // Odd or even frame ?
 
@@ -35,15 +37,18 @@ char xpos_second_tank[2]; // xpos for second tank
 char ypos_second_tank[2]; // ypos for second tank
 char direction_second_tank[2]; // direction for second tank, between 0 and 23
 
-const char tank_mask[372] = {
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+const char tank_mask[KERNAL + 12 + KERNAL] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
-const char missile_mask[380 - 180 + 4] = {
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0xff, 0xff, 0xff, 0xff, 
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+const unsigned char second_tank_nusiz[12 + KERNAL] = { 
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x30, 0x30, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+}; 
+const char missile_mask[4 + KERNAL] = {
+    0xff, 0xff, 0xff, 0xff, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
 // Generated from build_sprites.c & PlayerPal & back to C with spritegen
@@ -60,9 +65,6 @@ const unsigned char tank9[12] = { 0x10, 0x18, 0x3c, 0x24, 0x46, 0xdb, 0xdb, 0xd9
 const unsigned char tank10[12] ={ 0x08, 0x18, 0x3c, 0x6c, 0xc6, 0xda, 0xda, 0xdb, 0x5b, 0x6c, 0x2c, 0x34 };
 const unsigned char tank11[12] ={ 0x00, 0xc6, 0xfe, 0xe6, 0xd6, 0xda, 0xdb, 0x5b, 0x5b, 0x6b, 0x6b, 0x08 };
 const unsigned char tank12[12] ={ 0x00, 0xc6, 0xfe, 0xc6, 0xba, 0xba, 0xba, 0xba, 0xd6, 0xd6, 0xd6, 0x10 };
-
-const unsigned char second_tank[10] = { 0x20, 0x20, 0x20, 0x30, 0x30, 0x20, 0x20, 0x20, 0x20, 0x20}; 
-unsigned char landscape[KERNAL * 3];
 
 const char *tank_models[24] = {tank0, tank1, tank2, tank3, tank4, tank5, 
                                tank6, tank5, tank4, tank3, tank2, tank1, 
@@ -291,14 +293,16 @@ void prepare_drawing()
         // Set up sprite pointer
         if (Y) {
             sprite_ptr1 = tank_models[X] - 1 - i; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
-            mask_ptr1 = tank_mask + KERNAL - sizeof(tank0) - 1 - i; // Same offset as sprite_ptr
+            mask_ptr1 = tank_mask + KERNAL - 1 - i; // Same offset as sprite_ptr
+            second_tank_mask1 = tank_mask + KERNAL - 1 - ypos_second_tank[Y];
+            second_tank_nusiz1 = second_tank_nusiz - ypos_second_tank[Y];
         } else {
             sprite_ptr0 = tank_models[X] - 1 - i; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
-            mask_ptr0 = tank_mask + KERNAL - sizeof(tank0) - 1 - i; // Same offset as sprite_ptr
+            mask_ptr0 = tank_mask + KERNAL - 1 - i; // Same offset as sprite_ptr
+            second_tank_mask0 = tank_mask + KERNAL - 1 - ypos_second_tank[Y];
+            second_tank_nusiz0 = second_tank_nusiz - ypos_second_tank[Y];
         }
         REFP0[Y] = sprite_reflect[X];
-        // Second tank
-        i = ypos_second_tank[Y];
     }
     i = OUT_OF_SCREEN; 
     // Set up missiles display
@@ -307,7 +311,7 @@ void prepare_drawing()
     } else if (direction_missile[0] != -1) {
         i = ymissile[0] >> 8;
     }
-    missile_mask_ptr = missile_mask + 12 - 1 - i;
+    missile_mask_ptr = missile_mask - 1 - i;
 }
     
 void main()
@@ -364,6 +368,8 @@ void main()
             *ENABL = missile_mask_ptr[Y];
             *PF2 = Y; // To check
             *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y];
+            *NUSIZ0 = second_tank_nusiz0[Y];
+            *ENAM0 = second_tank_mask0[Y];
             load(sprite_ptr0[Y] & mask_ptr0[Y]);
             Y--;
             strobe(WSYNC);
@@ -371,6 +377,8 @@ void main()
             *ENABL = missile_mask_ptr[Y];
             *PF2 = Y; // To check
             *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y];
+            *NUSIZ1 = second_tank_nusiz1[Y];
+            *ENAM1 = second_tank_mask1[Y];
             load(sprite_ptr0[Y] & mask_ptr0[Y]);
             Y--;
         } while (Y); 
