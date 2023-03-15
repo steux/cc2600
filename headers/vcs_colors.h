@@ -28,4 +28,8 @@
 #define VCS_GREEN     0xC4
 #endif
 
+#define VCS_GRAY      0x06
+#define VCS_DGRAY     0x02
+#define VCS_LGRAY     0x0A
+
 #endif // __VCS_COLORS_H__
