@@ -53,10 +53,10 @@ void main()
         // Do some logic here
 
         // Set up sprite pointer
-        sprite_ptr = sprite0 - 2 - ypos; // -2 offset because lower position (ypos = 0) matches sprite_ptr[Y = 2] (line 96)
-        mask_ptr = sprite_mask + KERNAL - sizeof(sprite0) - 2 - ypos; // Same offset as speite_ptr
+        sprite_ptr = sprite0 - 1 - ypos; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1] (line 96)
+        mask_ptr = sprite_mask + KERNAL - sizeof(sprite0) - 1 - ypos; // Same offset as speite_ptr
         // Set up color pointer 
-        color_ptr = colors0 - 1 - ypos; // -1 offset baecause lower position (ypos = 0) matches color_ptr[Y = 1] (lint 94)
+        color_ptr = colors0 - ypos; // 0 offset baecause lower position (ypos = 0) matches color_ptr[Y = 0] (lint 103)
        
         // Joystick input 
         if (!(*SWCHA & 0x80)) { *HMP0 = 0xF0; *REFP0 = 0; } // Right
@@ -72,7 +72,7 @@ void main()
         strobe(WSYNC);
         strobe(HMCLR);
 
-        Y = KERNAL + 1; // Initialize line counter
+        Y = KERNAL; // Initialize line counter
         X = sprite_ptr[Y] & mask_ptr[Y]; // Preload sprite data for the first line
         Y--;
         // Load TIA registers for first line
@@ -96,6 +96,12 @@ void main()
             load(sprite_ptr[Y] & mask_ptr[Y]); // Load next line sprite data
             Y--;
         } while (Y);
+        
+        // Last line is out of loop and is simpler
+        strobe(WSYNC);
+        store(*GRP0); // Apply preloaded sprite data
+        *COLUP0 = color_ptr[Y]; // Load current line sprite color
+        *PF2 = Y; // Marker. Just to check that what is displayed is correct
         
         strobe(WSYNC);
         // Overscan

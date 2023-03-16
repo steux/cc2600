@@ -231,6 +231,10 @@ impl<'a, 'b> GeneratorState<'a> {
                     } else if high_byte && *eight_bits {
                         dasm_operand = "#0".to_string();
                         nb_bytes = 2;
+                    } else if *eight_bits && !v.var_const {
+                        // This is indirect addressing, but in a mode not possible by 6502
+                        // (constant offset)
+                        return Err(syntax_error(self.compiler_state, "Indirect adressing mode is only available with Y (use Y as array index)", pos));
                     } else {
                         let off = if high_byte { offset + 1 } else { offset };
                         if off != 0 {
