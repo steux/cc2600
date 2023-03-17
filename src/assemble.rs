@@ -9,7 +9,7 @@ pub enum AsmMnemonic {
     STA, STX, STY,
     TAX, TAY, TXA, TYA,
     ADC, SBC, EOR, AND, ORA,
-    LSR, ASL,
+    LSR, ASL, ROR,
     CLC, SEC,  
     CMP, CPX, CPY, 
     BCC, BCS, BEQ, BMI, BNE, BPL,

@@ -18,8 +18,6 @@
     Contact info: bruno.steux@gmail.com
 */
 
-// TODO: Add 3E+ bankswitching scheme support
-
 mod cpp;
 mod error;
 mod compile;
@@ -543,5 +541,26 @@ char i; void main() { i = one; }";
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
         assert!(result.contains("cctmp0\n\thex 7a6f626900\ncctmp1\n\thex 7a6f626100\ns\n\t.byte <cctmp0, <cctmp1, >cctmp0, >cctmp1"));
+    }
+    
+    #[test]
+    fn right_shift_test1() {
+        let args = sargs(1);
+        let input = "signed char i; void main() { i >>= 1; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA i\n\tCMP #128\n\tROR\n\tSTA i"));
+    }
+    #[test]
+    fn right_shift_test2() {
+        let args = sargs(1);
+        let input = "signed char i; void main() { i >>= 2; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA i\n\tLSR\n\tLSR\n\tCLC\n\tADC #224\n\tEOR #224\n\tSTA i"));
     }
 }

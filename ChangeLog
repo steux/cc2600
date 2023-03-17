@@ -1,7 +1,8 @@
 v0.1.9 :
+    - Implemented arithmetic right shift
     - Bug fixed with Y-Indirect mode misuse (constant array index)
     - 3E+ minimum 4 banks (solves the Stella execution issue)
-    - Modified startup code
+    - Modified startup code not to initalize TIA registers twice
     - Added preliminrary support for 3E+ bankswitching scheme
     - Added support for quoted strings assignment to char*
     - Added better support for quoted string (escaped characters)

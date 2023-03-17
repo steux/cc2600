@@ -1200,8 +1200,23 @@ impl<'a, 'b> GeneratorState<'a> {
         match right {
             ExprType::Immediate(v) => {
                 if *v >= 0 && *v <= 8 {
-                    for _ in 0..*v {
-                        self.sasm(operation)?;
+                    if signed && operation == LSR {
+                        if *v == 1 {
+                            self.asm(CMP, &ExprType::Immediate(0x80), pos, false)?;
+                            self.sasm(ROR)?;
+                        } else {
+                            for _ in 0..*v {
+                                self.sasm(LSR)?;
+                            }
+                            self.sasm(CLC)?;
+                            let mask = -128 >> *v;
+                            self.asm(ADC, &ExprType::Immediate(mask), pos, false)?;
+                            self.asm(EOR, &ExprType::Immediate(mask), pos, false)?;
+                        }
+                    } else {
+                        for _ in 0..*v {
+                            self.sasm(operation)?;
+                        }
                     }
                 } else {
                     return Err(syntax_error(self.compiler_state, "Negative shift operation not allowed", pos));
