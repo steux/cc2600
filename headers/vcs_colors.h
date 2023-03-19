@@ -17,6 +17,8 @@
 // Others are PAL only. Beware with SECAM systems
 #define VCS_ORANGE    0x4A
 #define VCS_GREEN     0x54
+#define VCS_BROWN     0x24
+#define VCS_DGRAY     0x04
 #else // NTSC colors
 #define VCS_BLUE      0x72
 #define VCS_RED       0x44
@@ -26,10 +28,11 @@
 #define VCS_YELLOW    0x1C
 #define VCS_ORANGE    0x3A
 #define VCS_GREEN     0xC4
+#define VCS_BROWN     0x14
+#define VCS_DGRAY     0x02
 #endif
 
 #define VCS_GRAY      0x06
-#define VCS_DGRAY     0x02
-#define VCS_LGRAY     0x0A
+#define VCS_LGRAY     0x0C
 
 #endif // __VCS_COLORS_H__
