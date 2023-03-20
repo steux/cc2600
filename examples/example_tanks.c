@@ -171,7 +171,6 @@ void init()
     *COLUP1 = VCS_BLUE;
     *REFP1 = 0x08; // Second player looks left
     *VDELP1 = 1; // Delay P0 update
-    *CTRLPF = 0x11; // 2 pixels wide ball + Reflective playfield, for this tutorial
     *COLUPF = VCS_BLACK; 
     
     // Init game state
@@ -396,8 +395,8 @@ void main()
         load(j); // Load for the second line
         // Now, we will draw the image
         do {
-            // We're using a "hybrid" 2 lines kernel (NUSIZX & ENAMX are set one line out of two, for the display of the
-            // second tank. A programmable TIA register is also set every second line) 
+            // We're using a "hybrid" 2 lines kernel (GRPX & ENAMX are set every line, so maximize player and shells
+            // resolution. NUSIZX is set one line out of two, for the display of the second tank. A programmable TIA register is also set every second line) 
             strobe(WSYNC);
             store(*GRP0);    // loads GRP0 and GRP1
             *ENAM1 = second_tank_mask1[Y];
@@ -421,7 +420,6 @@ void main()
             // timing of second kernel line is between 64 and 72 cycles (<76, so OK)
         } while (Y); 
 
-        // TODO: display shell of first player / second player second tank, then next frame shell of second player / first player second tank
         // Last line
         strobe(WSYNC);
         store(*GRP0);

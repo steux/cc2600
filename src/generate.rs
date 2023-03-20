@@ -120,6 +120,7 @@ impl<'a, 'b> GeneratorState<'a> {
             RTS => 6,
             _ => 2 
         };
+        let mut cycles_alt = None;
 
         match operand {
             ExprType::Label(l) => {
@@ -130,7 +131,7 @@ impl<'a, 'b> GeneratorState<'a> {
                 cycles = match mnemonic {
                     JMP => 3,
                     JSR => 6,
-                    _ => 2,
+                    _ => { cycles_alt = Some(3); 2},
                 };
                 signed = false;
                 dasm_operand = (*l).to_string();
@@ -371,6 +372,7 @@ impl<'a, 'b> GeneratorState<'a> {
                         _ => () 
                     }
                 }
+                cycles_alt = Some(cycles + 1);
             },
             ExprType::AbsoluteX(variable) => {
                 let v = self.compiler_state.get_variable(variable);
@@ -422,6 +424,7 @@ impl<'a, 'b> GeneratorState<'a> {
                         _ => () 
                     }
                 }
+                cycles_alt = Some(cycles + 1);
             },
             ExprType::Nothing => {
                 dasm_operand = "".to_string();
@@ -440,7 +443,7 @@ impl<'a, 'b> GeneratorState<'a> {
         if let Some(f) = &self.current_function {
             let code : &mut AssemblyCode = self.functions_code.get_mut(f).unwrap();
             let instruction = AsmInstruction {
-                mnemonic, dasm_operand, cycles, nb_bytes, protected: self.protected,
+                mnemonic, dasm_operand, cycles, cycles_alt, nb_bytes, protected: self.protected,
             };
             code.append_asm(instruction);
         }

@@ -35,6 +35,7 @@ pub struct AsmInstruction {
     pub mnemonic: AsmMnemonic,
     pub dasm_operand: String,
     pub cycles: u32,
+    pub cycles_alt: Option<u32>,
     pub nb_bytes: u32,
     pub protected: bool,
 }
@@ -58,15 +59,22 @@ impl AsmLine {
             },
             AsmLine::Instruction(inst) => {
                 if cycles {
-                    if !inst.dasm_operand.is_empty() {
-                        s += writer.write(format!("\t{} {:19}\t; {}\n", inst.mnemonic, &inst.dasm_operand, inst.cycles).as_bytes())?;
+                    let c = if let Some(alt) = inst.cycles_alt {
+                        format!("\t; {}/{}", inst.cycles, alt)
                     } else {
-                        s += writer.write(format!("\t{:23}\t; {}\n", inst.mnemonic, inst.cycles).as_bytes())?;
+                        format!("\t; {}", inst.cycles)
+                    };
+                    if !inst.dasm_operand.is_empty() {
+                        s += writer.write(format!("\t{} {:19}{}\n", inst.mnemonic, &inst.dasm_operand, c).as_bytes())?;
+                    } else {
+                        s += writer.write(format!("\t{:23}{}\n", inst.mnemonic, c).as_bytes())?;
                     }
-                } else if !inst.dasm_operand.is_empty() {
-                    s += writer.write(format!("\t{} {}\n", inst.mnemonic, &inst.dasm_operand).as_bytes())?;
                 } else {
-                    s += writer.write(format!("\t{}\n", inst.mnemonic).as_bytes())?;
+                    if !inst.dasm_operand.is_empty() {
+                        s += writer.write(format!("\t{} {}\n", inst.mnemonic, &inst.dasm_operand).as_bytes())?;
+                    } else {
+                        s += writer.write(format!("\t{}\n", inst.mnemonic).as_bytes())?;
+                    }
                 }
             },
             AsmLine::Inline(inst) => {
@@ -116,6 +124,7 @@ impl AssemblyCode {
                                 mnemonic: inst.mnemonic,
                                 dasm_operand: format!("{}inline{}", inst.dasm_operand, inline_counter),
                                 cycles: inst.cycles,
+                                cycles_alt: inst.cycles_alt,
                                 nb_bytes: inst.nb_bytes,
                                 protected: false,
                             }));
@@ -534,23 +543,23 @@ impl AssemblyCode {
                 let label2 = format!(".fix{}", nb_fixes);
                 match operation2 {
                     Operation::Eq => self.code.push(AsmLine::Instruction(AsmInstruction {
-                        mnemonic: AsmMnemonic::BEQ, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                        mnemonic: AsmMnemonic::BEQ, dasm_operand: label2.clone(), cycles: 2, cycles_alt: Some(3), nb_bytes: 2, protected: false
                     })),
                     Operation::Neq => self.code.push(AsmLine::Instruction(AsmInstruction {
-                        mnemonic: AsmMnemonic::BNE, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                        mnemonic: AsmMnemonic::BNE, dasm_operand: label2.clone(), cycles: 2, cycles_alt: Some(3), nb_bytes: 2, protected: false
                     })),
                     Operation::Gt => {
                         let label3 = format!(".fixup{}", nb_fixes);
                         self.code.push(AsmLine::Instruction(AsmInstruction {
-                            mnemonic: AsmMnemonic::BEQ, dasm_operand: label3.clone(), cycles: 2, nb_bytes: 2, protected: false
+                            mnemonic: AsmMnemonic::BEQ, dasm_operand: label3.clone(), cycles: 2, cycles_alt: Some(3), nb_bytes: 2, protected: false
                         }));       
                         if signed {
                             self.code.push(AsmLine::Instruction(AsmInstruction {
-                                mnemonic: AsmMnemonic::BPL, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                                mnemonic: AsmMnemonic::BPL, dasm_operand: label2.clone(), cycles: 2, cycles_alt: Some(3), nb_bytes: 2, protected: false
                             }));       
                         } else {
                             self.code.push(AsmLine::Instruction(AsmInstruction {
-                                mnemonic: AsmMnemonic::BCS, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                                mnemonic: AsmMnemonic::BCS, dasm_operand: label2.clone(), cycles: 2, cycles_alt: Some(3), nb_bytes: 2, protected: false
                             }));       
                         }
                         self.code.push(AsmLine::Label(label3));
@@ -558,29 +567,29 @@ impl AssemblyCode {
                     Operation::Gte => {
                         if signed {
                             self.code.push(AsmLine::Instruction(AsmInstruction {
-                                mnemonic: AsmMnemonic::BPL, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                                mnemonic: AsmMnemonic::BPL, dasm_operand: label2.clone(), cycles: 2, cycles_alt: Some(3), nb_bytes: 2, protected: false
                             }));       
                         } else {
                             self.code.push(AsmLine::Instruction(AsmInstruction {
-                                mnemonic: AsmMnemonic::BCS, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                                mnemonic: AsmMnemonic::BCS, dasm_operand: label2.clone(), cycles: 2, cycles_alt: Some(3), nb_bytes: 2, protected: false
                             }));       
                         }
                     },
                     Operation::Lt => {
                         if signed {
                             self.code.push(AsmLine::Instruction(AsmInstruction {
-                                mnemonic: AsmMnemonic::BMI, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                                mnemonic: AsmMnemonic::BMI, dasm_operand: label2.clone(), cycles: 2, cycles_alt: Some(3), nb_bytes: 2, protected: false
                             }));       
                         } else {
                             self.code.push(AsmLine::Instruction(AsmInstruction {
-                                mnemonic: AsmMnemonic::BCC, dasm_operand: label2.clone(), cycles: 2, nb_bytes: 2, protected: false
+                                mnemonic: AsmMnemonic::BCC, dasm_operand: label2.clone(), cycles: 2, cycles_alt: Some(3), nb_bytes: 2, protected: false
                             }));       
                         }
                     },
                     _ => unreachable!()
                 }
                 self.code.push(AsmLine::Instruction(AsmInstruction {
-                    mnemonic: AsmMnemonic::JMP, dasm_operand: label, cycles: 3, nb_bytes: 3, protected: false
+                    mnemonic: AsmMnemonic::JMP, dasm_operand: label, cycles: 3, cycles_alt: None, nb_bytes: 3, protected: false
                 }));
                 self.code.push(AsmLine::Label(label2));
                 self.code.append(&mut tail);
