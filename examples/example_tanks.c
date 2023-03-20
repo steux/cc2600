@@ -15,7 +15,6 @@ unsigned char X, Y;
 char i, j;
 char *sprite_ptr0, *sprite_ptr1;
 char *mask_ptr0, *mask_ptr1;
-char *shell_mask_ptr;
 char *second_tank_mask0, *second_tank_mask1;
 char *playfield_valreg_ptr;
 char joystick[2]; // Joystick inputs (bit7 is button)
@@ -42,11 +41,14 @@ const char tank_mask[KERNAL + 12 + KERNAL] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
-
+const unsigned char shell_mask[4 + KERNAL] = { 
+    0x12, 0x12, 0x12, 0x12,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+}; 
 // Used for NUSIZX register setting + Bit 1 for ENAMX (second tank displayed using the missile sprite)
 // Bit 0 for ENABL (tank shell using the ball sprite)
 const unsigned char second_tank_mask[14 + KERNAL] = { 
-    0x21, 0x21, 0x23, 0x23, 0x22, 0x22, 0x32, 0x32, 0x22, 0x22, 0x22, 0x22, 0x20, 0x20,
+    0x20, 0x20, 0x22, 0x22, 0x22, 0x22, 0x32, 0x32, 0x22, 0x22, 0x22, 0x22, 0x20, 0x20,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 }; 
 
@@ -92,7 +94,7 @@ const char sprite_hm[153] = {0x70, 0x60, 0x50, 0x40, 0x30, 0x70, 0x60, 0x50, 0x4
 #define REG_PF1     0x0e
 #define REG_PF2     0x0f
 
-aligned(256) const char playfield_valregs[256] = {
+const char playfield_valregs[256] = {
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
@@ -115,7 +117,6 @@ aligned(256) const char playfield_valregs[256] = {
 
 void sprites_hpos_set()
 {
-    i = (odd || direction_shell[0] == -1) && direction_shell[1] != -1; // Condition for second shell is precomputed. Withing the code it is a bit too long and causes weird results
     X = xpos[0] >> 8;
     Y = sprite_wait[X];
     strobe(WSYNC);
@@ -130,7 +131,11 @@ void sprites_hpos_set()
     do { Y--; } while (Y);
     strobe(RESP1);
     *HMP1 = sprite_hm[X];
-    X = xpos_second_tank[0];
+    if (!odd && direction_shell[0] != - 1) {
+        X = xshell[0] >> 8;
+    } else {
+        X = xpos_second_tank[0];
+    }
     Y = sprite_wait[X];
     *HMP0 = 0; // Stop motion of player 0
     strobe(WSYNC);
@@ -138,7 +143,11 @@ void sprites_hpos_set()
     do { Y--; } while (Y);
     strobe(RESM0);
     *HMM0 = sprite_hm[X];
-    X = xpos_second_tank[1];
+    if (odd && direction_shell[1] != - 1) {
+        X = xshell[1] >> 8;
+    } else {
+        X = xpos_second_tank[1];
+    }
     Y = sprite_wait[X];
     *HMP1 = 0; // Stop motion of player 1
     strobe(WSYNC);
@@ -146,20 +155,9 @@ void sprites_hpos_set()
     do { Y--; } while (Y);
     strobe(RESM1);
     *HMM1 = sprite_hm[X];
-    if (i) {
-        X = xshell[1] >> 8;
-    } else {
-        X = xshell[0] >> 8;
-    }
     Y = sprite_wait[X];
-    *HMM0 = 0; // Stop motion of shell 0 (second tank of player 0)
-    strobe(WSYNC);
-    strobe(HMOVE);
-    do { Y--; } while (Y);
-    strobe(RESBL);
-    *HMBL = sprite_hm[X];
     csleep(10); // Necessary, otherwise if the ball is on the left (tank bullets), this would occur too early (in HBLANK)
-    *HMM1 = 0; // Stop motion of shell 1 (second tank of player 1)
+    *HMM0 = 0; // Stop motion of shell 0 (second tank of player 0)
     strobe(WSYNC);
     strobe(HMOVE);
     strobe(WSYNC);
@@ -173,7 +171,6 @@ void init()
     *COLUP1 = VCS_BLUE;
     *REFP1 = 0x08; // Second player looks left
     *VDELP1 = 1; // Delay P0 update
-    *VDELBL = 1; // Delay ball update
     *CTRLPF = 0x11; // 2 pixels wide ball + Reflective playfield, for this tutorial
     *COLUPF = VCS_BLACK; 
     
@@ -315,26 +312,33 @@ void prepare_drawing()
         // Set up players sprites
         X = direction[Y];
         i = ypos[Y] >> 8;
+        if (direction_shell[Y] != -1) {
+            j = yshell[Y] >> 8;
+        } else j = 0;
         // Set up sprite pointer
         if (Y) {
             sprite_ptr1 = tank_models[X] - 1 - i; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
             mask_ptr1 = tank_mask + KERNAL - 1 - i; // Same offset as sprite_ptr
-            second_tank_mask1 = second_tank_mask - ypos_second_tank[Y];
+            if (odd && j) {
+                second_tank_mask1 = shell_mask - 1 - j;
+                *NUSIZ1 = 0x10;
+            } else {
+                second_tank_mask1 = second_tank_mask - ypos_second_tank[Y];
+                *NUSIZ1 = 0x20;
+            } 
         } else {
             sprite_ptr0 = tank_models[X] - 1 - i; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
             mask_ptr0 = tank_mask + KERNAL - 1 - i; // Same offset as sprite_ptr
-            second_tank_mask0 = second_tank_mask - ypos_second_tank[Y];
+            if (!odd && j) {
+                second_tank_mask0 = shell_mask - 1 - j;
+                *NUSIZ0 = 0x10;
+            } else {
+                second_tank_mask0 = second_tank_mask - ypos_second_tank[Y];
+                *NUSIZ0 = 0x20;
+            } 
         }
         REFP0[Y] = sprite_reflect[X];
     }
-    i = OUT_OF_SCREEN; 
-    // Set up shells display
-    if ((odd || direction_shell[0] == -1) && direction_shell[1] != -1) {
-        i = yshell[1] >> 8;
-    } else if (direction_shell[0] != -1) {
-        i = yshell[0] >> 8;
-    }
-    shell_mask_ptr = second_tank_mask - 1 - i;
 }
     
 void main()
@@ -367,13 +371,11 @@ void main()
 
         Y = KERNAL;
         // Load TIA registers for the first line
-        *ENABL = shell_mask_ptr[Y] << 1;
         *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y];
         *GRP0 = sprite_ptr0[Y] & mask_ptr0[Y];
         i = playfield_valreg_ptr[Y];
         Y--;
         // Load TIA registers for the second line
-        *ENABL = shell_mask_ptr[Y] << 1; // This is not active until GRP0 is loaded
         *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y]; // This is not active until GRP0 is loaded
         j = sprite_ptr0[Y] & mask_ptr0[Y];
         X = playfield_valreg_ptr[Y];
@@ -397,28 +399,29 @@ void main()
             // We're using a "hybrid" 2 lines kernel (NUSIZX & ENAMX are set one line out of two, for the display of the
             // second tank. A programmable TIA register is also set every second line) 
             strobe(WSYNC);
-            store(*GRP0);    // loads GRP0, GRP1 and ENABL1 (due to VDEL registers) 
-            *ENABL = shell_mask_ptr[Y] << 1;
+            store(*GRP0);    // loads GRP0 and GRP1
+            *ENAM1 = second_tank_mask1[Y];
+            *NUSIZ0 = (*ENAM0 = second_tank_mask0[Y]) & 0xf0;
             *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y];
             i = playfield_valreg_ptr[Y];
             X = sprite_ptr0[Y] & mask_ptr0[Y];
-            *NUSIZ0 = (*ENAM0 = second_tank_mask0[Y]) & 0xf0;
             Y--;
             load(playfield_valreg_ptr[Y]);
-            // 6 reads can go over a 256 bytes boundaries per line (all masks reads) 
-            // so timing of first kernel line is between 69 and 75 cycles (<76, so OK)
+            // 8 reads can go over a 256 bytes boundaries per line (all masks and playfield reads) 
+            // so timing of first kernel line is between 67 and 75 cycles (<76, so OK)
             strobe(WSYNC);
             *GRP0 = X;
             store(X); // Transfer accumulator to X (TAX)
             VSYNC[X] = i; // Change one of the TIA registers, programatically
-            *ENABL = shell_mask_ptr[Y] << 1;
-            *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y];
+            *ENAM0 = second_tank_mask0[Y];
             *NUSIZ1 = (*ENAM1 = second_tank_mask1[Y]) & 0xf0;
+            *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y];
             load(sprite_ptr0[Y] & mask_ptr0[Y]);
             Y--;
-            // timing of second kernel line is between 66 and 72 cycles (<76, so OK)
+            // timing of second kernel line is between 64 and 72 cycles (<76, so OK)
         } while (Y); 
 
+        // TODO: display shell of first player / second player second tank, then next frame shell of second player / first player second tank
         // Last line
         strobe(WSYNC);
         store(*GRP0);
