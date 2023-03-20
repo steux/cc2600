@@ -1,4 +1,5 @@
 v0.1.9 :
+    - Added cycles alt to generated assembler code comments
     - Implemented arithmetic right shift
     - Bug fixed with Y-Indirect mode misuse (constant array index)
     - 3E+ minimum 4 banks (solves the Stella execution issue)
