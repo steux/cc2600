@@ -276,6 +276,7 @@ impl<'a, 'b> GeneratorState<'a> {
                 }
             },
             ExprType::AbsoluteY(variable) => {
+                let mut indirect = false;
                 let v = self.compiler_state.get_variable(variable);
                 signed = v.signed;
                 let offset = if v.memory == VariableMemory::Superchip {
@@ -338,6 +339,7 @@ impl<'a, 'b> GeneratorState<'a> {
                         }
                         nb_bytes = 2;
                         cycles = if mnemonic == STA {6} else {5};
+                        indirect = true;
                         match mnemonic {
                             STX | STY | LDX | LDY | CPX | CPY => return Err(syntax_error(self.compiler_state, "Can't use Y indirect addressing on X or Y operation", pos)),
                             _ => () 
@@ -372,7 +374,7 @@ impl<'a, 'b> GeneratorState<'a> {
                         _ => () 
                     }
                 }
-                cycles_alt = Some(cycles + 1);
+                if v.memory != VariableMemory::Zeropage || indirect { cycles_alt = Some(cycles + 1); }
             },
             ExprType::AbsoluteX(variable) => {
                 let v = self.compiler_state.get_variable(variable);
@@ -424,7 +426,7 @@ impl<'a, 'b> GeneratorState<'a> {
                         _ => () 
                     }
                 }
-                cycles_alt = Some(cycles + 1);
+                if v.memory != VariableMemory::Zeropage { cycles_alt = Some(cycles + 1); }
             },
             ExprType::Nothing => {
                 dasm_operand = "".to_string();

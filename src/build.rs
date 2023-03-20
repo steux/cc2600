@@ -468,17 +468,18 @@ Powerup
         ", 0x1FEF - nb_banked_functions * 10, bank))?;
 
             if bank == 0 {
-                // Generate bankswitching functions code
-                banked_function_address = 0x0FEF - nb_banked_functions * 10;
-                debug!("Banked function address={:04x}", banked_function_address);
-                gstate.write(&format!("
+                if nb_banked_functions > 0 {
+                    // Generate bankswitching functions code
+                    banked_function_address = 0x0FEF - nb_banked_functions * 10;
+                    debug!("Banked function address={:04x}", banked_function_address);
+                    gstate.write(&format!("
         ORG ${:04x}
         RORG ${:04x}", 
-                banked_function_address, 0x1000 + banked_function_address))?;
-                for bank_ex in 1..=maxbank {
-                    for f in compiler_state.sorted_functions().iter() {
-                        if f.1.code.is_some() && !f.1.inline && f.1.bank == bank_ex {
-                            gstate.write(&format!("
+        banked_function_address, 0x1000 + banked_function_address))?;
+                    for bank_ex in 1..=maxbank {
+                        for f in compiler_state.sorted_functions().iter() {
+                            if f.1.code.is_some() && !f.1.inline && f.1.bank == bank_ex {
+                                gstate.write(&format!("
 Call{}
         LDX ${:04x}+{}
         NOP
@@ -488,7 +489,9 @@ Call{}
         NOP
         NOP
         RTS", f.0, bankswitching_address, f.1.bank))?;
+                            }
                         }
+
                     }
                 }
             } else {
