@@ -95,7 +95,7 @@ const char sprite_hm[153] = {0x70, 0x60, 0x50, 0x40, 0x30, 0x70, 0x60, 0x50, 0x4
 #define REG_PF1     0x0e
 #define REG_PF2     0x0f
 
-const char playfield_valregs[256] = {
+const char playfield_valregs[384] = {
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
@@ -111,8 +111,14 @@ const char playfield_valregs[256] = {
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUPF, VCS_BLACK, REG_PF0, 0, REG_PF1, 0, REG_PF2, 0, REG_COLUPF, VCS_BROWN, 
     REG_COLUPF, VCS_WHITE, REG_PF2, 0xaa, REG_PF1, 0x55, REG_PF0, 0xa0, REG_CTRLPF, 0x10, REG_COLUBK, VCS_BROWN, REG_COLUPF, VCS_BROWN, REG_COLUBK, VCS_GREEN, 
-    //REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
-    //REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
+    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
+    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
+    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
+    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
+    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
+    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
+    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
+    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN 
 };
 
@@ -195,6 +201,23 @@ void init()
     playfield_valreg_ptr = playfield_valregs + 63;
 }
 
+//void player_was_hit();
+
+void gameover()
+{
+}
+
+void player_was_hit()
+{
+    // Explosioon sound
+    for (Y = 1; Y >= 0; Y--) {
+        if (lives[Y] == 0) {
+            // Explosion player 0
+            gameover();
+        }
+    }
+}
+
 void game_logic()
 {
     // Execute action for both players
@@ -262,6 +285,42 @@ void game_logic()
             }
         }
     }
+
+    // Detect collisions
+    {
+        if (*CXM0P & 0x80) {
+            // M0 hit Player 1 tank
+            lives[1]--;
+            player_was_hit();
+            direction_shell[0] = -1;
+        }
+        if (*CXM1P & 0x80) {
+           // M1 hit Player 0 tank
+            lives[0]--;
+            player_was_hit();
+            direction_shell[1] = -1;
+        }
+        if (*CXPPMM & 0x40) {
+            // This is most likely a hit of shell on the second tank
+            if (odd && direction_shell[1] != - 1) {
+                // This is player 1 that hit player 0 second tank
+                lives[0]--;
+                player_was_hit();
+                direction_shell[1] = -1;
+            } else if (!odd && direction_shell[0] != -1) {
+                // This is player 0 that hit plsyer 1 second tank
+                lives[1]--;
+                player_was_hit();
+                direction_shell[0] = -1;
+            } else {
+                // Shells have hit each other
+                direction_shell[0] = -1;
+                direction_shell[1] = -1;
+            }
+        } 
+    }
+
+    strobe(CXCLR);
 }
 
 const char nusiz_for_lives[4] = {0, 0, 1, 3};
