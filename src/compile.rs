@@ -872,24 +872,28 @@ fn compile_func_decl<'a>(state: &mut CompilerState<'a>, pairs: Pairs<'a, Rule>) 
     match pair.as_rule() {
         Rule::id_name => {
             let name = pair.as_str();
-            let pair = p.next().unwrap();
-            match pair.as_rule() {
-                Rule::block => {
-                    let n = name.to_string();
-                    if let Some(f) = state.functions.get(&n) {
-                        if f.code.is_some() {
-                            return Err(syntax_error(state, &format!("Function {} already defined", n), pair.as_span().start()));
+            let pair = p.next();
+            match pair {
+                Some(px) => match px.as_rule() {
+                    Rule::block => {
+                        let n = name.to_string();
+                        if let Some(f) = state.functions.get(&n) {
+                            if f.code.is_some() {
+                                return Err(syntax_error(state, &format!("Function {} already defined", n), px.as_span().start()));
+                            }
                         }
-                    }
-                    let code = compile_block(state, pair)?;
-                    state.functions.insert(n, Function {
-                        order: state.functions.len(),
-                        inline,
-                        bank,
-                        code: Some(code)
-                    });
+                        let code = compile_block(state, px)?;
+                        state.functions.insert(n, Function {
+                            order: state.functions.len(),
+                            inline,
+                            bank,
+                            code: Some(code)
+                        });
+                    },
+                    _ => unreachable!(), 
                 },
-                _ => {
+                None => {
+                    // This is just a prototype definition
                     let n = name.to_string();
                     if state.functions.get(&n).is_none() {
                         state.functions.insert(n, Function {
