@@ -1,3 +1,6 @@
+v0.2.0:
+    - Switched to cc6502 code base (shared with cc7800)
+
 v0.1.9 (03/28/2023) :
     - Added support for function prototypes
     - Added cycles alt to generated assembler code comments

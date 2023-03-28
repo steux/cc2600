@@ -1,6 +1,6 @@
 [package]
 name = "cc2600"
-version = "0.1.9"
+version = "0.2.0"
 edition = "2021"
 authors = ["Bruno STEUX <bruno.steux@gmail.com>"]
 license = "GPL-3.0-or-later"
@@ -15,6 +15,4 @@ categories = ["command-line-utilities", "game-development", "compilers"]
 clap = { version = "4.0", features = ["derive"] }
 env_logger = "0.9"
 log = "0.4"
-pest = "2.5"
-pest_derive = "2.5"
-regex = "1.7"
+cc6502 = "0.1"
