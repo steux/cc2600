@@ -1,8 +1,6 @@
 #include "vcs.h"
 #include "vcs_colors.h"
 
-// TODO: Add sounds
-
 unsigned char X, Y;
 
 #define BLANK 40
@@ -21,14 +19,14 @@ char *second_tank_mask0, *second_tank_mask1;
 char *playfield_valreg_ptr;
 char joystick[2]; // Joystick inputs (bit7 is button)
 char switches; // Console switches
-char odd; // Odd or even frame ?
 char sound_iterator[2];
 char sound_counter[2];
+char counter; // For explosion
 
 // Game state
 char game_state; // 0: not started, 1: running, 2: explosion
+char odd; // Odd or even frame ?
 char playfield_select;
-char counter; // For explosion
 unsigned short xpos[2]; // Position of sprites. 16-bits to account for diagonal movements
 unsigned short ypos[2];
 signed char direction[2]; // Between 0 and 23
@@ -44,6 +42,10 @@ char lives[2]; // Remaining lives for all tanks / all players
 char xpos_second_tank[2]; // xpos for second tank
 char ypos_second_tank[2]; // ypos for second tank
 char direction_second_tank[2]; // Direction for second tank, between 0 and 23
+
+const char sprite_reflect[18] = {0, 0, 0, 0, 0, 0, 
+                                 0, 8, 8, 8, 8, 8, 
+                                 8, 8, 8, 8, 8, 8}; // Remaining 0 are from tank_mask
 
 // Used for masking GRPX register for player tank display
 const char tank_mask[KERNAL + 12 + KERNAL] = {
@@ -88,11 +90,6 @@ const char *tank_models[29] = {tank0, tank1, tank2, tank3, tank4, tank5,
                                tank12, tank11, tank10, tank9, tank8, tank7,
                                explosion0, explosion1, explosion2, explosion3, explosion4
 };
-
-const char sprite_reflect[24] = {0, 0, 0, 0, 0, 0, 
-                                 0, 8, 8, 8, 8, 8, 
-                                 8, 8, 8, 8, 8, 8,
-                                 0, 0, 0, 0, 0, 0};
 
 #ifdef PAL
 const char explosion_colors[5] = { 0x4E, 0x4C, 0x4A, 0x48, 0x46 };
@@ -163,15 +160,15 @@ const char playfield_special[48] = {
 
 // Sound code
 
-#define GAMEOVER_SOUND  0
-#define SCORE_SOUND     1
-#define HIGHSCORE_SOUND 2
-#define GREAT_SOUND     3
+#define TANK_SOUND      0
+#define TANK_HIT        1
+#define TANK_FIRE       2
+#define GAME_OVER       3
 
-const unsigned char sound[4] = { 0x38, 0x48, 0x48, 0x48 };
-const unsigned char sound_index[4] = { 0, 9, 13, 17 };
-const unsigned char sound_pitch[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-const unsigned char sound_duration[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+const unsigned char sound[4] = { 0x28, 0x3a, 0x88, 0x7f };
+const unsigned char sound_index[4] = { 0, 2, 6, 9 };
+const unsigned char sound_pitch[12] = { 29, 0, 30, 17, 29, 0, 8, 19, 0, 11, 22, 0 };
+const unsigned char sound_duration[12] = { 10, 0, 15, 15, 30, 0, 7, 15, 0, 7, 15, 0 };
 
 // X is the sound to play
 // Y is the player number (matching voice number)
@@ -294,10 +291,15 @@ void init()
 void player_was_hit()
 {
     // Explosion sound
+    X = TANK_HIT;
+    play_sound();
     for (X = 1; X >= 0; X--) {
         if (lives[X] == 0) {
             // Explosion player
+            X = GAME_OVER;
+            play_sound();
             game_state = 2;
+            break;
         }
     }
 }
@@ -330,6 +332,38 @@ inline void hide_second_tank()
     ypos_second_tank[X] = KERNAL;
 }
 
+void collision_management()
+{
+    // Collisions management 
+    if (CXM0P[Y] & 0x80) {
+        // Y = 0 => M0 hit Player 1 tank
+        // Y = 1 => M1 hit Player 0 tank
+        X = 1;
+        if (Y) X = 0;
+        lives[X]--;
+        if (lives[X] == 1) {
+            switch_to_second_tank();
+            hide_second_tank();
+        }
+        player_was_hit();
+        direction_shell[Y] = -1;
+    }
+
+    // Collision between missiles and playfield
+    if ((CXM0FB[Y] & 0x80) && direction_shell[Y] != -1 && Y != odd) {
+        // Missile hit playfield
+        i = (playfield_select >> 3);
+        X = ((yshell[Y] >> 8) >> 3) + i;
+        j = playfield_special[X];
+        if (j & 8) {
+            direction_shell[Y] = -1;
+        } else if (j & 16) {
+            // Ping pong
+            direction_shell[Y] = shell_pingpong[X = direction_shell[Y]]; 
+        }
+    }
+}
+
 void game_logic()
 {
     if (switches & 0x80) {
@@ -346,35 +380,11 @@ void game_logic()
     // Execute action for both players
     for (Y = 1; Y >= 0; Y--) {
 
-        // Collisions management 
-        if (CXM0P[Y] & 0x80) {
-            // Y = 0 => M0 hit Player 1 tank
-            // Y = 1 => M1 hit Player 0 tank
-            X = 1;
-            if (Y) X = 0;
-            lives[X]--;
-            if (lives[X] == 1) {
-                switch_to_second_tank();
-                hide_second_tank();
-            }
-            player_was_hit();
-            direction_shell[Y] = -1;
-        }
+        collision_management();
 
-        // Collision between missiles and playfield
-        if ((CXM0FB[Y] & 0x80) && direction_shell[Y] != -1 && Y != odd) {
-            // Missile hit playfield
-            X = ((yshell[Y] >> 8) >> 3) + (playfield_select >> 3);
-            j = playfield_special[X];
-            if (j & 8) {
-                direction_shell[Y] = -1;
-            } else if (j & 16) {
-                // Ping pong
-                direction_shell[Y] = shell_pingpong[X = direction_shell[Y]]; 
-            }
-        }
-
-        X = ((ypos[Y] >> 8) >> 3) + (playfield_select >> 3);
+        // Get the playfield cross/fire parameters
+        i = playfield_select >> 3;
+        X = ((ypos[Y] >> 8) >> 3) + i;
         j = playfield_special[X];
 
         if (!(joystick[Y] & 0x04)) { // Left
@@ -414,6 +424,8 @@ void game_logic()
             else if ((xpos[Y] >> 8) >= 150) xpos[Y] = 149 * 256;
             if ((ypos[Y] >> 8) == 0) ypos[Y] = 256;
             else if ((ypos[Y] >> 8) >= 181) ypos[Y] = 180 * 256;
+            X = 0;
+            play_sound();
         }
         if (!(joystick[Y] & 0x02) && lives[Y] != 1) { // Backward : switch tank
             if (tank_switch_counter[Y] == 0) {
@@ -443,17 +455,18 @@ void game_logic()
                         direction[Y]--;
                         if (direction[Y] < 0) direction[Y] = 23;
                     }
+                    X = TANK_FIRE;
+                    play_sound();
                 }
             }
         } else button_pressed[Y] = 0; 
 
         // Make the shell progress
-        if (direction_shell[Y] != -1) {
-            X = direction_shell[Y];
+        if ((X = direction_shell[Y]) != -1) {
             xshell[Y] += dx_shell[X];
             yshell[Y] -= dy_shell[X];
             distance_shell[Y]++;
-            if ((xshell[Y] >> 8) == 0 || (xshell[Y] >> 8) >= 153 || (yshell[Y] >> 8) == 0 || (yshell[Y] >> 8) >= 189 || distance_shell[Y] > firing_range[Y]) {
+            if ((xshell[Y] >> 8) == 0 || (xshell[Y] >> 8) >= 153 || (yshell[Y] >> 8) == 0 || (yshell[Y] >> 8) >= 189 || distance_shell[Y] >= firing_range[Y]) {
                 direction_shell[Y] = -1;
                 xshell[Y] = 0;
             }
@@ -471,6 +484,7 @@ void game_logic()
                     X = 0;
                     hide_second_tank();
                 }
+                Y = 0;
                 player_was_hit();
                 direction_shell[1] = -1;
             } else if (odd && direction_shell[0] != -1) {
@@ -480,6 +494,7 @@ void game_logic()
                     X = 1;
                     hide_second_tank();
                 }
+                Y = 1;
                 player_was_hit();
                 direction_shell[0] = -1;
             } else {
@@ -610,7 +625,7 @@ void main()
             if (!(switches & 2)) {
                 if (counter == 0) {
                     playfield_select += 32;
-                    if (playfield_select > sizeof(playfield_valregs) - 192) playfield_select = 0;
+                    if (playfield_select >= sizeof(playfield_valregs) - 191) playfield_select = 0;
                     playfield_valreg_ptr = playfield_valregs - 1 + playfield_select;
                     counter = 1; // Anti bouncing for select
                 }
