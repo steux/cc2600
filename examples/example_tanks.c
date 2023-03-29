@@ -13,7 +13,7 @@ unsigned char X, Y;
 #define MAX_DISTANCE_MISSILE_1 100 
 #define MAX_DISTANCE_MISSILE_2 50 
 
-char i, j, r;
+char i, j, k, r;
 char rand_counter;
 char *sprite_ptr0, *sprite_ptr1;
 char *mask_ptr0, *mask_ptr1;
@@ -22,6 +22,8 @@ char *playfield_valreg_ptr;
 char joystick[2]; // Joystick inputs (bit7 is button)
 char switches; // Console switches
 char odd; // Odd or even frame ?
+char sound_iterator[2];
+char sound_counter[2];
 
 // Game state
 char game_state; // 0: not started, 1: running, 2: explosion
@@ -80,7 +82,6 @@ const unsigned char explosion2[12] = { 0x1e, 0x6a, 0x48, 0xf5, 0x41, 0xd3, 0x93,
 const unsigned char explosion3[12] = { 0x52, 0x76, 0xf7, 0xa3, 0x86, 0x00, 0x40, 0x47, 0x84, 0xaa, 0xe5, 0x23};
 const unsigned char explosion4[12] = { 0x43, 0x64, 0x82, 0xc1, 0x00, 0x00, 0x00, 0x00, 0x81, 0x41, 0xc2, 0x25};
 
-
 const char *tank_models[29] = {tank0, tank1, tank2, tank3, tank4, tank5, 
                                tank6, tank5, tank4, tank3, tank2, tank1, 
                                tank0, tank7, tank8, tank9, tank10, tank11,
@@ -133,7 +134,7 @@ const char playfield_valregs[384] = {
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     // The trees
-    REG_COLUBK, VCS_LGREEN, REG_PF0, 0x0, REG_PF1, 0x0, REG_PF2, 0x0, REG_CTRLPF, 0x00, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_BLUE, REG_COLUPF, VCS_BROWN, REG_PF2, 0x44,  
+    REG_COLUPF, VCS_BLACK, REG_PF0, 0x0, REG_PF1, 0x0, REG_PF2, 0x0, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_BLUE, REG_COLUPF, VCS_BROWN, REG_PF2, 0x44,  
     REG_PF1, 0x22, REG_PF0, 0xA0, REG_PF1, 0x77, REG_PF1, 0x55, REG_PF1, 0x22, REG_PF1, 0x77, REG_PF1, 0x22, REG_PF2, 0xee,
     // The road
     REG_PF2, 0x44, REG_COLUPF, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_CTRLPF, 0x04, REG_PF0, 0, REG_PF1, 0, REG_PF2, 0, REG_COLUPF, VCS_BROWN, 
@@ -155,8 +156,54 @@ const char playfield_valregs[384] = {
 // Bit 3: Stop shell
 // Bit 4: Ping pong shell
 const char playfield_special[48] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xc, 0xc, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xc, 0xc, 0xc, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 
 };
+
+// Sound code
+
+#define GAMEOVER_SOUND  0
+#define SCORE_SOUND     1
+#define HIGHSCORE_SOUND 2
+#define GREAT_SOUND     3
+
+const unsigned char sound[4] = { 0x38, 0x48, 0x48, 0x48 };
+const unsigned char sound_index[4] = { 0, 9, 13, 17 };
+const unsigned char sound_pitch[26] = { 11, 12, 13, 14, 15, 16, 17, 18, 0, 25, 26, 23, 0, 13, 11, 12, 0, 19, 16, 15, 12, 0, 12, 0, 12, 0 };
+const unsigned char sound_duration[26] = { 7, 7, 7, 7, 7, 7, 7, 7, 0, 7, 7, 14, 0, 7, 7, 10, 0, 7, 7, 7, 14, 7, 7, 7, 21, 0 };
+
+// X is the sound to play
+// Y is the player number (matching voice number)
+// X is used by the function (beware)
+void play_sound()
+{
+    AUDV0[Y] = sound[X];
+    AUDC0[Y] = sound[X] >> 4;
+    X = sound_index[X];
+    sound_iterator[Y] = X;
+    sound_counter[Y] = sound_duration[X];
+    AUDF0[Y] = sound_pitch[X];
+}
+
+// X is the player number (matching voice number)
+// Y is used (beware)
+void play_sound_iteration()
+{
+    if (sound_counter[X]) {
+        sound_counter[X]--;
+        if (sound_counter[X] == 0) {
+            sound_iterator[X]++;
+            Y = sound_iterator[X];
+            sound_counter[X] = sound_duration[Y];
+            if (sound_counter[X]) {
+                AUDF0[X] = sound_pitch[Y];
+            } else {
+                AUDV0[X] = 0;
+                AUDC0[X] = 0;
+                AUDF0[X] = 0;
+            }
+        } 
+    }
+}
 
 void sprites_hpos_set()
 {
@@ -234,8 +281,8 @@ void init()
         lives[X] = 3; 
     }
 
-    playfield_select = 65;
-    playfield_valreg_ptr = playfield_valregs + playfield_select;
+    playfield_select = 0;
+    playfield_valreg_ptr = playfield_valregs - 1;
 
     game_state = 0;
     // Reset collision detection
@@ -371,7 +418,7 @@ void game_logic()
             xshell[Y] += dx_shell[X];
             yshell[Y] -= dy_shell[X];
             distance_shell[Y]++;
-            if ((xshell[Y] >> 8) == 0 || (xshell[Y] >> 8) > 152 || (yshell[Y] >> 8) == 0 || (yshell[Y] >> 8) > 188 || distance_shell[Y] > firing_range[Y]) {
+            if ((xshell[Y] >> 8) == 0 || (xshell[Y] >> 8) >= 153 || (yshell[Y] >> 8) == 0 || (yshell[Y] >> 8) >= 189 || distance_shell[Y] > firing_range[Y]) {
                 direction_shell[Y] = -1;
                 xshell[Y] = 0;
             }
@@ -497,14 +544,14 @@ void prepare_drawing()
     for (Y = 1; Y >= 0; Y--) {
         // Set up players sprites
         X = direction[Y];
-        i = ypos[Y] >> 8;
+        i = (ypos[Y] >> 8) + 1; // +1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
         if (direction_shell[Y] != -1) {
             j = yshell[Y] >> 8;
         } else j = 0;
         // Set up sprite pointer
         if (Y) {
-            sprite_ptr1 = tank_models[X] - 1 - i; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
-            mask_ptr1 = tank_mask + KERNAL - 1 - i; // Same offset as sprite_ptr
+            sprite_ptr1 = tank_models[X] - i;
+            mask_ptr1 = tank_mask + KERNAL - i; // Same offset as sprite_ptr
             if (odd && j) {
                 second_tank_mask1 = shell_mask - 1 - j;
                 *NUSIZ1 = 0x10;
@@ -513,8 +560,8 @@ void prepare_drawing()
                 *NUSIZ1 = 0x20;
             } 
         } else {
-            sprite_ptr0 = tank_models[X] - 1 - i; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
-            mask_ptr0 = tank_mask + KERNAL - 1 - i; // Same offset as sprite_ptr
+            sprite_ptr0 = tank_models[X] - i; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
+            mask_ptr0 = tank_mask + KERNAL - i; // Same offset as sprite_ptr
             if (!odd && j) {
                 second_tank_mask0 = shell_mask - 1 - j;
                 *NUSIZ0 = 0x10;
@@ -558,11 +605,11 @@ void main()
             if (!(switches & 2)) {
                 if (counter == 0) {
                     playfield_select += 32;
-                    if (playfield_select > sizeof(playfield_valregs) - 192) playfield_select = 1;
-                    playfield_valreg_ptr = playfield_valregs + playfield_select;
-                    counter = 1;
+                    if (playfield_select > sizeof(playfield_valregs) - 192) playfield_select = 0;
+                    playfield_valreg_ptr = playfield_valregs - 1 + playfield_select;
+                    counter = 1; // Anti bouncing for select
                 }
-            } else counter = 0;
+            } else counter = 0; // Anti bouncing for select
         } else if (game_state == 2) {
             // Game over
             for (Y = 1; Y >= 0; Y--) {
@@ -591,12 +638,12 @@ void main()
         // Load TIA registers for the first line
         *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y];
         *GRP0 = sprite_ptr0[Y] & mask_ptr0[Y];
-        i = playfield_valreg_ptr[Y];
+        i = playfield_valreg_ptr[Y]; // The first value for playfield is for index KERNAL (192)
         Y--;
         // Load TIA registers for the second line
         *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y]; // This is not active until GRP0 is loaded
         j = sprite_ptr0[Y] & mask_ptr0[Y];
-        X = playfield_valreg_ptr[Y];
+        X = playfield_valreg_ptr[Y]; // The first register for playfield if for index KERNAL - 1 (191), applied for the first 2 lines
         VSYNC[X] = i; // Change one of the TIA registers, programatically
         Y--;
     
@@ -624,7 +671,7 @@ void main()
             i = playfield_valreg_ptr[Y];
             X = sprite_ptr0[Y] & mask_ptr0[Y];
             Y--;
-            load(playfield_valreg_ptr[Y]);
+            load(playfield_valreg_ptr[Y]); // The last register for playfield is for Y = 1 (and is applied for the last two lines)
             // 8 reads can go over a 256 bytes boundaries per line (all masks and playfield reads) 
             // so timing of first kernel line is between 67 and 75 cycles (<76, so OK)
             strobe(WSYNC);
@@ -653,6 +700,9 @@ void main()
         // Overscan
         *VBLANK = 2; // Enable VBLANK
         // Do some logic here
+        for (X = 1; X >= 0; X--)
+            play_sound_iteration();
+        
         while (*INTIM);
         strobe(WSYNC);
     }
