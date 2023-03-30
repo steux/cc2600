@@ -553,6 +553,7 @@ char i; void main() { i = one; }";
         print!("{:?}", result);
         assert!(result.contains("LDA i\n\tCMP #128\n\tROR\n\tSTA i"));
     }
+
     #[test]
     fn right_shift_test2() {
         let args = sargs(1);
@@ -562,5 +563,16 @@ char i; void main() { i = one; }";
         let result = str::from_utf8(&output).unwrap();
         print!("{:?}", result);
         assert!(result.contains("LDA i\n\tLSR\n\tLSR\n\tCLC\n\tADC #224\n\tEOR #224\n\tSTA i"));
+    }
+    
+    #[test]
+    fn right_shift_test3() {
+        let args = sargs(1);
+        let input = "char i; char *ptr; void main() { i = ptr >> 8; }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDA ptr+1\n\tSTA i"));
     }
 }
