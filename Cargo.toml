@@ -15,4 +15,5 @@ categories = ["command-line-utilities", "game-development", "compilers"]
 clap = { version = "4.0", features = ["derive"] }
 env_logger = "0.9"
 log = "0.4"
-cc6502 = "0.1"
+cc6502 = "0.2"
+#cc6502 = { path = "../cc6502" } 
