@@ -1,4 +1,4 @@
-v0.2.0:
+v0.2.0 (03/30/2023) :
     - Switched to cc6502 code base (shared with cc7800)
 
 v0.1.9 (03/28/2023) :
