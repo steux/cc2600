@@ -22,6 +22,7 @@ use cc6502::Args;
 use cc6502::compile::compile;
 
 use std::fs::File;
+use std::io;
 use std::io::BufReader;
 
 use clap::Parser;
@@ -32,15 +33,12 @@ use build::build_cartridge;
 fn main() {
     env_logger::init();
     let args = Args::parse();
-    
-    let f = match File::open(&args.input) {
-        Ok(file) => file,
-        Err(err) => {
-            eprintln!("{}", err);
-            std::process::exit(1);
-        }
-    };
-    let reader = BufReader::new(f);
+    if args.version {
+        const VERSION: &str = env!("CARGO_PKG_VERSION");
+        println!("cc2600 v{} - a subset of C compiler targetting the Atari 2600", VERSION);
+        std::process::exit(0); 
+    }
+   
     let mut writer = match File::create(&args.output) {
         Ok(file) => file,
         Err(err) => {
@@ -49,11 +47,31 @@ fn main() {
         }
     };
 
-    match compile(reader, &mut writer, &args, build_cartridge) {
-        Err(e) => {
-            eprintln!("{}", e);
-            std::process::exit(1) 
-        },
-        Ok(_) => std::process::exit(0) 
+    if args.input == "stdin" {
+        let reader = io::stdin().lock();
+        match compile(reader, &mut writer, &args, build_cartridge) {
+            Err(e) => {
+                eprintln!("{}", e);
+                std::process::exit(1) 
+            },
+            Ok(_) => std::process::exit(0) 
+        }
+    } else {
+        let f = match File::open(&args.input) {
+            Ok(file) => file,
+            Err(err) => {
+                eprintln!("{}", err);
+                std::process::exit(1);
+            }
+        };
+        let reader = BufReader::new(f);
+        match compile(reader, &mut writer, &args, build_cartridge) {
+            Err(e) => {
+                eprintln!("{}", e);
+                std::process::exit(1) 
+            },
+            Ok(_) => std::process::exit(0) 
+        }
     }
+
 }
