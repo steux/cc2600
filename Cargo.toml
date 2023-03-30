@@ -1,6 +1,6 @@
 [package]
 name = "cc2600"
-version = "0.1.9"
+version = "0.1.10"
 edition = "2021"
 authors = ["Bruno STEUX <bruno.steux@gmail.com>"]
 license = "GPL-3.0-or-later"

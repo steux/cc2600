@@ -1,3 +1,6 @@
+v0.1.10 (03/20/3023) :
+    - Corrected 8 bit right shift of pointer (used for DPC and DPC+)
+
 v0.1.9 (03/28/2023) :
     - Added support for function prototypes
     - Added cycles alt to generated assembler code comments
