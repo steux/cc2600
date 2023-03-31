@@ -21,11 +21,11 @@
 use std::io::Write;
 use log::debug;
 
-use crate::error::Error;
-use crate::compile::*;
-use crate::assemble::AssemblyCode;
-use crate::generate::*;
-use crate::Args;
+use cc6502::error::Error;
+use cc6502::compile::*;
+use cc6502::assemble::AssemblyCode;
+use cc6502::generate::*;
+use cc6502::Args;
 
 pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, args: &Args) -> Result<(), Error> 
 {

@@ -1,8 +1,6 @@
 #include "vcs.h"
 #include "vcs_colors.h"
 
-// TODO: Add sounds
-
 unsigned char X, Y;
 
 #define BLANK 40
@@ -13,7 +11,7 @@ unsigned char X, Y;
 #define MAX_DISTANCE_MISSILE_1 100 
 #define MAX_DISTANCE_MISSILE_2 50 
 
-char i, j, r;
+char i, j, k, r;
 char rand_counter;
 char *sprite_ptr0, *sprite_ptr1;
 char *mask_ptr0, *mask_ptr1;
@@ -21,12 +19,14 @@ char *second_tank_mask0, *second_tank_mask1;
 char *playfield_valreg_ptr;
 char joystick[2]; // Joystick inputs (bit7 is button)
 char switches; // Console switches
-char odd; // Odd or even frame ?
+char sound_iterator[2];
+char sound_counter[2];
+char counter; // For explosion
 
 // Game state
 char game_state; // 0: not started, 1: running, 2: explosion
+char odd; // Odd or even frame ?
 char playfield_select;
-char counter; // For explosion
 unsigned short xpos[2]; // Position of sprites. 16-bits to account for diagonal movements
 unsigned short ypos[2];
 signed char direction[2]; // Between 0 and 23
@@ -43,6 +43,10 @@ char xpos_second_tank[2]; // xpos for second tank
 char ypos_second_tank[2]; // ypos for second tank
 char direction_second_tank[2]; // Direction for second tank, between 0 and 23
 
+const char sprite_reflect[18] = {0, 0, 0, 0, 0, 0, 
+                                 0, 8, 8, 8, 8, 8, 
+                                 8, 8, 8, 8, 8, 8}; // Remaining 0 are from tank_mask
+
 // Used for masking GRPX register for player tank display
 const char tank_mask[KERNAL + 12 + KERNAL] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -55,9 +59,9 @@ const unsigned char shell_mask[4 + KERNAL] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 }; 
 // Used for NUSIZX register setting + Bit 1 for ENAMX (second tank displayed using the missile sprite)
-const unsigned char second_tank_mask[14 + KERNAL] = { 
+const unsigned char second_tank_mask[KERNAL] = { 
     0x20, 0x20, 0x22, 0x22, 0x22, 0x22, 0x32, 0x32, 0x22, 0x22, 0x22, 0x22, 0x20, 0x20,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0  
 }; 
 
 // Generated from build_sprites.c & PlayerPal & back to C with spritegen
@@ -80,18 +84,12 @@ const unsigned char explosion2[12] = { 0x1e, 0x6a, 0x48, 0xf5, 0x41, 0xd3, 0x93,
 const unsigned char explosion3[12] = { 0x52, 0x76, 0xf7, 0xa3, 0x86, 0x00, 0x40, 0x47, 0x84, 0xaa, 0xe5, 0x23};
 const unsigned char explosion4[12] = { 0x43, 0x64, 0x82, 0xc1, 0x00, 0x00, 0x00, 0x00, 0x81, 0x41, 0xc2, 0x25};
 
-
 const char *tank_models[29] = {tank0, tank1, tank2, tank3, tank4, tank5, 
                                tank6, tank5, tank4, tank3, tank2, tank1, 
                                tank0, tank7, tank8, tank9, tank10, tank11,
                                tank12, tank11, tank10, tank9, tank8, tank7,
                                explosion0, explosion1, explosion2, explosion3, explosion4
 };
-
-const char sprite_reflect[24] = {0, 0, 0, 0, 0, 0, 
-                                 0, 8, 8, 8, 8, 8, 
-                                 8, 8, 8, 8, 8, 8,
-                                 0, 0, 0, 0, 0, 0};
 
 #ifdef PAL
 const char explosion_colors[5] = { 0x4E, 0x4C, 0x4A, 0x48, 0x46 };
@@ -129,11 +127,13 @@ const char playfield_valregs[384] = {
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
-    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
-    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
-    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
+    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN,     
+    // The lake
+    REG_PF2, 0x0, REG_PF1, 0x0, REG_PF0, 0x00, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
+    REG_PF0, 0x70, REG_CTRLPF, 0x00, REG_PF0, 0x30, REG_PF1, 0x0f, REG_PF2, 0xff, REG_PF2, 0xf0, REG_COLUPF, VCS_BLUE, REG_COLUBK, VCS_LGREEN, 
+    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN,
     // The trees
-    REG_COLUBK, VCS_LGREEN, REG_PF0, 0x0, REG_PF1, 0x0, REG_PF2, 0x0, REG_CTRLPF, 0x00, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_BLUE, REG_COLUPF, VCS_BROWN, REG_PF2, 0x44,  
+    REG_CTRLPF, 0x01 /* Reflective and not priority */, REG_PF0, 0x0, REG_PF1, 0x0, REG_PF2, 0x0, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_BLUE, REG_COLUPF, VCS_BROWN, REG_PF2, 0x44,  
     REG_PF1, 0x22, REG_PF0, 0xA0, REG_PF1, 0x77, REG_PF1, 0x55, REG_PF1, 0x22, REG_PF1, 0x77, REG_PF1, 0x22, REG_PF2, 0xee,
     // The road
     REG_PF2, 0x44, REG_COLUPF, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_CTRLPF, 0x04, REG_PF0, 0, REG_PF1, 0, REG_PF2, 0, REG_COLUPF, VCS_BROWN, 
@@ -155,8 +155,54 @@ const char playfield_valregs[384] = {
 // Bit 3: Stop shell
 // Bit 4: Ping pong shell
 const char playfield_special[48] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xc, 0xc, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0xc, 0xc, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 
 };
+
+// Sound code
+
+#define TANK_SOUND      0
+#define TANK_HIT        1
+#define TANK_FIRE       2
+#define GAME_OVER       3
+
+const unsigned char sound[4] = { 0x28, 0x3a, 0x88, 0x7f };
+const unsigned char sound_index[4] = { 0, 2, 6, 9 };
+const unsigned char sound_pitch[12] = { 29, 0, 30, 17, 29, 0, 8, 19, 0, 11, 22, 0 };
+const unsigned char sound_duration[12] = { 10, 0, 15, 15, 30, 0, 7, 15, 0, 7, 15, 0 };
+
+// X is the sound to play
+// Y is the player number (matching voice number)
+// X is used by the function (beware)
+void play_sound()
+{
+    AUDV0[Y] = sound[X];
+    AUDC0[Y] = sound[X] >> 4;
+    X = sound_index[X];
+    sound_iterator[Y] = X;
+    sound_counter[Y] = sound_duration[X];
+    AUDF0[Y] = sound_pitch[X];
+}
+
+// X is the player number (matching voice number)
+// Y is used (beware)
+void play_sound_iteration()
+{
+    if (sound_counter[X]) {
+        sound_counter[X]--;
+        if (sound_counter[X] == 0) {
+            sound_iterator[X]++;
+            Y = sound_iterator[X];
+            sound_counter[X] = sound_duration[Y];
+            if (sound_counter[X]) {
+                AUDF0[X] = sound_pitch[Y];
+            } else {
+                AUDV0[X] = 0;
+                AUDC0[X] = 0;
+                AUDF0[X] = 0;
+            }
+        } 
+    }
+}
 
 void sprites_hpos_set()
 {
@@ -211,7 +257,7 @@ void init()
 {
     // Init graphics
     *COLUP0 = VCS_DGRAY;
-    *COLUP1 = VCS_BLUE;
+    *COLUP1 = VCS_RED;
     *REFP1 = 0x08; // Second player looks left
     *VDELP1 = 1; // Delay P0 update
     *COLUPF = VCS_BLACK; 
@@ -234,8 +280,8 @@ void init()
         lives[X] = 3; 
     }
 
-    playfield_select = 65;
-    playfield_valreg_ptr = playfield_valregs + playfield_select;
+    playfield_select = 0;
+    playfield_valreg_ptr = playfield_valregs - 1;
 
     game_state = 0;
     // Reset collision detection
@@ -245,10 +291,15 @@ void init()
 void player_was_hit()
 {
     // Explosion sound
+    X = TANK_HIT;
+    play_sound();
     for (X = 1; X >= 0; X--) {
         if (lives[X] == 0) {
             // Explosion player
+            X = GAME_OVER;
+            play_sound();
             game_state = 2;
+            break;
         }
     }
 }
@@ -281,6 +332,38 @@ inline void hide_second_tank()
     ypos_second_tank[X] = KERNAL;
 }
 
+void collision_management()
+{
+    // Collisions management 
+    if (CXM0P[Y] & 0x80) {
+        // Y = 0 => M0 hit Player 1 tank
+        // Y = 1 => M1 hit Player 0 tank
+        X = 1;
+        if (Y) X = 0;
+        lives[X]--;
+        if (lives[X] == 1) {
+            switch_to_second_tank();
+            hide_second_tank();
+        }
+        player_was_hit();
+        direction_shell[Y] = -1;
+    }
+
+    // Collision between missiles and playfield
+    if ((CXM0FB[Y] & 0x80) && direction_shell[Y] != -1 && Y != odd) {
+        // Missile hit playfield
+        i = (playfield_select >> 3);
+        X = ((yshell[Y] >> 8) >> 3) + i;
+        j = playfield_special[X];
+        if (j & 8) {
+            direction_shell[Y] = -1;
+        } else if (j & 16) {
+            // Ping pong
+            direction_shell[Y] = shell_pingpong[X = direction_shell[Y]]; 
+        }
+    }
+}
+
 void game_logic()
 {
     if (switches & 0x80) {
@@ -297,7 +380,11 @@ void game_logic()
     // Execute action for both players
     for (Y = 1; Y >= 0; Y--) {
 
-        X = ((ypos[Y] >> 8) >> 3) + (playfield_select >> 3);
+        collision_management();
+
+        // Get the playfield cross/fire parameters
+        i = playfield_select >> 3;
+        X = ((ypos[Y] >> 8) >> 3) + i;
         j = playfield_special[X];
 
         if (!(joystick[Y] & 0x04)) { // Left
@@ -317,13 +404,17 @@ void game_logic()
         } else rotation_counter[Y] = ROTATION_DELAY - 1;
         if (!(joystick[Y] & 0x01)) { // Up/Forward
             X = direction[Y];
-            if ((CXP0FB[Y] & 0x80) && (j & 4)) {
-                // Tank should be stopped there
-                X += 12;
-                if (X >= 24) X -= 24;
+            i = 0;
+            if (CXP0FB[Y] & 0x80) { // Collide with playfield
+                if (j & 4) {
+                    // Tank should be stopped there
+                    X += 12;
+                    if (X >= 24) X -= 24;
+                }
+                i = j & 2; // Test for slow down
             }
             go_forward();
-            if (!(j & 2)) {
+            if (!i) {
                 go_forward();
                 if (j & 1) {
                     go_forward();
@@ -333,9 +424,12 @@ void game_logic()
             else if ((xpos[Y] >> 8) >= 150) xpos[Y] = 149 * 256;
             if ((ypos[Y] >> 8) == 0) ypos[Y] = 256;
             else if ((ypos[Y] >> 8) >= 181) ypos[Y] = 180 * 256;
+            X = 0;
+            play_sound();
         }
         if (!(joystick[Y] & 0x02) && lives[Y] != 1) { // Backward : switch tank
             if (tank_switch_counter[Y] == 0) {
+                X = Y;
                 switch_to_second_tank();
             } 
             tank_switch_counter[Y] = 60; // 1 second delay between two tank switches
@@ -361,46 +455,20 @@ void game_logic()
                         direction[Y]--;
                         if (direction[Y] < 0) direction[Y] = 23;
                     }
+                    X = TANK_FIRE;
+                    play_sound();
                 }
             }
         } else button_pressed[Y] = 0; 
 
         // Make the shell progress
-        if (direction_shell[Y] != -1) {
-            X = direction_shell[Y];
+        if ((X = direction_shell[Y]) != -1) {
             xshell[Y] += dx_shell[X];
             yshell[Y] -= dy_shell[X];
             distance_shell[Y]++;
-            if ((xshell[Y] >> 8) == 0 || (xshell[Y] >> 8) > 152 || (yshell[Y] >> 8) == 0 || (yshell[Y] >> 8) > 188 || distance_shell[Y] > firing_range[Y]) {
+            if ((xshell[Y] >> 8) == 0 || (xshell[Y] >> 8) >= 153 || (yshell[Y] >> 8) == 0 || (yshell[Y] >> 8) >= 189 || distance_shell[Y] >= firing_range[Y]) {
                 direction_shell[Y] = -1;
                 xshell[Y] = 0;
-            }
-        }
-       
-        // Collisions management 
-        if (CXM0P[Y] & 0x80) {
-            // Y = 0 => M0 hit Player 1 tank
-            // Y = 1 => M1 hit Player 0 tank
-            X = 1;
-            if (Y) X = 0;
-            lives[X]--;
-            if (lives[X] == 1) {
-                switch_to_second_tank();
-                hide_second_tank();
-            }
-            player_was_hit();
-            direction_shell[Y] = -1;
-        }
-
-        if (CXM0FB[Y] & 0x80) {
-            // Missile hit playfield
-            X = ((yshell[Y] >> 8) >> 3) + (playfield_select >> 3);
-            j = playfield_special[X];
-            if (j & 8) {
-                direction_shell[Y] = -1;
-            } else if (j & 16) {
-                // Ping pong
-                direction_shell[Y] = shell_pingpong[X = direction_shell[Y]]; 
             }
         }
     }
@@ -416,6 +484,7 @@ void game_logic()
                     X = 0;
                     hide_second_tank();
                 }
+                Y = 0;
                 player_was_hit();
                 direction_shell[1] = -1;
             } else if (odd && direction_shell[0] != -1) {
@@ -425,6 +494,7 @@ void game_logic()
                     X = 1;
                     hide_second_tank();
                 }
+                Y = 1;
                 player_was_hit();
                 direction_shell[0] = -1;
             } else {
@@ -434,9 +504,6 @@ void game_logic()
             }
         } 
     }
-
-    // Reset collision detection
-    strobe(CXCLR);
 }
 
 const char nusiz_for_lives[4] = {0, 0, 1, 3};
@@ -454,8 +521,8 @@ void display_remaining_lives()
     sprite_ptr1 = tank10;
     Y = lives[1];
     if (Y == 0) {
+        sprite_ptr1 = tank_models[Y = direction[1]]; //explosion2;
         Y = 1;
-        sprite_ptr1 = explosion2;
     }
     X = 160 + 4 - (Y << 4); // 4 pixels margin on the right
     Y = sprite_wait[X];
@@ -468,7 +535,7 @@ void display_remaining_lives()
     sprite_ptr0 = tank10;
     X = lives[0];
     if (X == 0) {
-        sprite_ptr0 = explosion2;
+        sprite_ptr0 = tank_models[Y = direction[0]]; //explosion2;
     }
     strobe(WSYNC);
     strobe(HMOVE);
@@ -497,14 +564,14 @@ void prepare_drawing()
     for (Y = 1; Y >= 0; Y--) {
         // Set up players sprites
         X = direction[Y];
-        i = ypos[Y] >> 8;
+        i = (ypos[Y] >> 8) + 1; // +1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
         if (direction_shell[Y] != -1) {
             j = yshell[Y] >> 8;
         } else j = 0;
         // Set up sprite pointer
         if (Y) {
-            sprite_ptr1 = tank_models[X] - 1 - i; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
-            mask_ptr1 = tank_mask + KERNAL - 1 - i; // Same offset as sprite_ptr
+            sprite_ptr1 = tank_models[X] - i;
+            mask_ptr1 = tank_mask + KERNAL - i; // Same offset as sprite_ptr
             if (odd && j) {
                 second_tank_mask1 = shell_mask - 1 - j;
                 *NUSIZ1 = 0x10;
@@ -513,8 +580,8 @@ void prepare_drawing()
                 *NUSIZ1 = 0x20;
             } 
         } else {
-            sprite_ptr0 = tank_models[X] - 1 - i; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
-            mask_ptr0 = tank_mask + KERNAL - 1 - i; // Same offset as sprite_ptr
+            sprite_ptr0 = tank_models[X] - i; // -1 offset because lower position (ypos = 0) matches sprite_ptr[Y = 1]
+            mask_ptr0 = tank_mask + KERNAL - i; // Same offset as sprite_ptr
             if (!odd && j) {
                 second_tank_mask0 = shell_mask - 1 - j;
                 *NUSIZ0 = 0x10;
@@ -558,11 +625,11 @@ void main()
             if (!(switches & 2)) {
                 if (counter == 0) {
                     playfield_select += 32;
-                    if (playfield_select > sizeof(playfield_valregs) - 192) playfield_select = 1;
-                    playfield_valreg_ptr = playfield_valregs + playfield_select;
-                    counter = 1;
+                    if (playfield_select >= sizeof(playfield_valregs) - 191) playfield_select = 0;
+                    playfield_valreg_ptr = playfield_valregs - 1 + playfield_select;
+                    counter = 1; // Anti bouncing for select
                 }
-            } else counter = 0;
+            } else counter = 0; // Anti bouncing for select
         } else if (game_state == 2) {
             // Game over
             for (Y = 1; Y >= 0; Y--) {
@@ -582,6 +649,9 @@ void main()
             }
         } else game_logic();
 
+        // Reset collision detection
+        strobe(CXCLR);
+
         // Drawing
         prepare_drawing();
 
@@ -591,12 +661,12 @@ void main()
         // Load TIA registers for the first line
         *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y];
         *GRP0 = sprite_ptr0[Y] & mask_ptr0[Y];
-        i = playfield_valreg_ptr[Y];
+        i = playfield_valreg_ptr[Y]; // The first value for playfield is for index KERNAL (192)
         Y--;
         // Load TIA registers for the second line
         *GRP1 = sprite_ptr1[Y] & mask_ptr1[Y]; // This is not active until GRP0 is loaded
         j = sprite_ptr0[Y] & mask_ptr0[Y];
-        X = playfield_valreg_ptr[Y];
+        X = playfield_valreg_ptr[Y]; // The first register for playfield if for index KERNAL - 1 (191), applied for the first 2 lines
         VSYNC[X] = i; // Change one of the TIA registers, programatically
         Y--;
     
@@ -624,7 +694,7 @@ void main()
             i = playfield_valreg_ptr[Y];
             X = sprite_ptr0[Y] & mask_ptr0[Y];
             Y--;
-            load(playfield_valreg_ptr[Y]);
+            load(playfield_valreg_ptr[Y]); // The last register for playfield is for Y = 1 (and is applied for the last two lines)
             // 8 reads can go over a 256 bytes boundaries per line (all masks and playfield reads) 
             // so timing of first kernel line is between 67 and 75 cycles (<76, so OK)
             strobe(WSYNC);
@@ -653,6 +723,9 @@ void main()
         // Overscan
         *VBLANK = 2; // Enable VBLANK
         // Do some logic here
+        for (X = 1; X >= 0; X--)
+            play_sound_iteration();
+        
         while (*INTIM);
         strobe(WSYNC);
     }

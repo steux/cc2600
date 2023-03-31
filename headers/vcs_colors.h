@@ -21,7 +21,7 @@
 #define VCS_DGRAY     0x04
 #else // NTSC colors
 #define VCS_BLUE      0x72
-#define VCS_RED       0x44
+#define VCS_RED       0x32
 #define VCS_PURPLE    0x56
 #define VCS_LGREEN    0xC8
 #define VCS_LBLUE     0x9A

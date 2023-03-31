@@ -7,7 +7,7 @@ CFLAGS=-I../headers
 %.bin: %.a
 	dasm $< -f3 -v4 -o$@
 
-all: example_sprite.bin test_superchip.bin test_dpc.bin test_dpcplus.bin test_3e.bin test_3eplus.bin
+all: example_sprite.bin test_superchip.bin test_dpc.bin test_dpcplus.bin test_3e.bin test_3eplus.bin example_tanks.bin
 
 clean:
 	rm *.bin
