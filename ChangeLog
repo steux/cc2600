@@ -1,4 +1,7 @@
-v0.1.10 (03/20/3023) :
+v0.1.11 (02/04/2023) :
+    - Backorted bug corrections from cc6502 (v0.2 onwards)
+
+v0.1.10 (03/20/2023) :
     - Corrected 8 bit right shift of pointer (used for DPC and DPC+)
 
 v0.1.9 (03/28/2023) :

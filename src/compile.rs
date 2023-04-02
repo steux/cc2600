@@ -449,7 +449,7 @@ fn compile_quoted_string(s: &str) -> String
 
 fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(), Error>
 {
-    let mut var_type = VariableType::Char;
+    let mut var_type_ex = VariableType::Char;
     let mut var_const = false;
     let mut signedness_specified = false;
     let mut signed = state.signed_chars;
@@ -471,7 +471,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                             signedness_specified = true;
                         },
                         Rule::var_simple_type => if p.as_str().eq("short") {
-                            var_type = VariableType::Short;
+                            var_type_ex = VariableType::Short;
                             if !signedness_specified { signed = true; }
                         },
                         Rule::aligned => alignment = p.into_inner().next().unwrap().as_str().parse::<usize>().unwrap(),
@@ -483,6 +483,7 @@ fn compile_var_decl(state: &mut CompilerState, pairs: Pairs<Rule>) -> Result<(),
                 let mut name = "";
                 let mut size = None;
                 let mut def = VariableDefinition::None;
+                let mut var_type = var_type_ex;
                 for p in pair.into_inner() {
                     match p.as_rule() {
                         Rule::pointer => var_type = VariableType::CharPtr,
