@@ -1,3 +1,6 @@
+v0.2.1 :
+    - Switched to cc6502 v0.3 with atari2600 feature 
+
 v0.2.0 (03/30/2023) :
     - Switched to cc6502 code base (shared with cc7800)
 
