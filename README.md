@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="50%" src="https://github.com/steux/cc2600/raw/main/misc/cc2600.svg" />
+  <img width="50%" src="https://github.com/steux/cc2600/raw/main/misc/cc2600.png" />
 </p>
 
 # cc2600
@@ -32,7 +32,7 @@ cc2600 is implemented in the Rust programming language, a touch of modernity for
 - Superchip (128 bytes of additional RAM!) support
 - Uses only 1 byte of RAM
 - load/store/strobe intrinsics allow the writing of efficient kernels.
-- X and Y registers are directly mapped to X and Y variables, just like if they ware declared as unsigned char global variables.
+- X and Y registers are directly mapped to X and Y variables, just like if they were declared as unsigned char global variables.
 - All C constructs are implemented (for, if, while, goto, etc).
 - Clean bootstrap/bankswitching code is automatically generated
 - PlusROM support for Wifi communication with PlusCART
@@ -40,7 +40,7 @@ cc2600 is implemented in the Rust programming language, a touch of modernity for
 ## Known limitations
 
 
-- The only data types supported are char (8-bit), short (16-bit) and char pointers (16-bits), and one dimensional arrays of chars and pointers.
+- The only data types supported are char (8-bit), short (16-bit) and char pointers (16-bits), and one dimensional arrays of these types.
 - Only global variables are supported, not local variables (no use of stack. It's so slow on 6502 and so dangerous due
     to the lack of RAM that it'd be a bad idea anyway)
 - Functions can't have arguments and return values (no use of stack). Everything must go through global variables.
@@ -65,7 +65,7 @@ A rather complete example of what is possible with cc2600 is the [HappyBird](htt
 
 A few examples are also available in the `examples` directory. There is a Makefile in the folder, but it should only work on Linux. If you want to build yourself the magnificient DPC (David Patrick Crane coprocessor) example featuring Garfield, type :
 
-`cc2600 -I../headers examples/test_dpc.c`
+`cc2600 -Iheaders examples/test_dpc.c`
 
 This will produce `out.a`, which is a DASM compatible source code.
 
@@ -122,7 +122,7 @@ You can insert assembly code using the `#include`. If the filename provided ends
 
 16-bits arithmetics is supported, BUT beware to use only simple expressions (like a simple addition, or `+=`, not multiple additions on the same line of code), since carry propagation is not ensured (maybe will it be in the future). In particular 16-bits operations are not supported in comparisons. Use `short` to declare a 16-bits variable. `char *` are also 16-bits variables, since address space on 6502 is 16-bits wide.
 
-In order to convert from 16-bits to 8-bits, use the `>> 8` special operation to get the higher byte of a `short`, and nothing for the lower byte.
+In order to convert from 16-bits to 8-bits, use the `>> 8` special operation to get the higher byte of a `short`, and use nothing to get the lower byte.
 
 ### Optimizations
 
@@ -134,7 +134,7 @@ X and Y are `unsigned char` typed, BUT in order to optimize the loops, they are 
 - [ ] Fix 16 bits arithmetics so that it becomes more usable...
 - [X] Implement sign extend (for 8 bit to 16 bits variable assignment)
 - [ ] DWARF data output for debugging with Gopher2600
-- [ ] Add 3E+ bankswitching scheme support 
+- [X] Add 3E+ bankswitching scheme support 
 
 <p align="center">
   In Memoriam</br>
