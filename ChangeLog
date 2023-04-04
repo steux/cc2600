@@ -1,3 +1,6 @@
+v0.1.12 (04/04/2023) :
+    - Added support for comma operator
+
 v0.1.11 (02/04/2023) :
     - Backorted bug corrections from cc6502 (v0.2 onwards)
 

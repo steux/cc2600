@@ -1635,6 +1635,13 @@ fn generate_expr_cond(&mut self, expr: &'a Expr<'a>, pos: usize) -> Result<ExprT
                     },
                     Operation::TernaryCond1 => self.generate_ternary(lhs, rhs, pos),
                     Operation::TernaryCond2 => unreachable!(),
+                    Operation::Comma => {
+                        self.generate_expr(lhs, pos, false)?;
+                        self.purge_deferred_plusplus()?;
+                        self.acc_in_use = false;
+                        self.tmp_in_use = false;
+                        self.generate_expr(rhs, pos, false)
+                    }
                 }
             },
             Expr::Identifier((var, sub)) => {

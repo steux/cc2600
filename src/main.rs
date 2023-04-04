@@ -575,4 +575,15 @@ char i; void main() { i = one; }";
         print!("{:?}", result);
         assert!(result.contains("LDA ptr+1\n\tSTA i"));
     }
+    
+    #[test]
+    fn comma_test() {
+        let args = sargs(1);
+        let input = "void main() { for (Y = 0, X = 0; X != 10; Y++, X++); }";
+        let mut output = Vec::new();
+        compile(input.as_bytes(), &mut output, &args).unwrap();
+        let result = str::from_utf8(&output).unwrap();
+        print!("{:?}", result);
+        assert!(result.contains("LDY #0\n\tLDX #0\n.for1\n.forupdate1\n\tINY\n\tINX\n\tCPX #10\n\tBNE .for1"));
+    }
 }
