@@ -1,3 +1,6 @@
+v0.1.13 (04/11/2023) :
+    - Enhanced macros with parameters support
+
 v0.1.12 (04/04/2023) :
     - Added support for comma operator
 

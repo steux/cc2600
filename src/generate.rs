@@ -1031,6 +1031,7 @@ impl<'a, 'b> GeneratorState<'a> {
             self.tmp_in_use = true;
             Ok(ExprType::Tmp(signed))
         } else {
+            self.acc_in_use = true;
             Ok(ExprType::A(signed))
         }
     }
