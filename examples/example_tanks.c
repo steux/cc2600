@@ -109,11 +109,26 @@ const signed short dy_shell[24] = {0, 124, 240, 339, 415, 463, 480, 463, 415, 33
 const char sprite_wait[153] = {1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13};
 const char sprite_hm[153] = {0x70, 0x60, 0x50, 0x40, 0x30, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0};
 
-const char shell_pingpong[24] = { 12, 11, 10, 9, 20, 19, 18, 17, 16, 3, 2, 1, 0, 23, 22, 21, 8, 7, 6, 5, 4, 15, 14, 13};
+//                6
+//          7           5
+//      8                   4
+//     9                      3 
+//    10                       2
+//   11                         1
+//   12                         0
+//   13                        23 
+//    14                       22
+//     15                     21
+//       16                20
+//          17          19
+//                18
+// Ping pong is computed by bounding to the left (always)
+const char shell_pingpong[24] = { 12, 11, 10, 9, 8, 7, 18, 17, 16, 15, 14, 13, 0, 23, 22, 21, 20, 19, 6, 5, 4, 3, 2, 1};
+//const char shell_pingpong[24] = { 12, 11, 10, 9, 20, 19, 18, 17, 16, 3, 2, 1, 0, 23, 22, 21, 8, 7, 6, 5, 4, 15, 14, 13};
 
 #define REG_COLUPF  0x08
 #define REG_COLUBK  0x09
-#define REG_CTRLPF  0x0a
+#define REG_CTRLPF  0x0a // LSB: Playfield priority / Score mode / Reflective playfield
 #define REG_PF0     0x0d
 #define REG_PF1     0x0e
 #define REG_PF2     0x0f
@@ -125,13 +140,14 @@ const char playfield_valregs[384] = {
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
-    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
-    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
-    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN,     
+    // The bridge
+    REG_PF1, 0x0, REG_PF0, 0, REG_CTRLPF, 0x1, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_PF0, 0x60,  
+    REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_PF2, 0x0, REG_PF2, 0x03, REG_PF2, 0x0f, REG_COLUPF, VCS_WHITE, REG_COLUBK, VCS_GREEN, REG_COLUPF, VCS_ORANGE, 
+    REG_PF2, 0xff, REG_PF1, 0x0f, REG_COLUPF, VCS_WHITE, REG_CTRLPF, 0x5 /* Reflective and priority */,     
     // The lake
     REG_PF2, 0x0, REG_PF1, 0x0, REG_PF0, 0x00, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     REG_PF0, 0x70, REG_CTRLPF, 0x00, REG_PF0, 0x30, REG_PF1, 0x0f, REG_PF2, 0xff, REG_PF2, 0xf0, REG_COLUPF, VCS_BLUE, REG_COLUBK, VCS_LGREEN, 
-    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN,
+    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, 
     // The trees
     REG_CTRLPF, 0x01 /* Reflective and not priority */, REG_PF0, 0x0, REG_PF1, 0x0, REG_PF2, 0x0, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_BLUE, REG_COLUPF, VCS_BROWN, REG_PF2, 0x44,  
     REG_PF1, 0x22, REG_PF0, 0xA0, REG_PF1, 0x77, REG_PF1, 0x55, REG_PF1, 0x22, REG_PF1, 0x77, REG_PF1, 0x22, REG_PF2, 0xee,
@@ -155,7 +171,7 @@ const char playfield_valregs[384] = {
 // Bit 3: Stop shell
 // Bit 4: Ping pong shell
 const char playfield_special[48] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0xc, 0xc, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x14, 0x14, 0, 0, 0, 2, 2, 2, 2, 0, 0xc, 0xc, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 
 };
 
 // Sound code
@@ -684,7 +700,7 @@ void main()
         load(j); // Load for the second line
         // Now, we will draw the image
         do {
-            // We're using a "hybrid" 2 lines kernel (GRPX & ENAMX are set every line, so maximize player and shells
+            // We're using a "hybrid" 2 lines kernel (GRPX & ENAMX are set every line, to maximize player and shells
             // resolution. NUSIZX is set one line out of two, for the display of the second tank. A programmable TIA register is also set every second line) 
             strobe(WSYNC);
             store(*GRP0);    // loads GRP0 and GRP1
