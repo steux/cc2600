@@ -42,6 +42,7 @@ char lives[2]; // Remaining lives for all tanks / all players
 char xpos_second_tank[2]; // xpos for second tank
 char ypos_second_tank[2]; // ypos for second tank
 char direction_second_tank[2]; // Direction for second tank, between 0 and 23
+char tank_stopped[2]; // Is tank going backward ?
 
 const char sprite_reflect[18] = {0, 0, 0, 0, 0, 0, 
                                  0, 8, 8, 8, 8, 8, 
@@ -138,11 +139,12 @@ const char playfield_valregs[384] = {
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
     REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
-    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
-    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
+    // The bush
+    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_PF2, 0, REG_PF1, 0, REG_PF0, 0, 
+    REG_PF2, 0x55, REG_PF1, 0x51, REG_PF0, 0x50, REG_PF2, 0xaa, REG_PF1, 0xa2, REG_PF0, 0xa0, REG_COLUPF, VCS_GREEN, REG_CTRLPF, 0x4, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, 
     // The bridge
     REG_PF1, 0x0, REG_PF0, 0, REG_CTRLPF, 0x1, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_PF0, 0x60,  
-    REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_PF2, 0x0, REG_PF2, 0x03, REG_PF2, 0x0f, REG_COLUPF, VCS_WHITE, REG_COLUBK, VCS_GREEN, REG_COLUPF, VCS_ORANGE, 
+    REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_PF2, 0x0, REG_PF2, 0x03, REG_PF2, 0x0f, REG_COLUPF, VCS_WHITE, REG_COLUBK, VCS_GREEN, REG_COLUPF, VCS_ORANGE, 
     REG_PF2, 0xff, REG_PF1, 0x0f, REG_COLUPF, VCS_WHITE, REG_CTRLPF, 0x5 /* Reflective and priority */,     
     // The lake
     REG_PF2, 0x0, REG_PF1, 0x0, REG_PF0, 0x00, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_LGREEN, 
@@ -171,7 +173,7 @@ const char playfield_valregs[384] = {
 // Bit 3: Stop shell
 // Bit 4: Ping pong shell
 const char playfield_special[48] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x14, 0x14, 0, 0, 0, 2, 2, 2, 2, 0, 0xc, 0xc, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0x14, 0x14, 0, 0, 0, 2, 2, 2, 2, 0, 0xc, 0xc, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 
 };
 
 // Sound code
@@ -280,16 +282,16 @@ void init()
     
     // Init game state
     ypos[0] = ypos[1] = (KERNAL / 2 - 20) * 256;
-    xpos[0] = 30 * 256;
-    xpos[1] = (160 - 30 - 8) * 256;
+    xpos[0] = 16 * 256;
+    xpos[1] = (160 - 16 - 8) * 256;
     direction[0] = 0; 
     direction[1] = 12;
     direction_shell[0] = -1;
     direction_shell[1] = -1;
     xshell[0] = 0;
     xshell[1] = 0;
-    xpos_second_tank[0] = 30 + 4;
-    xpos_second_tank[1] = (160 - 30 - 4);
+    xpos_second_tank[0] = 16 + 4;
+    xpos_second_tank[1] = (160 - 16 - 4);
     for (X = 1; X >= 0; X--) {
         ypos_second_tank[X] = KERNAL / 2 + 8 + (1 - X);
         direction_second_tank[X] = direction[X];
@@ -409,6 +411,7 @@ void game_logic()
                 rotation_counter[Y] = 0;
                 direction[Y]--;
                 if (direction[Y] < 0) direction[Y] = 23;
+                tank_stopped[Y] = 1;
             }
         } else if (!(joystick[Y] & 0x08)) { // Right 
             rotation_counter[Y]++;
@@ -416,17 +419,19 @@ void game_logic()
                 rotation_counter[Y] = 0;
                 direction[Y]++;
                 if (direction[Y] == 24) direction[Y] = 0;
+                tank_stopped[Y] = 1;
             } 
         } else rotation_counter[Y] = ROTATION_DELAY - 1;
         if (!(joystick[Y] & 0x01)) { // Up/Forward
             X = direction[Y];
             i = 0;
             if (CXP0FB[Y] & 0x80) { // Collide with playfield
-                if (j & 4) {
+                if (j & 4 && !tank_stopped[Y]) {
                     // Tank should be stopped there
                     X += 12;
                     if (X >= 24) X -= 24;
-                }
+                    tank_stopped[Y] = 1;
+                } else tank_stopped[Y] = 0;
                 i = j & 2; // Test for slow down
             }
             go_forward();
@@ -632,6 +637,9 @@ void main()
 
         odd ^= 1; 
 
+        if (!(switches & 1)) { // Reset
+            init();
+        }
         if (game_state == 0) {
             if (!((joystick[0] | joystick[1]) & 0x80)) {
                 game_state = 1; // Start game
@@ -660,9 +668,6 @@ void main()
                     }
                 }
             }
-            if (!(switches & 1)) { // Reset
-                init();
-            }
         } else game_logic();
 
         // Reset collision detection
@@ -688,10 +693,6 @@ void main()
     
         *ENAM0 = 0;
         *ENAM1 = 0; // Just to make sure
-        *PF0 = 0;
-        *PF1 = 0;
-        *PF2 = 0;
-
         while (*INTIM); // Wait for the end of Vertical blank
         
         strobe(WSYNC);
@@ -733,8 +734,13 @@ void main()
         *TIM64T = (OVERSCAN * 76) / 64 + 2;
         
         *COLUBK = VCS_BLACK;
+        *PF0 = 0;
+        *PF1 = 0;
+        *PF2 = 0;
         // Display remaining lives
-        if (game_state) display_remaining_lives();
+        if (game_state) {
+            display_remaining_lives();
+        }
 
         // Overscan
         *VBLANK = 2; // Enable VBLANK
