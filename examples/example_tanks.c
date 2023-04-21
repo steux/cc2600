@@ -29,6 +29,8 @@ char odd; // Odd or even frame ?
 char playfield_select;
 unsigned short xpos[2]; // Position of sprites. 16-bits to account for diagonal movements
 unsigned short ypos[2];
+unsigned short xpos_old[2]; // Old position of sprites. 16-bits to account for diagonal movements
+unsigned short ypos_old[2];
 signed char direction[2]; // Between 0 and 23
 char rotation_counter[2]; // Rotation rotation_counter for both players
 unsigned short xshell[2]; // Position of shells. 16-bits to account for diagonal movements
@@ -42,7 +44,6 @@ char lives[2]; // Remaining lives for all tanks / all players
 char xpos_second_tank[2]; // xpos for second tank
 char ypos_second_tank[2]; // ypos for second tank
 char direction_second_tank[2]; // Direction for second tank, between 0 and 23
-char tank_stopped[2]; // Is tank going backward ?
 
 const char sprite_reflect[18] = {0, 0, 0, 0, 0, 0, 
                                  0, 8, 8, 8, 8, 8, 
@@ -350,6 +351,16 @@ inline void hide_second_tank()
     ypos_second_tank[X] = KERNAL;
 }
 
+// input: X: Y coordinate to get the playfield special tag for
+// output: j contains the playfield special tag
+// destroys i and X
+void load_playfield_special()
+{
+    i = (playfield_select >> 3);
+    X = (X >> 3) + i;
+    j = playfield_special[X];
+}
+
 void collision_management()
 {
     // Collisions management 
@@ -370,9 +381,8 @@ void collision_management()
     // Collision between missiles and playfield
     if ((CXM0FB[Y] & 0x80) && direction_shell[Y] != -1 && Y != odd) {
         // Missile hit playfield
-        i = (playfield_select >> 3);
-        X = ((yshell[Y] >> 8) >> 3) + i;
-        j = playfield_special[X];
+        X = (yshell[Y] >> 8);
+        load_playfield_special();
         if (j & 8) {
             direction_shell[Y] = -1;
         } else if (j & 16) {
@@ -401,17 +411,16 @@ void game_logic()
         collision_management();
 
         // Get the playfield cross/fire parameters
-        i = playfield_select >> 3;
-        X = ((ypos[Y] >> 8) >> 3) + i;
-        j = playfield_special[X];
+        X = (ypos[Y] >> 8);
+        load_playfield_special();
 
+        // Rotation management
         if (!(joystick[Y] & 0x04)) { // Left
             rotation_counter[Y]++;
             if (rotation_counter[Y] == ROTATION_DELAY) {
                 rotation_counter[Y] = 0;
                 direction[Y]--;
                 if (direction[Y] < 0) direction[Y] = 23;
-                tank_stopped[Y] = 1;
             }
         } else if (!(joystick[Y] & 0x08)) { // Right 
             rotation_counter[Y]++;
@@ -419,21 +428,27 @@ void game_logic()
                 rotation_counter[Y] = 0;
                 direction[Y]++;
                 if (direction[Y] == 24) direction[Y] = 0;
-                tank_stopped[Y] = 1;
             } 
         } else rotation_counter[Y] = ROTATION_DELAY - 1;
+        
+        i = 0;
+        X = 0;
+        if (CXP0FB[Y] & 0x80) { // Collide with playfield
+            if (j & 4) {
+                // Tank should be stopped there
+                xpos[Y] = xpos_old[Y];
+                ypos[Y] = ypos_old[Y];
+                X = 1;
+            };
+            i = j & 2; // Test for slow down
+        }
+        if (!X) {
+            xpos_old[Y] = xpos[Y];
+            ypos_old[Y] = ypos[Y];
+        }
+
         if (!(joystick[Y] & 0x01)) { // Up/Forward
             X = direction[Y];
-            i = 0;
-            if (CXP0FB[Y] & 0x80) { // Collide with playfield
-                if (j & 4 && !tank_stopped[Y]) {
-                    // Tank should be stopped there
-                    X += 12;
-                    if (X >= 24) X -= 24;
-                    tank_stopped[Y] = 1;
-                } else tank_stopped[Y] = 0;
-                i = j & 2; // Test for slow down
-            }
             go_forward();
             if (!i) {
                 go_forward();
@@ -448,6 +463,7 @@ void game_logic()
             X = 0;
             play_sound();
         }
+
         if (!(joystick[Y] & 0x02) && lives[Y] != 1) { // Backward : switch tank
             if (tank_switch_counter[Y] == 0) {
                 X = Y;
