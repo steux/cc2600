@@ -1,13 +1,10 @@
 CC=cc2600
 CFLAGS=-I../headers
 
-%.a: %.c
+%.bin: %.c
 	$(CC) -o $@ $< $(CFLAGS)
 
-%.bin: %.a
-	dasm $< -f3 -v4 -o$@
-
-all: example_sprite.bin test_superchip.bin test_dpc.bin test_dpcplus.bin test_3e.bin test_3eplus.bin example_tanks.bin
+all: example_sprite.bin test_superchip.bin test_dpc.bin test_dpcplus.bin test_3e.bin test_3eplus.bin armor_ambush_reloaded.bin
 
 clean:
 	rm *.bin
