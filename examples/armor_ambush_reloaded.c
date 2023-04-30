@@ -300,7 +300,7 @@ void init()
     xpos_second_tank[0] = 16 + 4;
     xpos_second_tank[1] = (160 - 16 - 4);
     for (X = 1; X >= 0; X--) {
-        ypos_second_tank[X] = KERNAL / 2 + 8 + (1 - X);
+        ypos_second_tank[X] = KERNAL / 2 + 9 + (1 - X);
         direction_second_tank[X] = direction[X];
         lives[X] = 3; 
     }
@@ -452,7 +452,6 @@ void game_logic()
             xpos_old[Y] = xpos[Y];
             ypos_old[Y] = ypos[Y];
         }
-
         if (!(joystick[Y] & 0x01)) { // Up/Forward
             X = direction[Y];
             go_forward();

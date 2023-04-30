@@ -1,3 +1,6 @@
+v0.3.1 (04/29/2023) :
+    - Added debug output 
+
 v0.3.0 (04/24/2023) :
     - Now calls DASM from cc2600 to directly make a cartridge
 

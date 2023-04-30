@@ -1,6 +1,6 @@
 [package]
 name = "cc2600"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 authors = ["Bruno STEUX <bruno.steux@gmail.com>"]
 license = "GPL-3.0-or-later"
@@ -15,5 +15,5 @@ categories = ["command-line-utilities", "game-development", "compilers"]
 clap = { version = "4.0", features = ["derive"] }
 env_logger = "0.9"
 log = "0.4"
-cc6502 = { version = "0.4", features = ["atari2600"] }
-#cc6502 = { path = "../cc6502", features = ["atari2600"] } 
+#cc6502 = { version = "0.4", features = ["atari2600"] }
+cc6502 = { path = "../cc6502", features = ["atari2600"] } 
