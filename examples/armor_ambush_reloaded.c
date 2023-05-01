@@ -305,12 +305,7 @@ void init()
         lives[X] = 3; 
     }
 
-    playfield_select = 192;
-    playfield_valreg_ptr = playfield_valregs - 1 + 192;
-
     game_state = 0;
-    // Reset collision detection
-    strobe(CXCLR);
 }
 
 void player_was_hit()
@@ -477,8 +472,10 @@ void game_logic()
             else if ((xpos[Y] >> 8) >= 150) xpos[Y] = 149 * 256;
             if ((ypos[Y] >> 8) == 0) ypos[Y] = 256;
             else if ((ypos[Y] >> 8) >= 181) ypos[Y] = 180 * 256;
-            X = 0;
-            play_sound();
+            if (!AUDV0[Y]) {
+                X = 0;
+                play_sound();
+            }
         }
 
         if (!(joystick[Y] & 0x02) && lives[Y] != 1) { // Backward : switch tank
@@ -649,6 +646,8 @@ void prepare_drawing()
 void main()
 {
     init();
+    playfield_select = 192;
+    playfield_valreg_ptr = playfield_valregs - 1 + 192;
 
     while(1) {
         // Blank
