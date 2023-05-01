@@ -300,7 +300,7 @@ void init()
     xpos_second_tank[0] = 16 + 4;
     xpos_second_tank[1] = (160 - 16 - 4);
     for (X = 1; X >= 0; X--) {
-        ypos_second_tank[X] = KERNAL / 2 + 9 + (1 - X);
+        ypos_second_tank[X] = KERNAL / 2 + (1 - X);
         direction_second_tank[X] = direction[X];
         lives[X] = 3; 
     }
@@ -346,9 +346,11 @@ void switch_to_second_tank()
 {
     i = xpos[X] >> 8;
     xpos[X] = xpos_second_tank[X] << 8;
+    xpos_old[X] = xpos_second_tank[X] << 8;
     xpos_second_tank[X] = i;
     i = ypos[X] >> 8;
     ypos[X] = ypos_second_tank[X] << 8;
+    ypos_old[X] = ypos_second_tank[X] << 8;
     ypos_second_tank[X] = (i & 0xFE) | X;
 }
 
@@ -398,6 +400,18 @@ void collision_management()
     }
 }
 
+void turn_left()
+{
+    direction[Y]--;
+    if (direction[Y] < 0) direction[Y] = 23;
+}
+
+void turn_right()
+{
+    direction[Y]++;
+    if (direction[Y] == 24) direction[Y] = 0;
+}
+
 void game_logic()
 {
     if (switches & 0x80) {
@@ -425,15 +439,13 @@ void game_logic()
             rotation_counter[Y]++;
             if (rotation_counter[Y] == ROTATION_DELAY) {
                 rotation_counter[Y] = 0;
-                direction[Y]--;
-                if (direction[Y] < 0) direction[Y] = 23;
+                turn_left();
             }
         } else if (!(joystick[Y] & 0x08)) { // Right 
             rotation_counter[Y]++;
             if (rotation_counter[Y] == ROTATION_DELAY) {
                 rotation_counter[Y] = 0;
-                direction[Y]++;
-                if (direction[Y] == 24) direction[Y] = 0;
+                turn_right();
             } 
         } else rotation_counter[Y] = ROTATION_DELAY - 1;
         
@@ -491,11 +503,9 @@ void game_logic()
                     // And go left/right randomly
                     rand();
                     if (r & 1) {
-                        direction[Y]++;
-                        if (direction[Y] == 24) direction[Y] = 0;
+                        turn_right();
                     } else {
-                        direction[Y]--;
-                        if (direction[Y] < 0) direction[Y] = 23;
+                        turn_left();
                     }
                     X = TANK_FIRE;
                     play_sound();
