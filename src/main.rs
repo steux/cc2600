@@ -30,6 +30,7 @@ use clap::Parser;
 
 mod build;
 use build::build_cartridge;
+use regex::Regex;
 
 fn main() -> Result<(), std::io::Error> {
     env_logger::init();
@@ -115,7 +116,13 @@ fn main() -> Result<(), std::io::Error> {
             Ok(())
         } else {
             let err = String::from_utf8(output.stdout).unwrap();
-            Err(std::io::Error::new(std::io::ErrorKind::Other, err))
+            let re = Regex::new(r"(-\d+ bytes free in bank \d)").unwrap();
+            if let Some(caps) = re.captures(&err) {
+                eprintln!("Out of memory: {}", &caps[0]);
+                std::process::exit(1) 
+            } else {
+                Err(std::io::Error::new(std::io::ErrorKind::Other, err))
+            } 
         }
     } else {
         Ok(())
