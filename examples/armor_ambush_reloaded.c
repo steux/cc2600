@@ -291,12 +291,12 @@ void init()
     ypos[0] = ypos[1] = (KERNAL / 2 - 20) * 256;
     xpos[0] = 16 * 256;
     xpos[1] = (160 - 16 - 8) * 256;
-    direction[0] = 0; 
     direction[1] = 12;
     direction_shell[0] = -1;
     direction_shell[1] = -1;
     xshell[0] = 0;
     xshell[1] = 0;
+    direction[0] = 0; 
     xpos_second_tank[0] = 16 + 4;
     xpos_second_tank[1] = (160 - 16 - 4);
     for (X = 1; X >= 0; X--) {
