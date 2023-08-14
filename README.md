@@ -41,13 +41,11 @@ cc2600 is implemented in the Rust programming language, a touch of modernity for
 
 
 - The only data types supported are char (8-bit), short (16-bit) and char pointers (16-bits), and one dimensional arrays of these types.
-- Only global variables are supported, not local variables (no use of stack. It's so slow on 6502 and so dangerous due
-    to the lack of RAM that it'd be a bad idea anyway)
-- Functions can't have arguments and return values (no use of stack). Everything must go through global variables.
 - Array subscripts are limited to constants, X and Y variables / registers.
-- 16-bits arithmetics is severly constrained. Generated code may not work if too complex (carry propagation is not ensured).
+- 16-bits arithmetics is implemented but limited to simple operations.
 - No 32-bits operations, no floating point.
 - Works with one C file. No linking provided. Use `#include "other_file.c"` to cope with this.
+
 
 ## How to install
 
@@ -91,9 +89,11 @@ DPC coprocessor support is implmented. Use "dpc.h" header to activate it. 2kB di
 
 DPC+ coprocessor is also supported, and opens up to 4KB of display RAM, 2B of music/frequency ROM (prefilled using `dpcplus_frequencies.h`), and 24KB of data for your game. Think big. DPC+ generate code work as it on Stella, but you'll have to prepend the ARM code "driver" (DPC+.arm) to make it work on Harmony cart or CartPlus (though the latter doesn't uses it). Cry for help on AtariAge forum if you don't understand a word about that.
 
+
 ### Superchip
 
 Superchip support is automatically activated if you use the keywork `superchip` before a variable declaration. It yields 128 bytes of additionnal RAM. Note that this is not compatible with 3E, DPC and DPC+ bankswitching schemes (but 3E and DPC+ provide some RAM by other ways).
+
 
 ### Intrinsics
 
@@ -109,6 +109,7 @@ cc2600 supports a few intrinsics to help making ASM-like tuned code :
 
 - `csleep(int)` stands for cycle sleep. Helps to insert nops in the code. Implemented for 2 to 10 cycles.
 
+
 ### Assembly code insertion
 
 You can insert assembly code using the `#include`. If the filename provided ends with ".a" or ".inc", it will be considered as assembler and inserted in the DASM generated code. You can also inline code using the following special tag `=== ASSEMBLER BEGIN ===`. For instance, to activate the i2c code from "i2c.inc" (savekey code) and tell the macros to use the `i` temporary variable, just type :
@@ -118,20 +119,23 @@ You can insert assembly code using the `#include`. If the filename provided ends
 ==== ASSEMBLER END ====
 ```
 
+
 ### 16-bits arithmetics support
 
 16-bits arithmetics is supported, BUT beware to use only simple expressions (like a simple addition, or `+=`, not multiple additions on the same line of code), since carry propagation is not ensured (maybe will it be in the future). In particular 16-bits operations are not supported in comparisons. Use `short` to declare a 16-bits variable. `char *` are also 16-bits variables, since address space on 6502 is 16-bits wide.
 
 In order to convert from 16-bits to 8-bits, use the `>> 8` special operation to get the higher byte of a `short`, and use nothing to get the lower byte.
 
+
 ### Optimizations
 
 X and Y are `unsigned char` typed, BUT in order to optimize the loops, they are considered `signed char` when compared to 0. Hence the code `do { something; Y-- } while (Y >= 0);` will be implemented with a `BPL` (branch if plus) instruction, just like you would do in assembler. Beware then that if Y > 128, due to the complement-to-2 binary representation, it will be considered negative number and the loop will exit immediately (i.e. don't use this for your 192 lines kernel loop. Use `Y > 0` comparison which uses the carry flag).
 
+
 ## TODO
 
 - [ ] Provide more examples
-- [ ] Fix 16 bits arithmetics so that it becomes more usable...
+- [X] Fix 16 bits arithmetics so that it becomes more usable...
 - [X] Implement sign extend (for 8 bit to 16 bits variable assignment)
 - [ ] DWARF data output for debugging with Gopher2600
 - [X] Add 3E+ bankswitching scheme support 
@@ -141,3 +145,4 @@ X and Y are `unsigned char` typed, BUT in order to optimize the loops, they are 
   <img src="https://github.com/steux/cc2600/raw/main/misc/Chuck Peddle.png" /></br>
   Chuck Peddle 1937 - 2019
 </p>
+
