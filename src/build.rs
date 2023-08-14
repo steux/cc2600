@@ -26,6 +26,32 @@ use cc6502::compile::*;
 use cc6502::assemble::AssemblyCode;
 use cc6502::generate::*;
 use cc6502::Args;
+use std::collections::HashMap;
+
+fn compute_function_level(function_name: &String, node: &str, current_level: usize, tree: &HashMap<String, Vec<String>>, i: u32) -> Option<usize> 
+{
+    let mut ret = None;
+    if i == 1000 { return None; } // In order to avoid recursive tree
+    if let Some(calls) = tree.get(node) {
+        // Is the function name in current_level tree ?
+        if calls.contains(function_name) {
+            ret = Some(current_level);
+        }
+        // Look at the lower levels if it is possible to find it also
+        for nodex in calls {
+            if let Some(lx) = compute_function_level(function_name, nodex, current_level + 1, tree, i + 1) {
+                if let Some(lxx) = ret {
+                    if lx > lxx {
+                        ret = Some(lx);
+                    }
+                } else {
+                    ret = Some(lx)
+                }
+            }
+        }
+    } 
+    ret
+}
 
 pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, args: &Args) -> Result<(), Error> 
 {
@@ -109,24 +135,61 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
     }
     
     // Start generation
-    let mut gstate = GeneratorState::new(compiler_state, writer, args.insert_code, bankswitching_scheme);
+    let mut gstate = GeneratorState::new(compiler_state, writer, args.insert_code, args.warnings.clone(), bankswitching_scheme);
     gstate.write("\tPROCESSOR 6502\n\n")?;
     
     for v in compiler_state.sorted_variables().iter() {
         if v.1.var_const  {
-            if let VariableDefinition::Value(val) = &v.1.def  {
-                gstate.write(&format!("{:23}\tEQU ${:x}\n", v.0, val))?;
+            if let VariableDefinition::Value(vx) = &v.1.def  {
+                match vx {
+                    VariableValue::Int(val) => gstate.write(&format!("{:23}\tEQU ${:x}\n", v.0, val)),
+                    VariableValue::LowPtr((s, offset)) => if *offset != 0 {
+                        gstate.write(&format!("{:23}\tEQU <({} + {})\n", v.0, s, offset))
+                    } else {
+                        gstate.write(&format!("{:23}\tEQU <{}\n", v.0, s))
+                    },
+                    VariableValue::HiPtr((s, offset)) => if *offset != 0 {
+                        gstate.write(&format!("{:23}\tEQU >({} + {})\n", v.0, s, offset))
+                    } else {
+                        gstate.write(&format!("{:23}\tEQU >{}\n", v.0, s))
+                    },
+                }?;
             }
         }
     }
+    
+    let mut nb_banked_functions = 0;
+    let mut banked_function_address = 0;
+    
+    for f in compiler_state.sorted_functions().iter() {
+        if f.1.code.is_some() {
+            if f.1.bank != 0 {
+                nb_banked_functions += 1;
+            }
+
+            gstate.local_label_counter_for = 0;
+            gstate.local_label_counter_if = 0;
+
+            gstate.functions_code.insert(f.0.clone(), AssemblyCode::new());
+            gstate.current_function = Some(f.0.clone());
+            gstate.generate_statement(f.1.code.as_ref().unwrap())?;
+            gstate.current_function = None;
+
+            if args.optimization_level > 0 {
+                gstate.optimize_function(f.0);
+            }
+            gstate.check_branches(f.0);
+        }
+    }
+
+    gstate.compute_functions_actually_in_use()?;
 
     gstate.write("\n\tSEG.U VARS\n\tORG $80\n\n")?;
     
     // Generate variables code
     gstate.write("cctmp                  \tds 1\n")?; 
     for v in compiler_state.sorted_variables().iter() {
-       // debug!("{:?}",v);
-        if v.1.memory == VariableMemory::Zeropage && v.1.def == VariableDefinition::None {
+        if v.1.memory == VariableMemory::Zeropage && v.1.def == VariableDefinition::None && v.1.global {
             if v.1.size > 1 {
                 let s = match v.1.var_type {
                     VariableType::CharPtr => 1,
@@ -146,6 +209,75 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                 gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
             }
         }
+    }
+
+    // Compute in the call tree the level of each function
+    let mut function_levels: Vec<Vec<String>> = Vec::new();
+    for f in compiler_state.sorted_functions().iter() {
+        let lev = if f.0 == "main" { Some(0) } else {
+            compute_function_level(f.0, "main", 1, &gstate.functions_call_tree, 0)
+        };
+        if let Some(level) = lev {
+            let l = function_levels.get_mut(level);
+            if let Some(a) = l {
+                a.push(f.0.clone())
+            } else {
+                function_levels.resize(level + 1, Vec::new());
+                function_levels[level].push(f.0.clone());
+            }
+        }
+    }
+    
+    let mut level = 0;
+    for l in function_levels {
+        let mut maxbsize = 0;
+        let mut bsize = 0;
+        let mut ft = true;
+        for fx in l {
+            if let Some(f) = compiler_state.functions.get(&fx) {
+                if gstate.functions_actually_in_use.get(&fx).is_some() && f.local_variables.len() != 0 {
+                    if ft {
+                        gstate.write(&format!("\nLOCAL_VARIABLES_{}\n\n", level))?;
+                        ft = false;
+                    }
+                    bsize = 0;
+                    gstate.write(&format!("\tORG LOCAL_VARIABLES_{}\n", level))?;
+                    for vx in &f.local_variables {
+                        if let Some(v) = compiler_state.variables.get(vx) {
+                            if v.memory == VariableMemory::Zeropage && v.def == VariableDefinition::None {
+                                if v.size > 1 {
+                                    let s = match v.var_type {
+                                        VariableType::CharPtr => 1,
+                                        VariableType::CharPtrPtr => 2,
+                                        VariableType::ShortPtr => 2,
+                                        _ => unreachable!()
+                                    };
+                                    gstate.write(&format!("{:23}\tds {}\n", vx, v.size * s))?; 
+                                    bsize += v.size * 2;
+                                } else {
+                                    let s = match v.var_type {
+                                        VariableType::Char => 1,
+                                        VariableType::Short => 2,
+                                        VariableType::CharPtr => 2,
+                                        VariableType::CharPtrPtr => 2,
+                                        VariableType::ShortPtr => 2,
+                                    };
+                                    gstate.write(&format!("{:23}\tds {}\n", vx, s))?; 
+                                    bsize += s;
+                                }
+                            }
+                        }
+                    }
+                    if bsize > maxbsize {
+                        maxbsize = bsize;
+                    }
+                }
+            }
+        }
+        if maxbsize != bsize {
+            gstate.write(&format!("\tORG LOCAL_VARIABLES_{} + {}\n", level, maxbsize))?;
+        }
+        level += 1;
     }
 
     if superchip {
@@ -262,30 +394,6 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
     // Generate functions code
     gstate.write("\n; Functions definitions\n\tSEG CODE\n")?;
 
-    let mut nb_banked_functions = 0;
-    let mut banked_function_address = 0;
-    
-    for f in compiler_state.sorted_functions().iter() {
-        if f.1.code.is_some() {
-            if f.1.bank != 0 {
-                nb_banked_functions += 1;
-            }
-
-            gstate.local_label_counter_for = 0;
-            gstate.local_label_counter_if = 0;
-
-            gstate.functions_code.insert(f.0.clone(), AssemblyCode::new());
-            gstate.current_function = Some(f.0.clone());
-            gstate.generate_statement(f.1.code.as_ref().unwrap())?;
-            gstate.current_function = None;
-
-            if args.optimization_level > 0 {
-                gstate.optimize_function(f.0);
-            }
-            gstate.check_branches(f.0);
-        }
-    }
-
     // Generate code for all banks
     for b in 0..=maxbank {
         
@@ -358,7 +466,7 @@ Powerup
 
             // Generate included assembler
             for asm in &compiler_state.included_assembler {
-                gstate.write(asm)?;
+                gstate.write(&asm.0)?;
             }
         }
         
@@ -385,22 +493,44 @@ Powerup
                             }
                             gstate.write(v.0)?;
                             let mut counter = 0;
-                            for i in arr {
-                                if counter == 0 {
-                                    gstate.write("\n\thex ")?;
-                                }
-                                counter += 1;
-                                if counter == 16 { counter = 0; }
-                                gstate.write(&format!("{:02x}", i & 0xff))?;
+                            for vx in arr {
+                                match vx {
+                                    VariableValue::Int(i) => {
+                                        if counter == 0 {
+                                            gstate.write("\n\thex ")?;
+                                        }
+                                        counter += 1;
+                                        if counter == 16 { counter = 0; }
+                                        gstate.write(&format!("{:02x}", i & 0xff))
+                                    },
+                                    VariableValue::LowPtr((s, offset)) => {
+                                        counter = 0;
+                                        if *offset != 0 {
+                                            gstate.write(&format!("\n\t.byte <({} + {})", s, offset))
+                                        } else {
+                                            gstate.write(&format!("\n\t.byte <{}", s))
+                                        }
+                                    },
+                                    VariableValue::HiPtr((s, offset)) => {
+                                        counter = 0;
+                                        if *offset != 0 {
+                                            gstate.write(&format!("\n\t.byte >({} + {})", s, offset))
+                                        } else {
+                                            gstate.write(&format!("\n\t.byte >{}", s))
+                                        }
+                                    },
+                                }?;
                             } 
                             if v.1.var_type == VariableType::ShortPtr {
-                                for i in arr {
+                                for vx in arr {
                                     if counter == 0 {
                                         gstate.write("\n\thex ")?;
                                     }
                                     counter += 1;
                                     if counter == 16 { counter = 0; }
-                                    gstate.write(&format!("{:02x}", (i >> 8) & 0xff))?;
+                                    if let VariableValue::Int(i) = vx {
+                                        gstate.write(&format!("{:02x}", (i >> 8) & 0xff))?;
+                                    }
                                 } 
                             }
                             gstate.write("\n")?;
@@ -417,7 +547,11 @@ Powerup
                                     gstate.write("\n\t.byte ")?;
                                 }
                                 counter += 1;
-                                gstate.write(&format!("<{}", i))?;
+                                if i.1 != 0 {
+                                    gstate.write(&format!("<({} + {})", i.0, i.1))?;
+                                } else {
+                                    gstate.write(&format!("<{}", i.0))?;
+                                }
                                 if counter % 8 != 0 {
                                     gstate.write(", ")?;
                                 } 
@@ -427,7 +561,11 @@ Powerup
                                     gstate.write("\n\t.byte ")?;
                                 }
                                 counter += 1;
-                                gstate.write(&format!(">{}", i))?;
+                                if i.1 != 0 {
+                                    gstate.write(&format!(">({} + {})", i.0, i.1))?;
+                                } else {
+                                    gstate.write(&format!(">{}", i.0))?;
+                                }
                                 if counter % 8 != 0 && counter < 2 * arr.len() {
                                     gstate.write(", ")?;
                                 } 
@@ -583,13 +721,15 @@ Call{}
                     }
                     gstate.write(v.0)?;
                     let mut counter = 0;
-                    for i in arr {
+                    for vx in arr {
                         if counter == 0 || counter == 16 {
                             gstate.write("\n\thex ")?;
                         }
                         counter += 1;
                         if counter == 16 { counter = 0; }
-                        gstate.write(&format!("{:02x}", i))?;
+                        if let VariableValue::Int(i) = vx {
+                            gstate.write(&format!("{:02x}", i & 0xff))?;
+                        }
                     } 
                     gstate.write("\n")?;
                 }
@@ -620,13 +760,15 @@ Call{}
                 if let VariableDefinition::Array(arr) = &v.1.def {
                     gstate.write(v.0)?;
                     let mut counter = 0;
-                    for i in arr {
+                    for vx in arr {
                         if counter == 0 || counter == 16 {
                             gstate.write("\n\thex ")?;
                         }
                         counter += 1;
                         if counter == 16 { counter = 0; }
-                        gstate.write(&format!("{:02x}", i))?;
+                        if let VariableValue::Int(i) = vx {
+                            gstate.write(&format!("{:02x}", i & 0xff))?;
+                        }
                     } 
                     gstate.write("\n")?;
                 } else {
@@ -671,13 +813,15 @@ Call{}
                     }
                     gstate.write(v.0)?;
                     let mut counter = 0;
-                    for i in arr {
+                    for vx in arr {
                         if counter == 0 || counter == 16 {
                             gstate.write("\n\thex ")?;
                         }
                         counter += 1;
                         if counter == 16 { counter = 0; }
-                        gstate.write(&format!("{:02x}", i))?;
+                        if let VariableValue::Int(i) = vx {
+                            gstate.write(&format!("{:02x}", i & 0xff))?;
+                        }
                     } 
                     gstate.write("\n")?;
                 }

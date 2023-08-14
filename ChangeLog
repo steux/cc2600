@@ -1,3 +1,6 @@
+v0.4.0 (08/14/2023) :
+    - switched to cc6502 v1.0
+
 v0.3.1 (05/21/2023) :
     - Added memory full error message
     - Added debug output 

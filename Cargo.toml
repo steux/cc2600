@@ -1,6 +1,6 @@
 [package]
 name = "cc2600"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
 authors = ["Bruno STEUX <bruno.steux@gmail.com>"]
 license = "GPL-3.0-or-later"
@@ -16,5 +16,5 @@ clap = { version = "4.0", features = ["derive"] }
 env_logger = "0.9"
 log = "0.4"
 regex = "1.8"
-cc6502 = { version = "0.5", features = ["atari2600"] }
-#cc6502 = { path = "../cc6502", features = ["atari2600"] } 
+#cc6502 = { version = "0.7", features = ["atari2600"] }
+cc6502 = { path = "../cc6502", features = ["atari2600"] } 
