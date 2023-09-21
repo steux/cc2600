@@ -108,6 +108,8 @@ fn main() -> Result<(), std::io::Error> {
         let output = output.unwrap();
         if output.status.success() {
             if args.verbose {
+                let output = String::from_utf8(output.stdout).unwrap();
+                println!("{}", output);
                 println!("Cartridge successfully compiled with DASM");
             }
             if !args.debug {
