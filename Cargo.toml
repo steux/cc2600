@@ -12,9 +12,9 @@ keywords = ["cli", "atari2600", "compiler", "gamedev"]
 categories = ["command-line-utilities", "game-development", "compilers"]
 
 [dependencies]
-clap = { version = "4.0", features = ["derive"] }
-env_logger = "0.9"
+clap = { version = "4", features = ["derive"] }
+env_logger = "0.10"
 log = "0.4"
-regex = "1.8"
+regex = "1"
 cc6502 = { version = "1.0", features = ["atari2600"] }
 #cc6502 = { path = "../cc6502", features = ["atari2600"] } 

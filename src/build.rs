@@ -26,12 +26,11 @@ use cc6502::compile::*;
 use cc6502::assemble::AssemblyCode;
 use cc6502::generate::*;
 use cc6502::Args;
-use std::collections::HashMap;
+use std::collections::{HashSet, HashMap};
 
-fn compute_function_level(function_name: &String, node: &str, current_level: usize, tree: &HashMap<String, Vec<String>>, i: u32) -> Option<usize> 
+fn compute_function_level(function_name: &String, node: &str, current_level: usize, tree: &HashMap<String, Vec<String>>, already_seen: &mut HashSet<String>) -> Option<usize> 
 {
     let mut ret = None;
-    if i == 1000 { return None; } // In order to avoid recursive tree
     if let Some(calls) = tree.get(node) {
         // Is the function name in current_level tree ?
         if calls.contains(function_name) {
@@ -39,7 +38,13 @@ fn compute_function_level(function_name: &String, node: &str, current_level: usi
         }
         // Look at the lower levels if it is possible to find it also
         for nodex in calls {
-            if let Some(lx) = compute_function_level(function_name, nodex, current_level + 1, tree, i + 1) {
+            debug!("Function name: {}, {:?}", function_name, nodex);
+            if already_seen.contains(nodex) {
+                debug!("Function {} has already been seen", nodex);
+                return None;
+            }
+            already_seen.insert(nodex.clone());
+            if let Some(lx) = compute_function_level(function_name, nodex, current_level + 1, tree, already_seen) {
                 if let Some(lxx) = ret {
                     if lx > lxx {
                         ret = Some(lx);
@@ -48,9 +53,10 @@ fn compute_function_level(function_name: &String, node: &str, current_level: usi
                     ret = Some(lx)
                 }
             }
+            already_seen.remove(nodex);
         }
     } 
-    ret
+    ret 
 }
 
 pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, args: &Args) -> Result<(), Error> 
@@ -215,7 +221,8 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
     let mut function_levels: Vec<Vec<String>> = Vec::new();
     for f in compiler_state.sorted_functions().iter() {
         let lev = if f.0 == "main" { Some(0) } else {
-            compute_function_level(f.0, "main", 1, &gstate.functions_call_tree, 0)
+            let mut already_seen = HashSet::new();
+            compute_function_level(f.0, "main", 1, &gstate.functions_call_tree, &mut already_seen)
         };
         if let Some(level) = lev {
             let l = function_levels.get_mut(level);
@@ -253,7 +260,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                                         _ => unreachable!()
                                     };
                                     gstate.write(&format!("{:23}\tds {}\n", vx, v.size * s))?; 
-                                    bsize += v.size * 2;
+                                    bsize += v.size * s;
                                 } else {
                                     let s = match v.var_type {
                                         VariableType::Char => 1,
