@@ -479,7 +479,7 @@ Powerup
         
         // Generate functions code
         for f in compiler_state.sorted_functions().iter() {
-            if f.1.code.is_some() && !f.1.inline && f.1.bank == bank {
+            if f.1.code.is_some() && !f.1.inline && f.1.bank == bank && gstate.functions_actually_in_use.get(f.0).is_some() {
                 debug!("Generating code for function #{}", f.0);
 
                 gstate.write(&format!("\n{}\tSUBROUTINE\n", f.0))?;
@@ -608,9 +608,18 @@ Powerup
             }
         }
         else {
+            let end_of_memory = if nb_banked_functions != 0 {
+                0x1fef - nb_banked_functions * 10
+            } else {
+                if compiler_state.variables.get("PLUSROM_API").is_some() {
+                    0x1fef
+                } else {
+                    0x1ffa
+                }
+            };
             gstate.write(&format!("
         ECHO ([${:04x}-.]d), \"bytes free in bank {}\"
-        ", 0x1FEF - nb_banked_functions * 10, bank))?;
+        ", end_of_memory, bank))?;
 
             if bank == 0 {
                 if nb_banked_functions > 0 {

@@ -1,3 +1,7 @@
+v0.4.1 (12/19/2023) :
+    - Corrected bug in zeropage memory usage counting
+    - Corrected bytes free estimation
+
 v0.4.0 (08/14/2023) :
     - switched to cc6502 v1.0
 
