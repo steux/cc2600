@@ -192,6 +192,8 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
 
     gstate.write("\n\tSEG.U VARS\n\tORG $80\n\n")?;
     
+    let mut zeropage_bytes = 1;
+    
     // Generate variables code
     gstate.write("cctmp                  \tds 1\n")?; 
     for v in compiler_state.sorted_variables().iter() {
@@ -204,6 +206,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                     _ => unreachable!()
                 };
                 gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
+                zeropage_bytes += v.1.size * s;
             } else {
                 let s = match v.1.var_type {
                     VariableType::Char => 1,
@@ -213,6 +216,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                     VariableType::ShortPtr => 2,
                 };
                 gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
+                zeropage_bytes += s;
             }
         }
     }
@@ -284,31 +288,49 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         if maxbsize != bsize {
             gstate.write(&format!("\tORG LOCAL_VARIABLES_{} + {}\n", level, maxbsize))?;
         }
+        zeropage_bytes += maxbsize;
         level += 1;
+    }
+    if args.verbose {
+        println!("Atari 2600 zeropage RAM usage: {}/128", zeropage_bytes);
+    }
+    if zeropage_bytes > 128 {
+        return Err(Error::Configuration { error: "Memory full. Zeropage Atari 2600 RAM is limited to 128 bytes".to_string() });
     }
 
     if superchip {
+        if args.verbose {
+            println!("Superchip RAM : 0x1000 onwards");
+        }
+        let mut filled = 0;
         gstate.write("\n\tSEG.U SUPERVARS\n\tORG $1000\n\tRORG $1000\n")?;
         // Superchip variables
         for v in compiler_state.sorted_variables().iter() {
             if v.1.memory == VariableMemory::Superchip && v.1.def == VariableDefinition::None {
-                if v.1.size > 1 {
+                let sx = if v.1.size > 1 {
                     let s = match v.1.var_type {
                         VariableType::CharPtr => 1,
                         VariableType::CharPtrPtr => 2,
                         VariableType::ShortPtr => 2,
                         _ => unreachable!()
                     };
-                    gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
+                    v.1.size * s 
                 } else {
-                    let s = match v.1.var_type {
+                    match v.1.var_type {
                         VariableType::Char => 1,
                         VariableType::Short => 2,
                         VariableType::CharPtr => 2,
                         VariableType::CharPtrPtr => 2,
                         VariableType::ShortPtr => 2,
-                    };
-                    gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
+                    }
+                };
+                filled += sx;
+                if filled > 128 {
+                    return Err(Error::Configuration { error: "Memory full. Superchip RAM is limited to 128 bytes".to_string() });
+                }
+                gstate.write(&format!("{:23}\tds {}\n", v.0, sx))?;
+                if args.verbose {
+                    println!(" - {} ({} byte{})", v.0, sx, if sx > 1 {"s"} else {""});
                 }
             }
         }
@@ -318,29 +340,40 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
     if bankswitching_scheme == "3E" {
         for bank in 1..=512 { // Max 512ko
             let mut first = true;
+            let mut filled = 0;
             for v in compiler_state.sorted_variables().iter() {
                 if v.1.memory == VariableMemory::MemoryOnChip(bank) && v.1.def == VariableDefinition::None {
                     if first {
                         first = false;
+                        if args.verbose {
+                            println!("Bank #{bank} - 3E RAM : 0x1000 onwards");
+                        }
                         gstate.write(&format!("\n\tSEG.U RAM_3E_{}\n\tORG $1000\n\tRORG $1000\n", bank))?;
                     }
-                    if v.1.size > 1 {
+                    let sx = if v.1.size > 1 {
                         let s = match v.1.var_type {
                             VariableType::CharPtr => 1,
                             VariableType::CharPtrPtr => 2,
                             VariableType::ShortPtr => 2,
                             _ => unreachable!()
                         };
-                        gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
+                        v.1.size * s 
                     } else {
-                        let s = match v.1.var_type {
+                        match v.1.var_type {
                             VariableType::Char => 1,
                             VariableType::Short => 2,
                             VariableType::CharPtr => 2,
                             VariableType::CharPtrPtr => 2,
                             VariableType::ShortPtr => 2,
-                        };
-                        gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
+                        }
+                    };
+                    filled += sx;
+                    if filled > 1024 {
+                        return Err(Error::Configuration { error: "Memory full. 3E RAM is limited to 1024 bytes per bank".to_string() });
+                    }
+                    gstate.write(&format!("{:23}\tds {}\n", v.0, sx))?;
+                    if args.verbose {
+                        println!(" - {} ({} byte{})", v.0, sx, if sx > 1 {"s"} else {""});
                     }
                 }
             }
@@ -351,6 +384,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
     if bankswitching_scheme == "3EP" {
         for bank in 0..64 { // Max 32ko
             let mut first = true;
+            let mut filled = 0;
             for v in compiler_state.sorted_variables().iter() {
                 if v.1.memory == VariableMemory::MemoryOnChip(bank) && v.1.def == VariableDefinition::None {
                     if first {
@@ -358,24 +392,34 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                         let segment = 3 - (bank & 3);
                         let address = 0x1000 + segment * 0x400;
                         gstate.write(&format!("\n\tSEG.U RAM_3E_{}\n\tORG ${:04x}\n\tRORG ${:04x}\n", bank, address, address))?;
+                        if args.verbose {
+                            println!("Bank #{bank} - 3E+ RAM : 0x{:04x} onwards", address);
+                        }
                     }
-                    if v.1.size > 1 {
+                    let sx = if v.1.size > 1 {
                         let s = match v.1.var_type {
                             VariableType::CharPtr => 1,
                             VariableType::CharPtrPtr => 2,
                             VariableType::ShortPtr => 2,
                             _ => unreachable!()
                         };
-                        gstate.write(&format!("{:23}\tds {}\n", v.0, v.1.size * s))?; 
+                        v.1.size * s 
                     } else {
-                        let s = match v.1.var_type {
+                        match v.1.var_type {
                             VariableType::Char => 1,
                             VariableType::Short => 2,
                             VariableType::CharPtr => 2,
                             VariableType::CharPtrPtr => 2,
                             VariableType::ShortPtr => 2,
-                        };
-                        gstate.write(&format!("{:23}\tds {}\n", v.0, s))?; 
+                        }
+                    };
+                    filled += sx;
+                    if filled > 512 {
+                        return Err(Error::Configuration { error: "Memory full. 3E+ RAM is limited to 512 bytes per bank".to_string() });
+                    }
+                    gstate.write(&format!("{:23}\tds {}\n", v.0, sx))?;
+                    if args.verbose {
+                        println!(" - {} ({} byte{})", v.0, sx, if sx > 1 {"s"} else {""});
                     }
                 }
             }
@@ -403,7 +447,8 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
 
     // Generate code for all banks
     for b in 0..=maxbank {
-        
+
+        let mut filled = 0;
         let (bank, banksize, rorg) = if bankswitching_scheme == "3E" { 
             if b == maxbank { (0, 0x0800, 0x1800) } else { (b + 1, 0x0800, 0x1000) }
         } else if bankswitching_scheme == "3EP" { 
@@ -412,13 +457,27 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
 
         // Prelude code for each bank
         debug!("Generating code for bank #{}", bank);
+        if args.verbose {
+            println!("Bank #{}: Filling memory at ${:04x} (RORG=${:04x})", bank, b * banksize, rorg);
+        }
+        if args.verbose {
+            println!("Bank #{bank}: Generating code at ${:04x}", rorg);
+        }
         gstate.current_bank = bank;
         gstate.write(&format!("\n\tORG ${:04x}\n\tRORG ${:04x}\n", b * banksize, rorg))?;
    
         if superchip {
             gstate.write("\n\tDS 256, $FF\n")?;
+            filled = 256;
+            if args.verbose {
+                println!(" - Superchip RAM data : 256/{banksize}");
+            }
         } else if bankswitching_scheme == "DPC" || bankswitching_scheme == "DPC+" {
             gstate.write("\n\tDS 128, $00\n")?;
+            filled = 128;
+            if args.verbose {
+                println!(" - DPC data : 128/{banksize}");
+            }
         }
 
         if maxbank > 0 && bankswitching_scheme != "3E" && bankswitching_scheme != "3EP" {
@@ -437,6 +496,10 @@ BankSwitch
         BANK_SWITCH_TRAMPOLINE
 ;----End of bank-identical code----
         ")?;
+            filled += 9 + 7;
+            if args.verbose {
+                println!(" - Trampoline code : {filled}/{banksize}");
+            }
         }
 
         // Generate startup code
@@ -455,6 +518,8 @@ Powerup
         BNE .loop
         ")?;
 
+            filled += 14;
+
             if bankswitching_scheme == "3EP" {
                 gstate.write("
         LDA #$81 ; ROM Bank 1 to segment 2
@@ -464,19 +529,48 @@ Powerup
         LDA #$03 ; ROM Bank 3 to segment 0
         STA ROM_SELECT
         ")?;
+                filled += 12;
 
             }
             
             gstate.write("
         JMP main
         ")?;
-
-            // Generate included assembler
-            for asm in &compiler_state.included_assembler {
-                gstate.write(&asm.0)?;
+            filled += 3;
+            if args.verbose {
+                println!(" - Powerup code : {filled}/{banksize}");
             }
         }
         
+        // Generate included assembler
+        for (i, asm) in (&compiler_state.included_assembler).iter().enumerate() {
+            let basm = if let Some(b) = asm.3 {
+                b as u32
+            } else { 0 };
+            debug!("assembler: {} {} {}", i, bank, basm);
+            if bank == basm {
+                gstate.write(&asm.0)?;
+                let name;
+                if let Some(n) = &asm.1 {
+                    name = n.as_str();
+                } else {
+                    name = "Unknown";
+                }
+                if let Some(s) = asm.2 {
+                    filled += s as u32;
+                    if args.verbose {
+                        println!(" - Assembler {} code (filled {}/{})", name, filled, banksize);
+                    }
+                } else {
+                    let nl = asm.0.lines().count() as u32; 
+                    filled += nl * 3; // 3 bytes default per line estimate.
+                    if args.verbose {
+                        println!(" - Assembler {} code (filled {}/{} - estimated)", name, filled, banksize);
+                    }
+                }
+            }
+        }
+
         // Generate functions code
         for f in compiler_state.sorted_functions().iter() {
             if f.1.code.is_some() && !f.1.inline && f.1.bank == bank && gstate.functions_actually_in_use.get(f.0).is_some() {
@@ -485,15 +579,28 @@ Powerup
                 gstate.write(&format!("\n{}\tSUBROUTINE\n", f.0))?;
                 gstate.write_function(f.0)?;
                 gstate.write("\tRTS\n")?;
+       
+                if args.verbose {
+                    let s = gstate.functions_code.get(f.0).unwrap().size_bytes() + 1;
+                    filled += s;
+                    println!(" - {} function (filled {}/{})", f.0, filled, banksize);
+                }
             }
         }
 
         // Generate ROM tables
         gstate.write("\n; Tables in ROM\n")?;
+        if args.verbose {
+            println!("Bank #{bank}: Inserting ROM tables");
+        }
+            
         for v in compiler_state.sorted_variables().iter() {
             if let VariableMemory::ROM(rom_bank) = v.1.memory {
                 if rom_bank == bank {
-                    match &v.1.def {
+                    let s = if filled > 0 {
+                        (((filled - 1) / v.1.alignment as u32) + 1) * v.1.alignment as u32
+                    } else { 0 };
+                    let s2 = match &v.1.def {
                         VariableDefinition::Array(arr) => {
                             if v.1.alignment != 1 {
                                 gstate.write(&format!("\n\talign {}\n", v.1.alignment))?;
@@ -541,6 +648,11 @@ Powerup
                                 } 
                             }
                             gstate.write("\n")?;
+                            if v.1.var_type == VariableType::ShortPtr {
+                                arr.len() * 2
+                            } else {
+                                arr.len()
+                            }
                         },
                         VariableDefinition::ArrayOfPointers(arr) => {
                             if v.1.alignment != 1 {
@@ -578,9 +690,14 @@ Powerup
                                 } 
                             } 
                             gstate.write("\n")?;
+                            arr.len() * 2
                         },
-                        _ => ()
-                    };
+                        _ => 0 
+                    } as u32;
+                    filled = s + s2;
+                    if args.verbose {
+                        println!(" - {} array (filled {}/{})", v.0, filled, banksize);
+                    }
                 }
             }
         }
