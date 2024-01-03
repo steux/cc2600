@@ -4,6 +4,10 @@
 #define kernel_macro
 #endif
     
+#ifndef kernel_long_macro
+#define kernel_long_macro strobe(WSYNC)
+#endif
+    
 char ms_next_mode;
 char ms_v, ms_colup0, ms_colup1;
 char *ms_colup0ptr, *ms_colup1ptr, *ms_grp0ptr, *ms_grp1ptr, *ms_scenery;
@@ -13,6 +17,7 @@ char ms_x;
 char ms_sprite_iter;
 char ms_sprite_x[10];
 char ms_sprite_id[10];
+char ms_nusiz[10];
 char ms_tmp;
 
 const char ms_sprite_wait[153] = {1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13};
@@ -20,8 +25,9 @@ const char ms_sprite_hm[153] = {0x70, 0x60, 0x50, 0x40, 0x30, 0x70, 0x60, 0x50, 
 
 const char sprite1[1] = {0};
 
-const char *ms_grptr[1] = {sprite1};
-const char *ms_coluptr[1] = {sprite1};
+#define NB_SPRITES_DEF 1
+const char *ms_grptr[NB_SPRITES_DEF] = {sprite1};
+const char *ms_coluptr[NB_SPRITES_DEF] = {sprite1};
 
 void kernel()
 {
@@ -62,13 +68,19 @@ kernel_start:
         } else {
             // No sprite display kernel
             // Prepare for next pair of sprites
+            ms_v = ms_scenery[Y];               // 9
+            Y++;                                // 2
+            X = ms_scenery[Y];                  // 8
+            strobe(WSYNC);                      // 3
+            VSYNC[X] = ms_v;                    // 7
+            Y++;                                // 2
             do {
-                ms_v = ms_scenery[Y];           // 9
-                strobe(WSYNC);
-                kernel_macro;                   // Max 15 cycles
+                kernel_long_macro;              // Macro max 76 * 2 - 40 = 112 cycles (min 76 - 9 = 67 cycles)
+                 ms_v = ms_scenery[Y];          // 9
                 Y++;                            // 2
                 X = ms_scenery[Y];              // 8
-                strobe(WSYNC);
+                strobe(WSYNC);                  // 3
+
                 VSYNC[X] = ms_v;                // 7
                 Y++;                            // 2
             } while (Y != ms_next_slice);       // 6
@@ -110,31 +122,34 @@ kernel_start:
             *COLUP0 = ms_colup0ptr[Y];      // 9 
             ms_v = ms_scenery[Y];           // 9
             Y++;                            // 2
+            // Setup new NUSIZ for new sprite 
+            X = ms_sprite_iter;             // 3
+            *NUSIZ1 = ms_nusiz[X];          // 7
             X = ms_scenery[Y];              // 8
             ms_colup0 = ms_colup0ptr[Y];    // 9 
             load(ms_grp0ptr[Y]);            // 6
-            strobe(WSYNC);                  // 3. Total (4) = 57 cycles
+            strobe(WSYNC);                  // 3. Total (4) = 67 cycles
 
             store(*GRP0);                   // 3
             *COLUP0 = ms_colup0;            // 6 / 9 
             VSYNC[X] = ms_v;                // 7 / 16
-            Y++;                            // 2 / 18
-            // Wait for 73 - 18 cycles exactly
-            X = ms_sprite_iter;             // 3 / 21
-            X = ms_sprite_id[X];            // 6 / 27 
-            ms_tmp = Y;                     // 3 / 30
-            ms_grp1ptr = ms_grptr[X] - ms_tmp;   // 21 / 41
-            ms_colup1ptr = ms_coluptr[X] - ms_tmp; // 21 / 72
+            // Wait for 73 - 16 cycles exactly
+            X = ms_sprite_iter;             // 3 / 19 
+            X = ms_sprite_id[X];            // 6 / 25 
+            ms_tmp = Y;                     // 3 / 28
+            ms_grp1ptr = ms_grptr[X] - ms_tmp;   // 21 / 39
+            ms_colup1ptr = ms_coluptr[X] - ms_tmp; // 21 / 71
             
-            strobe(HMOVE);                  // 3. Early HMOVE at cycle 73
-            strobe(WSYNC);                  // 3. Total (5) = 76
+            strobe(HMOVE);                  // 3. Early HMOVE at cycle 74
+            //strobe(WSYNC);                  // 3. Total (5) = 76
             
+            Y++;                            // 2 
             *GRP0 = ms_grp0ptr[Y];          // 9
             *COLUP0 = ms_colup0ptr[Y];      // 9 
             ms_v = ms_scenery[Y];           // 9
             Y++;                            // 2
             X = ms_scenery[Y];              // 8
-            strobe(WSYNC);                  // 3. Total (6) = 40 cycles
+            strobe(WSYNC);                  // 3. Total (6) = 42 cycles
             
             *GRP0 = ms_grp0ptr[Y];          // 9
             *COLUP0 = ms_colup0ptr[Y];      // 9 
