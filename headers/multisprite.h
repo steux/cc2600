@@ -105,17 +105,18 @@ kernel_start:
             X = ms_scenery[Y];              // 8
             *COLUP0 = ms_colup0ptr[Y];      // 9 // This color change is anticipateed. Color artifact when sprite 0 is on the right of the screen
             load(ms_grp0ptr[Y]);            // 6
-            strobe(WSYNC);                  // 3. Total (2) = 56
+            Y++;                            // 2
+            strobe(WSYNC);                  // 3. Total (2) = 58
             
             store(*GRP0);                   // 3
             VSYNC[X] = ms_v;                // 7
             // Player 1 repositionning
             X = ms_x;                       // 3
-            *HMP1 = ms_sprite_hm[X];        // 7
             X = ms_sprite_wait[X];          // 6
-            do { X--; } while (X);          // 5 / cycle. 4 for the last one. 
-            strobe(RESP0);                  // 3. Minimum = 33 cycles
-            Y++;                            // 2
+            if (X) {                        // 3
+                do { X--; } while (X);      // 5 / cycle. 4 for the last one. 
+            }
+            strobe(RESP0);                  // 3. Minimum = 24 cycles (ideally 28, so left part of the screen is not reachable)
             strobe(WSYNC);                  // 3. Total (3) = Unknown
             
             *GRP0 = ms_grp0ptr[Y];          // 9
@@ -125,10 +126,12 @@ kernel_start:
             // Setup new NUSIZ for new sprite 
             X = ms_sprite_iter;             // 3
             *NUSIZ1 = ms_nusiz[X];          // 7
+            X = ms_x;                       // 3
+            *HMP1 = ms_sprite_hm[X];        // 7
             X = ms_scenery[Y];              // 8
             ms_colup0 = ms_colup0ptr[Y];    // 9 
             load(ms_grp0ptr[Y]);            // 6
-            strobe(WSYNC);                  // 3. Total (4) = 67 cycles
+            strobe(WSYNC);                  // 3. Total (4) = 75 cycles
 
             store(*GRP0);                   // 3
             *COLUP0 = ms_colup0;            // 6 / 9 
@@ -139,17 +142,16 @@ kernel_start:
             ms_tmp = Y;                     // 3 / 28
             ms_grp1ptr = ms_grptr[X] - ms_tmp;   // 21 / 39
             ms_colup1ptr = ms_coluptr[X] - ms_tmp; // 21 / 71
-            
             strobe(HMOVE);                  // 3. Early HMOVE at cycle 74
-            //strobe(WSYNC);                  // 3. Total (5) = 76
+            //strobe(WSYNC);                // Total (5) = 74
             
-            Y++;                            // 2 
+            Y++;                            // 2 (for free) 
             *GRP0 = ms_grp0ptr[Y];          // 9
             *COLUP0 = ms_colup0ptr[Y];      // 9 
             ms_v = ms_scenery[Y];           // 9
             Y++;                            // 2
             X = ms_scenery[Y];              // 8
-            strobe(WSYNC);                  // 3. Total (6) = 42 cycles
+            strobe(WSYNC);                  // 3. Total (6) = 40 cycles
             
             *GRP0 = ms_grp0ptr[Y];          // 9
             *COLUP0 = ms_colup0ptr[Y];      // 9 
