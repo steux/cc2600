@@ -144,7 +144,7 @@ kernel_start:
             *COLUP0 = ms_colup0;            // 6 / 9 
             VSYNC[X] = ms_v;                // 7 / 16
             // Wait for 73 - 16 cycles exactly
-            X = ms_sprite_iter;             // 3 / 19 
+            X = ms_tmp;                     // 3 / 19 
             X = ms_sprite_id[X];            // 6 / 25 
             ms_tmp = Y;                     // 3 / 28
             ms_grp1ptr = ms_grptr[X] - ms_tmp;   // 21 / 39
