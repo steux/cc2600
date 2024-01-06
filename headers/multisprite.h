@@ -7,7 +7,11 @@
 #ifndef kernel_long_macro
 #define kernel_long_macro strobe(WSYNC)
 #endif
-    
+   
+#ifndef MAX_NB_SPRITES
+#define MAX_NB_SPRITES 10
+#endif
+
 char ms_next_mode;
 char ms_v, ms_colup0, ms_colup1;
 char *ms_colup0ptr, *ms_colup1ptr, *ms_grp0ptr, *ms_grp1ptr, *ms_scenery;
@@ -15,9 +19,11 @@ char ms_height0, ms_height1;
 char ms_next_slice;
 char ms_x;
 char ms_sprite_iter;
-char ms_sprite_x[10];
-char ms_sprite_id[10];
-char ms_nusiz[10];
+char ms_sprite_x[MAX_NB_SPRITES];
+char ms_sprite_y[MAX_NB_SPRITES];
+char ms_sprite_id[MAX_NB_SPRITES];
+char ms_nusiz[MAX_NB_SPRITES];
+char ms_sorted_by_y[MAX_NB_SPRITES];
 char ms_tmp;
 
 const char ms_sprite_wait[153] = {1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13};
@@ -100,13 +106,14 @@ kernel_start:
             Y++;                            // 2
             // Retrieve ms_x for next sprite
             X = ms_sprite_iter;             // 3
+            X = ms_sorted_by_y[X];          // 6
+            ms_tmp = X;                     // 3. To be used later
             ms_x = ms_sprite_x[X];          // 7
-            
             X = ms_scenery[Y];              // 8
             *COLUP0 = ms_colup0ptr[Y];      // 9 // This color change is anticipateed. Color artifact when sprite 0 is on the right of the screen
             load(ms_grp0ptr[Y]);            // 6
             Y++;                            // 2
-            strobe(WSYNC);                  // 3. Total (2) = 58
+            strobe(WSYNC);                  // 3. Total (2) = 67
             
             store(*GRP0);                   // 3
             VSYNC[X] = ms_v;                // 7
@@ -124,7 +131,7 @@ kernel_start:
             ms_v = ms_scenery[Y];           // 9
             Y++;                            // 2
             // Setup new NUSIZ for new sprite 
-            X = ms_sprite_iter;             // 3
+            X = ms_tmp;                     // 3
             *NUSIZ1 = ms_nusiz[X];          // 7
             X = ms_x;                       // 3
             *HMP1 = ms_sprite_hm[X];        // 7
@@ -154,8 +161,8 @@ kernel_start:
             strobe(WSYNC);                  // 3. Total (6) = 40 cycles
             
             *GRP0 = ms_grp0ptr[Y];          // 9
-            *COLUP0 = ms_colup0ptr[Y];      // 9 
             VSYNC[X] = ms_v;                // 7
+            *COLUP0 = ms_colup0ptr[Y];      // 9  // This color change is slightly delayed. Color artifact when sprite 0 is on the left of the screen
             Y++;                            // 2
             
             do {
@@ -167,9 +174,10 @@ kernel_start:
                 kernel_macro; // Max 15 cycles
                 Y++;                        // 2
                 X = ms_scenery[Y];          // 8
+                load(ms_grp0ptr[Y]);        // 6
                 strobe(WSYNC);              // 3
                 
-                *GRP0 = ms_grp0ptr[Y];      // 9
+                store(*GRP0);               // 3
                 *COLUP0 = ms_colup0ptr[Y];  // 9 
                 VSYNC[X] = ms_v;            // 7
                 Y++;                        // 2
