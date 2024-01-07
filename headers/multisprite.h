@@ -82,8 +82,8 @@ void kernel()
     ms_select_sprites();
     // Phase 1: before the kernel actually starts, allocates and positions sprites p0 and p1.
     ms_sprite_iter = 0;
-    ms_id_p[0] = ms_allocate_sprite();
-    ms_id_p[1] = ms_allocate_sprite();
+    ms_id_p[0] = ms_allocate_sprite(); // 47
+    ms_id_p[1] = ms_allocate_sprite(); // 47
 }
 
 void try_kernel()
