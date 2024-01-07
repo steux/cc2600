@@ -15,7 +15,6 @@
 char ms_next_mode;
 char ms_v, ms_colup0, ms_colup1;
 char *ms_colup0ptr, *ms_colup1ptr, *ms_grp0ptr, *ms_grp1ptr, *ms_scenery;
-char ms_height0, ms_height1;
 char ms_next_slice;
 char ms_x;
 char ms_sprite_iter;
@@ -24,7 +23,9 @@ char ms_sprite_y[MAX_NB_SPRITES];
 char ms_sprite_id[MAX_NB_SPRITES];
 char ms_nusiz[MAX_NB_SPRITES];
 char ms_sorted_by_y[MAX_NB_SPRITES];
-char ms_tmp;
+char ms_tmp, ms_tmp2;
+char ms_id_p[2];
+char ms_nb_sprites;
 
 const char ms_sprite_wait[153] = {1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13};
 const char ms_sprite_hm[153] = {0x70, 0x60, 0x50, 0x40, 0x30, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0};
@@ -34,8 +35,58 @@ const char sprite1[1] = {0};
 #define NB_SPRITES_DEF 1
 const char *ms_grptr[NB_SPRITES_DEF] = {sprite1};
 const char *ms_coluptr[NB_SPRITES_DEF] = {sprite1};
+const char ms_height[NB_SPRITES_DEF] = {8};
+
+void ms_select_sprites()
+{
+    Y = 0;
+    ms_sorted_by_y[Y] &= 0x7f; // Display this one (a priori)
+    char candidate1 = ms_sorted_by_y[Y];
+    for (Y = 1; Y != ms_nb_sprites; Y++) {
+        char candidate2 = ms_sorted_by_y[Y];
+        if (candidate2 & 0x80) { // If it was not displayed at previous iteration
+            // Let's see if this candidate overlaps with our previous candidate
+            char y2 = ms_sprite_y[X = candidate2 & 0x7f];
+            char y1 = ms_sprite_y[X = candidate1 & 0x7f];
+            char height1 = ms_height[X = ms_sprite_id[X]];
+            if (y1 + height1 + 8 >= y2) {
+                // Yes. It overlaps. Skip candidate1 and set it as prioritary for next time
+                ms_sorted_by_y[--Y] |= 0x80;
+                Y++;
+            } 
+            ms_sorted_by_y[Y] &= 0x7f;
+        }
+        candidate1 = candidate2;
+    }
+}
+
+inline char ms_allocate_sprite()
+{
+    X = ms_sprite_iter;
+    if (X != ms_nb_sprites) {
+        ms_tmp = ms_sorted_by_y[X];
+        if (ms_tmp & 0x80) { // was removed
+            X++;
+            if (X == ms_nb_sprites) return -1;
+            ms_tmp = ms_sorted_by_y[X];
+        }
+        X++;
+        ms_sprite_iter = X;
+        return ms_tmp;
+    }
+    return -1;
+}
 
 void kernel()
+{
+    ms_select_sprites();
+    // Phase 1: before the kernel actually starts, allocates and positions sprites p0 and p1.
+    ms_sprite_iter = 0;
+    ms_id_p[0] = ms_allocate_sprite();
+    ms_id_p[1] = ms_allocate_sprite();
+}
+
+void try_kernel()
 {
 kernel_start:
     if (ms_next_mode & 1) {
