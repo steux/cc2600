@@ -84,10 +84,10 @@ void kernel()
     ms_sprite_iter = 0;
     *GRP0 = 0;
     *VDELP0 = 0;
-    ms_id_p[0] = ms_allocate_sprite(); // 47
-    X = ms_id_p[0];
+    X = ms_allocate_sprite(); // 47
     // Position sprite 0
     if (X != -1) {
+        ms_id_p[0] = X;
         Y = ms_sprite_id[X];
         ms_tmp = ms_sprite_y[X];
         ms_grp0ptr = ms_grptr[Y] - ms_tmp;   // 21
@@ -103,10 +103,10 @@ void kernel()
         strobe(HMOVE);
     }
     *GRP1 = 0;
-    ms_id_p[1] = ms_allocate_sprite(); // 47
-    X = ms_id_p[1];
+    X = ms_allocate_sprite(); // 47
     // Position sprite 1
     if (X != -1) {
+        ms_id_p[1] = X;
         Y = ms_sprite_id[X];
         ms_tmp = ms_sprite_y[X];
         ms_grp1ptr = ms_grptr[Y] - ms_tmp;   // 21
@@ -150,73 +150,91 @@ void kernel()
     } while (Y != ms_next_slice);       // 6
 
     // Now we are going into display 0 and repo 1 kernel
-    X = ms_id_p[1];
-    if (X != -1) {
+    X = ms_id_p[1];                     // 3
+    if (X == -1) {                      // 5/7 // No sprite 1 is allocated. Try to repo one.
+        // [22/76]
         // Display sprite 0 while preparing for next sprite 1
-        ms_v = ms_scenery[Y];           // 9
-        strobe(WSYNC);                  // 3
+        X = ms_allocate_sprite();       // 47 [69/76]
+        strobe(WSYNC);                  // 3  [72/76]
 
         *GRP0 = ms_grp0ptr[Y];          // 9
         *COLUP0 = ms_colup0ptr[Y];      // 9 
-        Y++;                            // 2
-                                        // Retrieve ms_x for next sprite
-        X = ms_sprite_iter;             // 3
-        X = ms_sorted_by_y[X];          // 6
-        ms_tmp = X;                     // 3. To be used later
-        ms_x = ms_sprite_x[X];          // 7
-        X = ms_scenery[Y];              // 8
-        *COLUP0 = ms_colup0ptr[Y];      // 9 // This color change is anticipateed. Color artifact when sprite 0 is on the right of the screen
-        load(ms_grp0ptr[Y]);            // 6
-        Y++;                            // 2
-        strobe(WSYNC);                  // 3. Total (2) = 67
+        if (X != -1) {                  // 5/7 [23/76]
+                                        // Check if y position is compatible
+            ms_tmp = ms_sprite_y[X];    // 7 [30]
+            if (Y < ms_tmp + 8) {       // 11/13 [41/76]
+                ms_id_p[1] = X;                 // 3
+                ms_v = ms_scenery[Y];           // 9
+                Y++;                            // 2
+                X = ms_scenery[Y];              // 8
+                load(ms_grp0ptr[Y]);            // 6
+                strobe(WSYNC);                  // 3 [72/76]
 
-        store(*GRP0);                   // 3
-        VSYNC[X] = ms_v;                // 7
-                                        // Player 1 repositionning
-        X = ms_x;                       // 3
-        X = ms_sprite_wait[X];          // 6
-        do { X--; } while (X);          // 5 / cycle. 4 for the last one. 
-        strobe(RESP1);                  // 3. Minimum = 26 cycles
-        strobe(WSYNC);                  // 3. Total (3) = Unknown
+                store(*GRP0);                   // 3
+                *COLUP0 = ms_colup0ptr[Y];      // 9 
+                VSYNC[X] = ms_v;                // 7
+                Y++;                            // 2
+                ms_v = ms_scenery[Y];           // 9
+                strobe(WSYNC);                  // 3 [33/76]
 
-        *GRP0 = ms_grp0ptr[Y];          // 9
-        *COLUP0 = ms_colup0ptr[Y];      // 9 
-        ms_v = ms_scenery[Y];           // 9
-        Y++;                            // 2
-                                        // Setup new NUSIZ for new sprite 
-        X = ms_tmp;                     // 3
-        *NUSIZ1 = ms_nusiz[X];          // 7
-        X = ms_x;                       // 3
-        *HMP1 = ms_sprite_hm[X];        // 7
-        X = ms_scenery[Y];              // 8
-        ms_colup0 = ms_colup0ptr[Y];    // 9 
-        load(ms_grp0ptr[Y]);            // 6
-        strobe(WSYNC);                  // 3. Total (4) = 75 cycles
+                *GRP0 = ms_grp0ptr[Y];          // 9
+                *COLUP0 = ms_colup0ptr[Y];      // 9 
+                Y++;                            // 2 [20]
+                X = ms_id_p[1];                 // 3
+                *NUSIZ1 = ms_nusiz[X];          // 7 [30]
+                X = ms_sprite_x[X];             // 6
+                *HMP1 = ms_sprite_hm[X];        // 7
+                ms_x = X;                       // 3 [46]
+                X = ms_scenery[Y];              // 8
+                *COLUP0 = ms_colup0ptr[Y];      // 9 // This color change is anticipateed. C olor artifact when sprite 0 is on the right of the screen
+                load(ms_grp0ptr[Y]);            // 6
+                Y++;                            // 2
+                strobe(WSYNC);                  // 3 [74/76]                                                                                                                                                                                         otal (2) = 67
 
-        store(*GRP0);                   // 3
-        *COLUP0 = ms_colup0;            // 6 / 9 
-        VSYNC[X] = ms_v;                // 7 / 16
-                                        // Wait for 73 - 16 cycles exactly
-        X = ms_tmp;                     // 3 / 19 
-        X = ms_sprite_id[X];            // 6 / 25 
-        ms_tmp = Y;                     // 3 / 28
-        ms_grp1ptr = ms_grptr[X] - ms_tmp;   // 21 / 39
-        ms_colup1ptr = ms_coluptr[X] - ms_tmp; // 21 / 71
-        strobe(HMOVE);                  // 3. Early HMOVE at cycle 74
-                                        //strobe(WSYNC);                // Total (5) = 74
+                store(*GRP0);                   // 3
+                VSYNC[X] = ms_v;                // 7
+                // Player 1 repositionning
+                X = ms_x;                       // 3
+                X = ms_sprite_wait[X];          // 6
+                do { X--; } while (X);          // 5 / cycle. 4 for the last one. 
+                strobe(RESP1);                  // 3. Minimum = 26 cycles
+                strobe(WSYNC);                  // 3. Total (3) = Unknown
 
-        Y++;                            // 2 (for free) 
-        *GRP0 = ms_grp0ptr[Y];          // 9
-        *COLUP0 = ms_colup0ptr[Y];      // 9 
-        ms_v = ms_scenery[Y];           // 9
-        Y++;                            // 2
-        X = ms_scenery[Y];              // 8
-        strobe(WSYNC);                  // 3. Total (6) = 40 cycles
+                *GRP0 = ms_grp0ptr[Y];          // 9
+                *COLUP0 = ms_colup0ptr[Y];      // 9 
+                ms_v = ms_scenery[Y];           // 9
+                Y++;                            // 2
+                X = ms_scenery[Y];              // 8
+                ms_colup0 = ms_colup0ptr[Y];    // 9 
+                load(ms_grp0ptr[Y]);            // 6
+                strobe(WSYNC);                  // 3 [55/76]
 
-        *GRP0 = ms_grp0ptr[Y];          // 9
-        VSYNC[X] = ms_v;                // 7
-        *COLUP0 = ms_colup0ptr[Y];      // 9  // This color change is slightly delayed. Color artifact when sprite 0 is on the left of the screen
-        Y++;                            // 2
+                store(*GRP0);                   // 3
+                *COLUP0 = ms_colup0;            // 6 [9]
+                VSYNC[X] = ms_v;                // 7 [16]
+                // Wait for 73 - 16 cycles exactly
+                X = ms_id_p[1];                 // 3 [19]
+                X = ms_sprite_id[X];            // 6 [25] 
+                ms_grp1ptr = ms_grptr[X] - ms_tmp;   // 21 [46] 
+                ms_colup1ptr = ms_coluptr[X] - ms_tmp; // 21 [65]
+                Y++;                            // 2 [67]
+                csleep(3);                      // 3 [70]
+                strobe(HMOVE);                  // 3. Early HMOVE at cycle 73
+                //strobe(WSYNC);                // Total (5) = 74
+
+                *GRP0 = ms_grp0ptr[Y];          // 9 (anticipated)
+                *COLUP0 = ms_colup0ptr[Y];      // 9 
+                ms_v = ms_scenery[Y];           // 9
+                Y++;                            // 2
+                X = ms_scenery[Y];              // 8
+                strobe(WSYNC);                  // 3. Total (6) = 38 cycles
+
+                *GRP0 = ms_grp0ptr[Y];          // 9
+                VSYNC[X] = ms_v;                // 7
+                *COLUP0 = ms_colup0ptr[Y];      // 9  // This color change is slightly delayed. Color artifact when sprite 0 is on the left of the screen
+                Y++;                            // 2
+            }
+        }
     }
 
     // Simply display sprite p0
