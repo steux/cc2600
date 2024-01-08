@@ -1,3 +1,6 @@
+v0.4.2 (01/08/2024) :
+    - Added support for constant address in array of pointers
+
 v0.4.1 (12/19/2023) :
     - Corrected bug in zeropage memory usage counting
     - Corrected bytes free estimation

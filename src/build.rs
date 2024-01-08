@@ -666,10 +666,14 @@ Powerup
                                     gstate.write("\n\t.byte ")?;
                                 }
                                 counter += 1;
-                                if i.1 != 0 {
-                                    gstate.write(&format!("<({} + {})", i.0, i.1))?;
+                                if i.0 == "__address__" {
+                                    gstate.write(&format!("${:02x}", i.1 & 0xff))?;
                                 } else {
-                                    gstate.write(&format!("<{}", i.0))?;
+                                    if i.1 != 0 {
+                                        gstate.write(&format!("<({} + {})", i.0, i.1))?;
+                                    } else {
+                                        gstate.write(&format!("<{}", i.0))?;
+                                    }
                                 }
                                 if counter % 8 != 0 {
                                     gstate.write(", ")?;
@@ -680,14 +684,18 @@ Powerup
                                     gstate.write("\n\t.byte ")?;
                                 }
                                 counter += 1;
-                                if i.1 != 0 {
-                                    gstate.write(&format!(">({} + {})", i.0, i.1))?;
+                                if i.0 == "__address__" {
+                                    gstate.write(&format!("${:02x}", i.1 >> 8))?;
                                 } else {
-                                    gstate.write(&format!(">{}", i.0))?;
+                                    if i.1 != 0 {
+                                        gstate.write(&format!(">({} + {})", i.0, i.1))?;
+                                    } else {
+                                        gstate.write(&format!(">{}", i.0))?;
+                                    }
+                                    if counter % 8 != 0 && counter < 2 * arr.len() {
+                                        gstate.write(", ")?;
+                                    }
                                 }
-                                if counter % 8 != 0 && counter < 2 * arr.len() {
-                                    gstate.write(", ")?;
-                                } 
                             } 
                             gstate.write("\n")?;
                             arr.len() * 2

@@ -32,10 +32,10 @@ const char ms_sprite_hm[153] = {0x70, 0x60, 0x50, 0x40, 0x30, 0x70, 0x60, 0x50, 
 
 const char sprite1[1] = {0};
 
-#define NB_SPRITES_DEF 1
-const char *ms_grptr[NB_SPRITES_DEF] = {sprite1};
-const char *ms_coluptr[NB_SPRITES_DEF] = {sprite1};
-const char ms_height[NB_SPRITES_DEF] = {8};
+#define NB_SPRITES_DEF 2
+const char *ms_grptr[NB_SPRITES_DEF] = {sprite1, 0};
+const char *ms_coluptr[NB_SPRITES_DEF] = {sprite1, 0};
+const char ms_height[NB_SPRITES_DEF] = {8, 0};
 
 void ms_select_sprites()
 {
@@ -83,6 +83,25 @@ void kernel()
     // Phase 1: before the kernel actually starts, allocates and positions sprites p0 and p1.
     ms_sprite_iter = 0;
     ms_id_p[0] = ms_allocate_sprite(); // 47
+    X = ms_id_p[0];
+    // Position sprite 1
+    if (X != -1) {
+        strobe(WSYNC);                  // 3
+        X = ms_sprite_x[X];             // 7
+        X = ms_sprite_wait[X];          // 6
+        *HMP0 = ms_sprite_hm[X];        // 7
+
+        store(*GRP0);                   // 3
+        VSYNC[X] = ms_v;                // 7
+                                        // Player 1 repositionning
+        X = ms_x;                       // 3
+        X = ms_sprite_wait[X];          // 6
+        if (X) {                        // 3
+            do { X--; } while (X);      // 5 / cycle. 4 for the last one. 
+        }
+        strobe(RESP0);                  // 3. Minimum = 24 cycles (ideally 28, so left part of the screen is not reachable)
+        strobe(HMOVE);
+    }
     ms_id_p[1] = ms_allocate_sprite(); // 47
 }
 
@@ -174,7 +193,7 @@ kernel_start:
             if (X) {                        // 3
                 do { X--; } while (X);      // 5 / cycle. 4 for the last one. 
             }
-            strobe(RESP0);                  // 3. Minimum = 24 cycles (ideally 28, so left part of the screen is not reachable)
+            strobe(RESP1);                  // 3. Minimum = 24 cycles (ideally 28, so left part of the screen is not reachable)
             strobe(WSYNC);                  // 3. Total (3) = Unknown
             
             *GRP0 = ms_grp0ptr[Y];          // 9
