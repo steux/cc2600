@@ -264,20 +264,43 @@ void_kernel:
         } while (Y < ms_next_p0_slice);   // 5/6
     }
 
-    // [34/76] (in case of no p0 only)
+    // [34/76] (in case of no p0 alone)
     // [27/76] (in case of p0 only)
     // And then let's go into display 0 & 1 kernel
     if (Y < ms_next_p0_p1_slice) { // 5/6
-        *VDELP0 = 1;                        // 5
+        *VDELP0 = 1;                    // 5
         // [44/76] (in case of no p0 only)
         // [37/76] (in case of p0 only)
+        ms_v = ms_scenery[Y];           // 9
+        *COLUP0 = ms_colup0ptr[Y];      // 9
+        *COLUP1 = ms_colup1ptr[Y];      // 9
+        *GRP0 = ms_grp0ptr[Y];          // 9
+        *GRP1 = ms_grp1ptr[Y];          // 9
+        // Skip this WSYNC as we are late on this scanline...
+        //strobe(WSYNC);                // 3
+        // Don't execute the kernel macro on the first line in order to resync
+        //kernel_macro;                 // Max 15 cycles
+        Y++;                            // 2
+        X = ms_scenery[Y];              // 8
+        ms_colup0 = ms_colup0ptr[Y];    // 9
+        ms_colup1 = ms_colup1ptr[Y];    // 9
+        *GRP0 = ms_grp0ptr[Y];          // 9
+        load(ms_grp1ptr[Y]);            // 6
+        strobe(WSYNC);                  // 3: Total (2) = 61 
+
+        store(*GRP1);                   // 3
+        *COLUP0 = ms_colup0;            // 6
+        *COLUP1 = ms_colup1;            // 6
+        VSYNC[X] = ms_v;                // 7
+        Y++;                            // 2
+        
         do { // [30/76] while looping
             ms_v = ms_scenery[Y];           // 9
             ms_colup0 = ms_colup0ptr[Y];    // 9
             ms_colup1 = ms_colup1ptr[Y];    // 9
             *GRP0 = ms_grp0ptr[Y];          // 9
             load(ms_grp1ptr[Y]);            // 6
-            //strobe(WSYNC);                  // 3 ; Total (1) = 30 + 36 + 9 = 76
+            strobe(WSYNC);                  // 3 ; Total (1) = 30 + 36 + 9 = 76
 
             store(*GRP1);                   // 3
             *COLUP0 = ms_colup0;            // 6 
@@ -296,7 +319,10 @@ void_kernel:
             *COLUP1 = ms_colup1;            // 6
             VSYNC[X] = ms_v;                // 7
             Y++;                            // 2
-        } while (Y != ms_next_p0_p1_slice); // 5/6
+        } while (Y < ms_next_p0_p1_slice);  // 5/6
         *VDELP0 = 0;                        // 5
+        // [37/76] when getting out
+    } else {
+
     }
 }
