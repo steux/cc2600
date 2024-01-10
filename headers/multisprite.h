@@ -130,6 +130,7 @@ void kernel()
         ms_tmp = ms_sprite_y[X];
         X = ms_sprite_id[X];
         ms_next_p0_slice = ms_tmp + ms_height[X];
+        if (ms_next_p0_slice < ms_height[X]) ms_tmp = 0; // Manage out of upper screen sprites
         X = ms_id_p[1];
         if (X != 1) {
             if (ms_sprite_y[X] < ms_next_p0_slice) {
@@ -156,7 +157,7 @@ void kernel()
     Y++;                                // 2
 
 void_kernel:
-    if (Y < ms_next_void_slice) {       // 5/6
+    if (Y < ms_tmp) {       // 5/6
         do { 
             kernel_long_macro;              // Macro max 76 * 2 - 39 = 113 cycles (min 76 - 19 = 57 cycles)
             ms_v = ms_scenery[Y];           // 9
@@ -166,7 +167,7 @@ void_kernel:
 
             VSYNC[X] = ms_v;                // 7
             Y++;                            // 2
-        } while (Y < ms_next_void_slice);   // 5/6
+        } while (Y < ms_tmp);   // 5/6
     }
 
 kernel_start:
