@@ -73,6 +73,40 @@ inline char ms_allocate_sprite()
     return -1;
 }
 
+inline char ms_mark_as_removed()
+{
+    X = ms_sprite_iter;
+    ms_sorted_by_y[--X] |= 0x80;
+}
+
+void kernel_repo0()
+{
+    // Entering at [46/76]
+    ms_tmp = ms_scenery[Y];             // 9 [55/76] (variable)
+    X = ms_id_p[0];                     // 3
+    *NUSIZ0 = ms_nusiz[X];              // 7 [65/76]
+    strobe(WSYNC);                      // 3
+
+    X = ms_sprite_x[X];                 // 6
+    *HMP0 = ms_sprite_hm[X];            // 7
+    X = ms_sprite_wait[X];              // 6 [19/76]
+    do { X--; } while (X);              // 5 / cycle. 4 for the last one. 
+    strobe(RESP1);                      // 3. Minimum = 26 cycles
+    strobe(WSYNC);                      // 3
+   
+    X = ms_tmp;                         // 3
+    VSYNC[X] = ms_v;                    // 7 [10]
+    X = ms_id_p[0];                     // 3 
+    X = ms_sprite_id[X];                // 6  
+    ms_grp0ptr = ms_grptr[X] - ms_tmp;  // 21 // TODO: Compute ms_tmp
+    ms_colup0ptr = ms_coluptr[X] - ms_tmp; // 21
+    strobe(HMOVE);                      // Early hmove
+    //strobe(WSYNC);                    // 3
+
+    ms_v = ms_scenery[Y++];             // 11
+    // Must leave at < [53/76]
+} // RTS: 6
+
 void kernel()
 {
     ms_select_sprites();
@@ -153,6 +187,48 @@ void kernel()
     X = ms_scenery[Y];                  // 8
     strobe(WSYNC);                      // 3
     // Second prep line has started
+    VSYNC[X] = ms_v;                    // 7
+    Y++;                                // 2
+
+repo_kernel:
+
+    X = ms_id_p[0];                     // 3
+    if (X == -1) { // 4. There is no sprite 0. Allocate 1 ?
+        X = ms_id_p[1];                 // 3
+        if (X != -1) { // 4. There is a sprite 1
+            if (Y >= ms_sprite_y[X] + 8) X = -1; // 17
+        }
+        if (X != -1) { // 4 [44/76] This is OK. Let's try to allocate one                                                   
+            strobe(WSYNC);                  // 3 
+
+            ms_v = ms_scenery[Y];           // 9
+            Y++;                            // 2
+            X = ms_allocate_sprite();       // 47 [58/76]
+            if (X != -1) {                  // 5/7
+                // Check if y position is compatible
+                ms_id_p[0] = X;             // 3
+                strobe(WSYNC);              // 3
+                
+                X = ms_scenery[Y];          // 8
+                VSYNC[X] = ms_v;            // 7
+                Y++;                        // 2
+                ms_v = ms_scenery[Y++];     // 9
+                
+                X = ms_id_p[0];             // 3 [29/76]
+                if (Y < ms_sprite_y[X] + 8) { // 11/13 [40/76]
+                    kernel_repo0();          // 6 [46/76] 
+                } else {
+                    // This one will be skipped. Let's set it as prioritary for next time
+                    strobe(WSYNC);
+                    ms_mark_as_removed();
+                    ms_id_p[0] = -1;
+                }
+            }
+        }
+    }
+    X = ms_scenery[Y];                  // 8
+    strobe(WSYNC);                      // 3
+    
     VSYNC[X] = ms_v;                    // 7
     Y++;                                // 2
 
