@@ -97,10 +97,12 @@ void kernel_repo0()
     X = ms_tmp;                         // 3
     VSYNC[X] = ms_v;                    // 7 [10]
     X = ms_id_p[0];                     // 3 
-    X = ms_sprite_id[X];                // 6  
-    ms_grp0ptr = ms_grptr[X] - ms_tmp;  // 21 // TODO: Compute ms_tmp
-    ms_colup0ptr = ms_coluptr[X] - ms_tmp; // 21
-    strobe(HMOVE);                      // Early hmove
+    ms_tmp = ms_sprite_y[X];            // 7 [20]
+    X = ms_sprite_id[X];                // 6 [26]
+    ms_grp0ptr = ms_grptr[X] - ms_tmp;  // 21 [47]
+    ms_colup0ptr = ms_coluptr[X] - ms_tmp; // 21 [68]
+    Y++;                                // 2 [70]
+    strobe(HMOVE);                      // Early hmove [73]
     //strobe(WSYNC);                    // 3
 
     ms_v = ms_scenery[Y++];             // 11
