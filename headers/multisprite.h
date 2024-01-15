@@ -20,8 +20,12 @@
 #define MS_PLAYFIELD_HEIGHT 192
 #endif
 
-#ifndef INITBANK
-#define INITBANK
+#ifndef MS_OFFSCREEN_BANK
+#define MS_OFFSCREEN_BANK
+#endif
+
+#ifndef MS_KERNEL_BANK
+#define MS_KERNEL_BANK
 #endif
 
 char ms_v, y0, y1, h0, h1;
@@ -38,7 +42,7 @@ char ms_nb_sprites;
 const char ms_sprite_wait[153] = {1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13};
 const char ms_sprite_hm[153] = {0x70, 0x60, 0x50, 0x40, 0x30, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0};
 
-void ms_select_sprites()
+MS_OFFSCREEN_BANK void ms_select_sprites()
 {
     Y = 0;
     ms_sorted_by_y[Y] &= 0x7f; // Display this one (a priori)
@@ -79,7 +83,7 @@ inline char ms_allocate_sprite()
     return -1;
 }
 
-char ms_mark_as_removed()
+MS_KERNEL_BANK char ms_mark_as_removed()
 {
     X = ms_sprite_iter;
     ms_sorted_by_y[--X] |= 0x80;
@@ -90,7 +94,7 @@ char ms_mark_as_removed()
     Y++;                                // 2
 }
 
-char kernel_repo0()
+MS_KERNEL_BANK char kernel_repo0()
 {
     char ms_tmp;
 
@@ -124,7 +128,7 @@ char kernel_repo0()
     // Must leave at < [53/76]
 } // RTS: 6
 
-char kernel_repo1()
+MS_KERNEL_BANK char kernel_repo1()
 {
     char ms_tmp;
 
@@ -158,7 +162,7 @@ char kernel_repo1()
     // Must leave at < [53/76]
 } // RTS: 6
 
-void p0_kernel(char stop)
+MS_KERNEL_BANK void p0_kernel(char stop)
 {
     do {
         ms_v = ms_scenery[Y];       // 9
@@ -180,7 +184,7 @@ void p0_kernel(char stop)
     // [32/76] including RTS
 }
 
-void p1_kernel(char stop)
+MS_KERNEL_BANK void p1_kernel(char stop)
 {
     do {
         ms_v = ms_scenery[Y];       // 9
@@ -202,7 +206,7 @@ void p1_kernel(char stop)
     // [32/76] including RTS
 }
 
-void p0_p1_kernel(char stop)
+MS_KERNEL_BANK void p0_p1_kernel(char stop)
 {
     char ms_colup0, ms_colup1;
 
@@ -260,7 +264,7 @@ void p0_p1_kernel(char stop)
     // [40/76] when getting out (including RTS)
 }
 
-void void_kernel(char stop)
+MS_KERNEL_BANK void void_kernel(char stop)
 {
     strobe(WSYNC);                  // 3
     ms_v = ms_scenery[Y];           // 9
@@ -284,7 +288,7 @@ void void_kernel(char stop)
     }
 } //[15/76] when getting out (including RTS)
 
-INITBANK void kernel_prep()
+MS_OFFSCREEN_BANK void kernel_prep()
 {
     char ms_tmp;
     ms_select_sprites();
@@ -345,7 +349,7 @@ INITBANK void kernel_prep()
     VSYNC[X] = ms_v;                    // 7
 }
 
-void kernel()
+MS_KERNEL_BANK void kernel()
 {
     char ms_tmp;
 
