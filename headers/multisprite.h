@@ -1,7 +1,11 @@
 #include "vcs.h"
 
-#ifndef kernel_macro
-#define kernel_macro
+#ifndef kernel_short_macro
+#define kernel_short_macro
+#endif
+    
+#ifndef kernel_medium_macro
+#define kernel_medium_macro
 #endif
     
 #ifndef kernel_long_macro
@@ -152,22 +156,119 @@ char kernel_repo1()
 
 void p0_kernel(char stop)
 {
+    do {
+        ms_v = ms_scenery[Y];       // 9
+        strobe(WSYNC);              // 3
 
+        *GRP0 = ms_grp0ptr[Y];      // 9
+        *COLUP0 = ms_colup0ptr[Y];  // 9 
+        kernel_medium_macro; // Max 39 cycles
+        Y++;                        // 2
+        X = ms_scenery[Y];          // 8
+        load(ms_grp0ptr[Y]);        // 6
+        strobe(WSYNC);              // 3 // [37/76]
+
+        store(*GRP0);               // 3
+        *COLUP0 = ms_colup0ptr[Y];  // 9 
+        VSYNC[X] = ms_v;            // 7
+        Y++;                        // 2
+    } while (Y < stop);   // 5/6
+    // [32/76] including RTS
 }
 
 void p1_kernel(char stop)
 {
+    do {
+        ms_v = ms_scenery[Y];       // 9
+        strobe(WSYNC);              // 3
 
+        *GRP1 = ms_grp0ptr[Y];      // 9
+        *COLUP1 = ms_colup0ptr[Y];  // 9 
+        kernel_medium_macro; // Max 39 cycles
+        Y++;                        // 2
+        X = ms_scenery[Y];          // 8
+        load(ms_grp1ptr[Y]);        // 6
+        strobe(WSYNC);              // 3 // [37/76]
+
+        store(*GRP1);               // 3
+        *COLUP1 = ms_colup0ptr[Y];  // 9 
+        VSYNC[X] = ms_v;            // 7
+        Y++;                        // 2
+    } while (Y < stop);   // 5/6
+    // [32/76] including RTS
 }
 
 void p0_p1_kernel(char stop)
 {
+    char ms_colup0, ms_colup1;
 
+    *VDELP0 = 1;                    // 5
+    // [46/76] when coming from p0/p1 kernel
+    ms_v = ms_scenery[Y];           // 9
+    ms_colup1 = ms_colup1ptr[Y];    // 9
+    *GRP0 = ms_grp0ptr[Y];          // 9
+    *COLUP0 = ms_colup0ptr[Y];      // 9 [82/76]. No WSYNC necessary 
+    *GRP1 = ms_grp1ptr[Y];          // 6 
+    *COLUP1 = ms_colup1;            // 6 
+    Y++;                            // 2
+    X = ms_scenery[Y];              // 8
+    ms_colup0 = ms_colup0ptr[Y];    // 9
+    ms_colup1 = ms_colup1ptr[Y];    // 9
+    *GRP0 = ms_grp0ptr[Y];          // 9
+    load(ms_grp1ptr[Y]);            // 6
+    strobe(WSYNC);                  // 3: Total (2) = 140 = 64 into the second line
+
+    store(*GRP1);                   // 3
+    *COLUP0 = ms_colup0;            // 6
+    *COLUP1 = ms_colup1;            // 6
+    VSYNC[X] = ms_v;                // 7
+    Y++;                            // 2
+    
+    if (Y < stop) {
+
+        do { // [30/76] while looping
+            ms_v = ms_scenery[Y];           // 9
+            ms_colup0 = ms_colup0ptr[Y];    // 9
+            ms_colup1 = ms_colup1ptr[Y];    // 9
+            *GRP0 = ms_grp0ptr[Y];          // 9
+            load(ms_grp1ptr[Y]);            // 6
+            strobe(WSYNC);                  // 3 ; Total (1) = 30 + 36 + 9 = 76
+
+            store(*GRP1);                   // 3
+            *COLUP0 = ms_colup0;            // 6 
+            *COLUP1 = ms_colup1;            // 6
+            kernel_short_macro;             // Max 15 cycles
+            Y++;                            // 2
+            X = ms_scenery[Y];              // 8
+            ms_colup0 = ms_colup0ptr[Y];    // 9
+            ms_colup1 = ms_colup1ptr[Y];    // 9
+            *GRP0 = ms_grp0ptr[Y];          // 9
+            load(ms_grp1ptr[Y]);            // 6
+            strobe(WSYNC);                  // 3: Total (2) = 61 
+
+            store(*GRP1);                   // 3
+            *COLUP0 = ms_colup0;            // 6
+            *COLUP1 = ms_colup1;            // 6
+            VSYNC[X] = ms_v;                // 7
+            Y++;                            // 2
+        } while (Y < stop);                 // 5/6
+    }
+    *VDELP0 = 0;                        // 5
+    // [40/76] when getting out (including RTS)
 }
 
 void void_kernel(char stop)
 {
+    do { 
+        kernel_long_macro;              // Macro max 76 * 2 - 39 = 113 cycles (min 76 - 19 = 57 cycles)
+        ms_v = ms_scenery[Y];           // 9
+        Y++;                            // 2
+        X = ms_scenery[Y];              // 8
+        strobe(WSYNC);                  // 3
 
+        VSYNC[X] = ms_v;                // 7
+        Y++;                            // 2
+    } while (Y < stop);
 }
 
 void kernel()
@@ -214,7 +315,7 @@ void kernel()
         
         X = ms_sprite_x[X];             // 6
         X = ms_sprite_wait[X];          // 6
-        *HMP0 = ms_sprite_hm[X];        // 7
+        *HMP1 = ms_sprite_hm[X];        // 7
         do { X--; } while (X);          // 5 / cycle. 4 for the last one. 
         strobe(RESP1);                  // 3. Minimum = 26 cycles
         strobe(WSYNC);                  // 3
@@ -226,6 +327,8 @@ void kernel()
     ms_v = ms_scenery[Y];               // 9
     Y++;                                // 2
     X = ms_scenery[Y++];                // 10 
+    *HMP0 = 0;
+    *HMP1 = 0;
     strobe(WSYNC);                      // 3
     // First effective drawing line (Y = 1) 
     VSYNC[X] = ms_v;                    // 7
@@ -395,270 +498,4 @@ repo1_try_again:
             }
         }
     }
-/*
-void_kernel:
-    if (Y < ms_tmp) {       // 5/6
-        do { 
-            kernel_long_macro;              // Macro max 76 * 2 - 39 = 113 cycles (min 76 - 19 = 57 cycles)
-            ms_v = ms_scenery[Y];           // 9
-            Y++;                            // 2
-            X = ms_scenery[Y];              // 8
-            strobe(WSYNC);                  // 3
-
-            VSYNC[X] = ms_v;                // 7
-            Y++;                            // 2
-        } while (Y < ms_tmp);   // 5/6
-    }
-
-kernel_start:
-    // [14 or 15/76]
-    // Now we are going into display 0 and repo 1 kernel
-    X = ms_id_p[1];                     // 3
-    if (X == -1) {                      // 5/7 // No sprite 1 is allocated. Try to repo one.
-        // [22 or 23/76]
-        // Display sprite 0 while preparing for next sprite 1
-        X = ms_allocate_sprite();       // 47 [69/76]
-        strobe(WSYNC);                  // 3  [72/76]
-
-        *GRP0 = ms_grp0ptr[Y];          // 9
-        *COLUP0 = ms_colup0ptr[Y];      // 9 
-        if (X != -1) {                  // 5/7 [23/76]
-                                        // Check if y position is compatible
-            ms_tmp = ms_sprite_y[X];    // 7 [30]
-            if (Y < ms_tmp + 8) {       // 11/13 [41/76]
-                ms_id_p[1] = X;                 // 3
-                ms_v = ms_scenery[Y];           // 9
-                Y++;                            // 2
-                X = ms_scenery[Y];              // 8
-                load(ms_grp0ptr[Y]);            // 6
-                strobe(WSYNC);                  // 3 [72/76]
-
-                store(*GRP0);                   // 3
-                *COLUP0 = ms_colup0ptr[Y];      // 9 
-                VSYNC[X] = ms_v;                // 7
-                Y++;                            // 2
-                ms_v = ms_scenery[Y];           // 9
-                strobe(WSYNC);                  // 3 [33/76]
-
-                *GRP0 = ms_grp0ptr[Y];          // 9
-                *COLUP0 = ms_colup0ptr[Y];      // 9 
-                Y++;                            // 2 [20]
-                X = ms_id_p[1];                 // 3
-                *NUSIZ1 = ms_nusiz[X];          // 7 [30]
-                X = ms_sprite_x[X];             // 6
-                *HMP1 = ms_sprite_hm[X];        // 7
-                ms_x = X;                       // 3 [46]
-                X = ms_scenery[Y];              // 8
-                *COLUP0 = ms_colup0ptr[Y];      // 9 // This color change is anticipateed. C olor artifact when sprite 0 is on the right of the screen
-                load(ms_grp0ptr[Y]);            // 6
-                Y++;                            // 2
-                strobe(WSYNC);                  // 3 [74/76]                                                                                                                                                                                         otal (2) = 67
-
-                store(*GRP0);                   // 3
-                VSYNC[X] = ms_v;                // 7
-                // Player 1 repositionning
-                X = ms_x;                       // 3
-                X = ms_sprite_wait[X];          // 6
-                do { X--; } while (X);          // 5 / cycle. 4 for the last one. 
-                strobe(RESP1);                  // 3. Minimum = 26 cycles
-                strobe(WSYNC);                  // 3. Total (3) = Unknown
-
-                *GRP0 = ms_grp0ptr[Y];          // 9
-                *COLUP0 = ms_colup0ptr[Y];      // 9 
-                ms_v = ms_scenery[Y];           // 9
-                Y++;                            // 2
-                X = ms_scenery[Y];              // 8
-                ms_colup0 = ms_colup0ptr[Y];    // 9 
-                load(ms_grp0ptr[Y]);            // 6
-                strobe(WSYNC);                  // 3 [55/76]
-
-                store(*GRP0);                   // 3
-                *COLUP0 = ms_colup0;            // 6 [9]
-                VSYNC[X] = ms_v;                // 7 [16]
-                // Wait for 73 - 16 cycles exactly
-                X = ms_id_p[1];                 // 3 [19]
-                X = ms_sprite_id[X];            // 6 [25] 
-                ms_grp1ptr = ms_grptr[X] - ms_tmp;   // 21 [46] 
-                ms_colup1ptr = ms_coluptr[X] - ms_tmp; // 21 [65]
-                Y++;                            // 2 [67]
-                csleep(3);                      // 3 [70]
-                strobe(HMOVE);                  // 3. Early HMOVE at cycle 73
-                //strobe(WSYNC);                // Total (5) = 74
-
-                *GRP0 = ms_grp0ptr[Y];          // 9 (anticipated)
-                *COLUP0 = ms_colup0ptr[Y];      // 9 
-                ms_v = ms_scenery[Y];           // 9
-                Y++;                            // 2
-                X = ms_scenery[Y];              // 8
-                strobe(WSYNC);                  // 3. Total (6) = 38 cycles
-
-                *GRP0 = ms_grp0ptr[Y];          // 9
-                VSYNC[X] = ms_v;                // 7
-                *COLUP0 = ms_colup0ptr[Y];      // 9  // This color change is slightly delayed. Color artifact when sprite 0 is on the left of the screen
-                Y++;                            // 2
-            }
-        }
-    }
-    //[24 or 25/76] (in case of p1)
-
-    // Simply display sprite p0
-    if (Y < ms_next_p0_slice) { // 5/6
-        do {
-            ms_v = ms_scenery[Y];       // 9
-            strobe(WSYNC);              // 3
-
-            *GRP0 = ms_grp0ptr[Y];      // 9
-            *COLUP0 = ms_colup0ptr[Y];  // 9 
-            kernel_macro; // Max 15 cycles
-            Y++;                        // 2
-            X = ms_scenery[Y];          // 8
-            load(ms_grp0ptr[Y]);        // 6
-            strobe(WSYNC);              // 3
-
-            store(*GRP0);               // 3
-            *COLUP0 = ms_colup0ptr[Y];  // 9 
-            VSYNC[X] = ms_v;            // 7
-            Y++;                        // 2
-        } while (Y < ms_next_p0_slice);   // 5/6
-    }
-
-    // [34/76] (in case of no p0 alone)
-    // [27/76] (in case of p0 only)
-    // And then let's go into display 0 & 1 kernel
-    if (Y < ms_next_p0_p1_slice) { // 6/8
-        *VDELP0 = 1;                    // 5
-        // [45/76] (in case of no p0 only)
-        // [38/76] (in case of p0 only)
-        ms_v = ms_scenery[Y];           // 9
-        *COLUP0 = ms_colup0ptr[Y];      // 9
-        *COLUP1 = ms_colup1ptr[Y];      // 9
-        *GRP0 = ms_grp0ptr[Y];          // 9
-        *GRP1 = ms_grp1ptr[Y];          // 9. Total: 45 + 9 * 5 = 90... In hblank of next line...
-        // Skip this WSYNC as we are late on this scanline...
-        //strobe(WSYNC);                // 3
-        // Don't execute the kernel macro on the first line in order to resync
-        //kernel_macro;                 // Max 15 cycles
-        Y++;                            // 2
-        X = ms_scenery[Y];              // 8
-        ms_colup0 = ms_colup0ptr[Y];    // 9
-        ms_colup1 = ms_colup1ptr[Y];    // 9
-        *GRP0 = ms_grp0ptr[Y];          // 9
-        load(ms_grp1ptr[Y]);            // 6
-        strobe(WSYNC);                  // 3
-
-        store(*GRP1);                   // 3
-        *COLUP0 = ms_colup0;            // 6
-        *COLUP1 = ms_colup1;            // 6
-        VSYNC[X] = ms_v;                // 7
-        Y++;                            // 2
-        
-        do { // [30/76] while looping
-            ms_v = ms_scenery[Y];           // 9
-            ms_colup0 = ms_colup0ptr[Y];    // 9
-            ms_colup1 = ms_colup1ptr[Y];    // 9
-            *GRP0 = ms_grp0ptr[Y];          // 9
-            load(ms_grp1ptr[Y]);            // 6
-            strobe(WSYNC);                  // 3 ; Total (1) = 30 + 36 + 9 = 76
-
-            store(*GRP1);                   // 3
-            *COLUP0 = ms_colup0;            // 6 
-            *COLUP1 = ms_colup1;            // 6
-            kernel_macro;                   // Max 15 cycles
-            Y++;                            // 2
-            X = ms_scenery[Y];              // 8
-            ms_colup0 = ms_colup0ptr[Y];    // 9
-            ms_colup1 = ms_colup1ptr[Y];    // 9
-            *GRP0 = ms_grp0ptr[Y];          // 9
-            load(ms_grp1ptr[Y]);            // 6
-            strobe(WSYNC);                  // 3: Total (2) = 61 
-
-            store(*GRP1);                   // 3
-            *COLUP0 = ms_colup0;            // 6
-            *COLUP1 = ms_colup1;            // 6
-            VSYNC[X] = ms_v;                // 7
-            Y++;                            // 2
-        } while (Y < ms_next_p0_p1_slice);  // 5/6
-        *VDELP0 = 0;                        // 5
-        // [37/76] when getting out (including JMP)
-    } else {
-        // Void with repo 0
-        if (Y < ms_next_void_slice) {       // 5/6
-            do { 
-                kernel_long_macro;              // Macro max 76 * 2 - 39 = 113 cycles (min 76 - 19 = 57 cycles)
-                ms_v = ms_scenery[Y];           // 9
-                Y++;                            // 2
-                X = ms_scenery[Y];              // 8
-                strobe(WSYNC);                  // 3
-
-                VSYNC[X] = ms_v;                // 7
-                Y++;                            // 2
-            } while (Y < ms_next_void_slice);   // 5/6
-        }
-    }
-
-    // Display 1 with repo 0
-    
-    // And then let's go into display 0 & 1 kernel
-    if (Y < ms_next_p0_p1_slice) { // 6/8
-        *VDELP0 = 1;                    // 5
-        // [45/76] (in case of no p0 only)
-        // [38/76] (in case of p0 only)
-        ms_v = ms_scenery[Y];           // 9
-        *COLUP0 = ms_colup0ptr[Y];      // 9
-        *COLUP1 = ms_colup1ptr[Y];      // 9
-        *GRP0 = ms_grp0ptr[Y];          // 9
-        *GRP1 = ms_grp1ptr[Y];          // 9. Total: 45 + 9 * 5 = 90... In hblank of next line...
-        // Skip this WSYNC as we are late on this scanline...
-        //strobe(WSYNC);                // 3
-        // Don't execute the kernel macro on the first line in order to resync
-        //kernel_macro;                 // Max 15 cycles
-        Y++;                            // 2
-        X = ms_scenery[Y];              // 8
-        ms_colup0 = ms_colup0ptr[Y];    // 9
-        ms_colup1 = ms_colup1ptr[Y];    // 9
-        *GRP0 = ms_grp0ptr[Y];          // 9
-        load(ms_grp1ptr[Y]);            // 6
-        strobe(WSYNC);                  // 3
-
-        store(*GRP1);                   // 3
-        *COLUP0 = ms_colup0;            // 6
-        *COLUP1 = ms_colup1;            // 6
-        VSYNC[X] = ms_v;                // 7
-        Y++;                            // 2
-        
-        do { // [30/76] while looping
-            ms_v = ms_scenery[Y];           // 9
-            ms_colup0 = ms_colup0ptr[Y];    // 9
-            ms_colup1 = ms_colup1ptr[Y];    // 9
-            *GRP0 = ms_grp0ptr[Y];          // 9
-            load(ms_grp1ptr[Y]);            // 6
-            strobe(WSYNC);                  // 3 ; Total (1) = 30 + 36 + 9 = 76
-
-            store(*GRP1);                   // 3
-            *COLUP0 = ms_colup0;            // 6 
-            *COLUP1 = ms_colup1;            // 6
-            kernel_macro;                   // Max 15 cycles
-            Y++;                            // 2
-            X = ms_scenery[Y];              // 8
-            ms_colup0 = ms_colup0ptr[Y];    // 9
-            ms_colup1 = ms_colup1ptr[Y];    // 9
-            *GRP0 = ms_grp0ptr[Y];          // 9
-            load(ms_grp1ptr[Y]);            // 6
-            strobe(WSYNC);                  // 3: Total (2) = 61 
-
-            store(*GRP1);                   // 3
-            *COLUP0 = ms_colup0;            // 6
-            *COLUP1 = ms_colup1;            // 6
-            VSYNC[X] = ms_v;                // 7
-            Y++;                            // 2
-        } while (Y < ms_next_p0_p1_slice);  // 5/6
-        *VDELP0 = 0;                        // 5
-        // [37/76] when getting out (including JMP)
-    } else {
-        // Void with repo 1
-    }
-
-    if (Y < MS_PLAYFIELD_HEIGHT + 2)
-        goto kernel_start;
-*/
 }
