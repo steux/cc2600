@@ -20,7 +20,11 @@
 #define MS_PLAYFIELD_HEIGHT 192
 #endif
 
-char ms_v, y0, y1;
+#ifndef INITBANK
+#define INITBANK
+#endif
+
+char ms_v, y0, y1, h0, h1;
 char *ms_colup0ptr, *ms_colup1ptr, *ms_grp0ptr, *ms_grp1ptr, *ms_scenery;
 char ms_sprite_iter;
 char ms_sprite_x[MS_MAX_NB_SPRITES];
@@ -205,18 +209,17 @@ void p0_p1_kernel(char stop)
     *VDELP0 = 1;                    // 5
     // [46/76] when coming from p0/p1 kernel
     ms_v = ms_scenery[Y];           // 9
-    ms_colup1 = ms_colup1ptr[Y];    // 9
     *GRP0 = ms_grp0ptr[Y];          // 9
+    *COLUP1 = ms_colup1ptr[Y];      // 9
     *COLUP0 = ms_colup0ptr[Y];      // 9 [82/76]. No WSYNC necessary 
     *GRP1 = ms_grp1ptr[Y];          // 6 
-    *COLUP1 = ms_colup1;            // 6 
     Y++;                            // 2
     X = ms_scenery[Y];              // 8
     ms_colup0 = ms_colup0ptr[Y];    // 9
     ms_colup1 = ms_colup1ptr[Y];    // 9
     *GRP0 = ms_grp0ptr[Y];          // 9
     load(ms_grp1ptr[Y]);            // 6
-    strobe(WSYNC);                  // 3: Total (2) = 140 = 64 into the second line
+    strobe(WSYNC);                  // 3: Total (2) = 134 = 58 into the second line
 
     store(*GRP1);                   // 3
     *COLUP0 = ms_colup0;            // 6
@@ -259,21 +262,31 @@ void p0_p1_kernel(char stop)
 
 void void_kernel(char stop)
 {
-    do { 
-        kernel_long_macro;              // Macro max 76 * 2 - 39 = 113 cycles (min 76 - 19 = 57 cycles)
-        ms_v = ms_scenery[Y];           // 9
-        Y++;                            // 2
-        X = ms_scenery[Y];              // 8
-        strobe(WSYNC);                  // 3
+    strobe(WSYNC);                  // 3
+    ms_v = ms_scenery[Y];           // 9
+    Y++;                            // 2
+    X = ms_scenery[Y++];            // 10 
+    load(ms_v);                     // 3
+    strobe(WSYNC);                  // 3
 
-        VSYNC[X] = ms_v;                // 7
-        Y++;                            // 2
-    } while (Y < stop);
-}
+    store(VSYNC[X]);                // 4
+    if (Y < stop) {
+        do { 
+            kernel_long_macro;              // Macro max 76 * 2 - 39 = 113 cycles (min 76 - 19 = 57 cycles)
+            ms_v = ms_scenery[Y];           // 9
+            Y++;                            // 2
+            X = ms_scenery[Y++];            // 10 
+            load(ms_v);                     // 3
+            strobe(WSYNC);                  // 3
 
-void kernel()
+            store(VSYNC[X]);                // 4
+        } while (Y < stop);                 // 5/6
+    }
+} //[15/76] when getting out (including RTS)
+
+INITBANK void kernel_prep()
 {
-    char ms_tmp, h0, h1;
+    char ms_tmp;
     ms_select_sprites();
     
     // Phase 1: before the kernel actually starts, allocates and positions sprites p0 and p1.
@@ -322,26 +335,27 @@ void kernel()
         strobe(HMOVE);
     }
 
-    // 2 lines to prepare for drawing
+    // Prepare for drawing
     Y = 0;
     ms_v = ms_scenery[Y];               // 9
     Y++;                                // 2
     X = ms_scenery[Y++];                // 10 
     *HMP0 = 0;
     *HMP1 = 0;
-    strobe(WSYNC);                      // 3
-    // First effective drawing line (Y = 1) 
     VSYNC[X] = ms_v;                    // 7
+}
+
+void kernel()
+{
+    char ms_tmp;
+
+    strobe(WSYNC);                      // 3
 
 repo_kernel:
 
-    if (y0 == 255) { // 4. There is no sprite 0. Allocate 1 ?
+    if (y0 == 255) { // 8. There is no sprite 0. Allocate 1 ?
 repo0_kernel:
-        X = ms_id_p[1];                 // 3
-        if (X != -1) { // 4. There is a sprite 1
-            if (Y >= ms_sprite_y[X] + 8) X = -1; // 17
-        }
-        if (X != -1) { // 4 [44/76] This is OK. Let's try to allocate one                                                   
+        if (y1 == 255 || Y < y1 + 8) {      // 22                                              
 repo0_try_again: 
             strobe(WSYNC);                  // 3 
 
@@ -370,28 +384,24 @@ repo0_try_again:
                     goto repo0_try_again;
                 }
             }
+            X = ms_scenery[Y++];                // 10
+            strobe(WSYNC);                      // 3
+
+            VSYNC[X] = ms_v;                    // 7
         }
     }
-    X = ms_scenery[Y++];                // 10
-    strobe(WSYNC);                      // 3
-    
-    VSYNC[X] = ms_v;                    // 7
 
     // Repo kernel 1
-    if (y1 == 255) { // 4. There is no sprite 1. Allocate 1 ?
+    if (y1 == 255) { // 7. There is no sprite 1. Allocate 1 ?
 repo1_kernel:
-        X = ms_id_p[0];                 // 3
-        if (X != -1) { // 4. There is a sprite 0
-            if (Y >= ms_sprite_y[X] + 8) X = -1; // 17
-        }
-        if (X != -1) { // 4 [44/76] This is OK. Let's try to allocate one                                                   
+        if (y0 == 255 || Y < y0 + 8) {      // 22                                             
 repo1_try_again: 
             strobe(WSYNC);                  // 3 
 
             ms_v = ms_scenery[Y];           // 9
             Y++;                            // 2
             X = ms_allocate_sprite();       // 47 [58/76]
-            if (X != -1) {                  // 5/7
+            if (X != -1) {                  // 4/5
                 // Check if y position is compatible
                 ms_id_p[1] = X;             // 3
                 strobe(WSYNC);              // 3
@@ -413,13 +423,13 @@ repo1_try_again:
                     goto repo1_try_again;
                 }
             }
+            X = ms_scenery[Y++];                // 10 
+            strobe(WSYNC);                      // 3
+
+            VSYNC[X] = ms_v;                    // 7
         }
     }
-    X = ms_scenery[Y++];                // 8
-    strobe(WSYNC);                      // 3
     
-    VSYNC[X] = ms_v;                    // 7
-
     if (y0 < y1) {                      // 8/9
         void_kernel(y0);
         *GRP0 = ms_grp0ptr[Y];
@@ -477,14 +487,10 @@ repo1_try_again:
     } else {
         if (y0 != 255) {
             void_kernel(y0);
-            *GRP0 = ms_grp0ptr[Y];
-            *GRP1 = ms_grp1ptr[Y];
-            *COLUP0 = ms_colup0ptr[Y];
-            *COLUP1 = ms_colup1ptr[Y];
-            ms_tmp = y0 + h0;
-            X = y1 + h1;
-            if (X < ms_tmp) {
-                p0_p1_kernel(X);
+            ms_tmp = y0 + h0; // 11 [26/76]
+            X = y1 + h1;      // 10 [36/76]
+            if (X < ms_tmp) { // 5/6 [42/76]
+                p0_p1_kernel(X); // 12 [54/76]
                 p0_kernel(ms_tmp);
                 y0 = 255;
                 y1 = 255;
@@ -496,6 +502,9 @@ repo1_try_again:
                 y1 = 255;
                 goto repo0_kernel;
             }
+        } else {
+            // This is the end of the kernel. Fill with void.
+            void_kernel(MS_PLAYFIELD_HEIGHT + 1);
         }
     }
 }

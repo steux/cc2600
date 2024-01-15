@@ -9,6 +9,7 @@ const char ms_height[MS_NB_SPRITES_DEF] = {8};
 
 void main()
 {
+    kernel_prep();
     kernel();
 }
 
