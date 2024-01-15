@@ -16,17 +16,14 @@
 #define MS_PLAYFIELD_HEIGHT 192
 #endif
 
-char ms_v, ms_colup0, ms_colup1;
+char ms_v, y0, y1;
 char *ms_colup0ptr, *ms_colup1ptr, *ms_grp0ptr, *ms_grp1ptr, *ms_scenery;
-char ms_next_void_slice, ms_next_p0_slice, ms_next_p1_slice, ms_next_p0_p1_slice;
-char ms_x;
 char ms_sprite_iter;
 char ms_sprite_x[MS_MAX_NB_SPRITES];
 char ms_sprite_y[MS_MAX_NB_SPRITES];
 char ms_sprite_id[MS_MAX_NB_SPRITES];
 char ms_nusiz[MS_MAX_NB_SPRITES];
 char ms_sorted_by_y[MS_MAX_NB_SPRITES];
-char ms_tmp;
 char ms_id_p[2];
 char ms_nb_sprites;
 
@@ -58,6 +55,7 @@ void ms_select_sprites()
 
 inline char ms_allocate_sprite()
 {
+    char ms_tmp;
     X = ms_sprite_iter;
     if (X != ms_nb_sprites) {
         ms_tmp = ms_sorted_by_y[X];
@@ -73,14 +71,21 @@ inline char ms_allocate_sprite()
     return -1;
 }
 
-inline char ms_mark_as_removed()
+char ms_mark_as_removed()
 {
     X = ms_sprite_iter;
     ms_sorted_by_y[--X] |= 0x80;
+    X = ms_scenery[Y];                  // 8
+    strobe(WSYNC);                      // 3
+
+    VSYNC[X] = ms_v;                    // 7
+    Y++;                                // 2
 }
 
-void kernel_repo0()
+char kernel_repo0()
 {
+    char ms_tmp;
+
     // Entering at [46/76]
     ms_tmp = ms_scenery[Y];             // 9 [55/76] (variable)
     X = ms_id_p[0];                     // 3
@@ -91,30 +96,89 @@ void kernel_repo0()
     *HMP0 = ms_sprite_hm[X];            // 7
     X = ms_sprite_wait[X];              // 6 [19/76]
     do { X--; } while (X);              // 5 / cycle. 4 for the last one. 
-    strobe(RESP1);                      // 3. Minimum = 26 cycles
+    strobe(RESP0);                      // 3. Minimum = 26 cycles
     strobe(WSYNC);                      // 3
    
     X = ms_tmp;                         // 3
     VSYNC[X] = ms_v;                    // 7 [10]
     X = ms_id_p[0];                     // 3 
-    ms_tmp = ms_sprite_y[X];            // 7 [20]
+    y0 = ms_sprite_y[X];                // 7 [20]
     X = ms_sprite_id[X];                // 6 [26]
-    ms_grp0ptr = ms_grptr[X] - ms_tmp;  // 21 [47]
-    ms_colup0ptr = ms_coluptr[X] - ms_tmp; // 21 [68]
+    ms_grp0ptr = ms_grptr[X] - y0;      // 21 [47]
+    ms_colup0ptr = ms_coluptr[X] - y0;  // 21 [68]
     Y++;                                // 2 [70]
     strobe(HMOVE);                      // Early hmove [73]
     //strobe(WSYNC);                    // 3
 
     ms_v = ms_scenery[Y++];             // 11
+    *HMP0 = 0;
+    return ms_height[X];
     // Must leave at < [53/76]
 } // RTS: 6
 
+char kernel_repo1()
+{
+    char ms_tmp;
+
+    // Entering at [46/76]
+    ms_tmp = ms_scenery[Y];             // 9 [55/76] (variable)
+    X = ms_id_p[1];                     // 3
+    *NUSIZ1 = ms_nusiz[X];              // 7 [65/76]
+    strobe(WSYNC);                      // 3
+
+    X = ms_sprite_x[X];                 // 6
+    *HMP1 = ms_sprite_hm[X];            // 7
+    X = ms_sprite_wait[X];              // 6 [19/76]
+    do { X--; } while (X);              // 5 / cycle. 4 for the last one. 
+    strobe(RESP1);                      // 3. Minimum = 26 cycles
+    strobe(WSYNC);                      // 3
+   
+    X = ms_tmp;                         // 3
+    VSYNC[X] = ms_v;                    // 7 [10]
+    X = ms_id_p[1];                     // 3 
+    y1 = ms_sprite_y[X];                // 7 [20]
+    X = ms_sprite_id[X];                // 6 [26]
+    ms_grp1ptr = ms_grptr[X] - y1;      // 21 [47]
+    ms_colup1ptr = ms_coluptr[X] - y1;  // 21 [68]
+    Y++;                                // 2 [70]
+    strobe(HMOVE);                      // Early hmove [73]
+    //strobe(WSYNC);                    // 3
+
+    ms_v = ms_scenery[Y++];             // 11
+    *HMP1 = 0;                          
+    return ms_height[X];
+    // Must leave at < [53/76]
+} // RTS: 6
+
+void p0_kernel(char stop)
+{
+
+}
+
+void p1_kernel(char stop)
+{
+
+}
+
+void p0_p1_kernel(char stop)
+{
+
+}
+
+void void_kernel(char stop)
+{
+
+}
+
 void kernel()
 {
+    char ms_tmp, h0, h1;
     ms_select_sprites();
     
     // Phase 1: before the kernel actually starts, allocates and positions sprites p0 and p1.
     ms_sprite_iter = 0;
+    y0 = 255;
+    y1 = 255;
     *GRP0 = 0;
     *VDELP0 = 0;
     X = ms_allocate_sprite(); // 47
@@ -122,9 +186,10 @@ void kernel()
     if (X != -1) {
         ms_id_p[0] = X;
         Y = ms_sprite_id[X];
-        ms_tmp = ms_sprite_y[X];
-        ms_grp0ptr = ms_grptr[Y] - ms_tmp;   // 21
-        ms_colup0ptr = ms_coluptr[Y] - ms_tmp; // 21
+        y0 = ms_sprite_y[X];
+        ms_grp0ptr = ms_grptr[Y] - y0;   // 21
+        ms_colup0ptr = ms_coluptr[Y] - y0; // 21
+        h0 = ms_height[Y];
         strobe(WSYNC);                  // 3
         
         X = ms_sprite_x[X];             // 6
@@ -141,9 +206,10 @@ void kernel()
     if (X != -1) {
         ms_id_p[1] = X;
         Y = ms_sprite_id[X];
-        ms_tmp = ms_sprite_y[X];
-        ms_grp1ptr = ms_grptr[Y] - ms_tmp;   // 21
-        ms_colup1ptr = ms_coluptr[Y] - ms_tmp; // 21
+        y1 = ms_sprite_y[X];
+        ms_grp1ptr = ms_grptr[Y] - y1;   // 21
+        ms_colup1ptr = ms_coluptr[Y] - y1; // 21
+        h1 = ms_height[Y];
         strobe(WSYNC);                  // 3
         
         X = ms_sprite_x[X];             // 6
@@ -155,52 +221,25 @@ void kernel()
         strobe(HMOVE);
     }
 
-    // We are ready for the actual kernel
-    ms_tmp = MS_PLAYFIELD_HEIGHT + 2;
-    ms_next_void_slice = MS_PLAYFIELD_HEIGHT + 2;
-    ms_next_p0_slice = MS_PLAYFIELD_HEIGHT + 2;
-    ms_next_p1_slice = MS_PLAYFIELD_HEIGHT + 2;
-    ms_next_p0_p1_slice = MS_PLAYFIELD_HEIGHT + 2;
-    X = ms_id_p[0];
-    if (X != -1) {
-        ms_tmp = ms_sprite_y[X];
-        X = ms_sprite_id[X];
-        ms_next_p0_slice = ms_tmp + ms_height[X];
-        if (ms_next_p0_slice < ms_height[X]) ms_tmp = 0; // Manage out of upper screen sprites
-        X = ms_id_p[1];
-        if (X != 1) {
-            if (ms_sprite_y[X] < ms_next_p0_slice) {
-                ms_next_p0_p1_slice = ms_next_p0_slice;   
-                ms_next_p0_slice = ms_sprite_y[X];
-                X = ms_sprite_id[X];
-                ms_next_p1_slice = ms_next_p0_slice + ms_height[X];
-            } else {
-                ms_next_void_slice = ms_sprite_y[X];
-                X = ms_sprite_id[X];
-                ms_next_p1_slice = ms_next_void_slice + ms_height[X];
-            }
-        }
-    }
-
     // 2 lines to prepare for drawing
     Y = 0;
     ms_v = ms_scenery[Y];               // 9
     Y++;                                // 2
-    X = ms_scenery[Y];                  // 8
+    X = ms_scenery[Y++];                // 10 
     strobe(WSYNC);                      // 3
-    // Second prep line has started
+    // First effective drawing line (Y = 1) 
     VSYNC[X] = ms_v;                    // 7
-    Y++;                                // 2
 
 repo_kernel:
 
-    X = ms_id_p[0];                     // 3
-    if (X == -1) { // 4. There is no sprite 0. Allocate 1 ?
+    if (y0 == 255) { // 4. There is no sprite 0. Allocate 1 ?
+repo0_kernel:
         X = ms_id_p[1];                 // 3
         if (X != -1) { // 4. There is a sprite 1
             if (Y >= ms_sprite_y[X] + 8) X = -1; // 17
         }
         if (X != -1) { // 4 [44/76] This is OK. Let's try to allocate one                                                   
+repo0_try_again: 
             strobe(WSYNC);                  // 3 
 
             ms_v = ms_scenery[Y];           // 9
@@ -210,7 +249,7 @@ repo_kernel:
                 // Check if y position is compatible
                 ms_id_p[0] = X;             // 3
                 strobe(WSYNC);              // 3
-                
+               
                 X = ms_scenery[Y];          // 8
                 VSYNC[X] = ms_v;            // 7
                 Y++;                        // 2
@@ -218,22 +257,145 @@ repo_kernel:
                 
                 X = ms_id_p[0];             // 3 [29/76]
                 if (Y < ms_sprite_y[X] + 8) { // 11/13 [40/76]
-                    kernel_repo0();          // 6 [46/76] 
+                    h0 = kernel_repo0();          // 6 [46/76] 
                 } else {
                     // This one will be skipped. Let's set it as prioritary for next time
-                    strobe(WSYNC);
-                    ms_mark_as_removed();
+                    strobe(WSYNC);                      // 3
                     ms_id_p[0] = -1;
+
+                    ms_mark_as_removed();
+                    goto repo0_try_again;
                 }
             }
         }
     }
-    X = ms_scenery[Y];                  // 8
+    X = ms_scenery[Y++];                // 10
     strobe(WSYNC);                      // 3
     
     VSYNC[X] = ms_v;                    // 7
-    Y++;                                // 2
 
+    // Repo kernel 1
+    if (y1 == 255) { // 4. There is no sprite 1. Allocate 1 ?
+repo1_kernel:
+        X = ms_id_p[0];                 // 3
+        if (X != -1) { // 4. There is a sprite 0
+            if (Y >= ms_sprite_y[X] + 8) X = -1; // 17
+        }
+        if (X != -1) { // 4 [44/76] This is OK. Let's try to allocate one                                                   
+repo1_try_again: 
+            strobe(WSYNC);                  // 3 
+
+            ms_v = ms_scenery[Y];           // 9
+            Y++;                            // 2
+            X = ms_allocate_sprite();       // 47 [58/76]
+            if (X != -1) {                  // 5/7
+                // Check if y position is compatible
+                ms_id_p[1] = X;             // 3
+                strobe(WSYNC);              // 3
+               
+                X = ms_scenery[Y];          // 8
+                VSYNC[X] = ms_v;            // 7
+                Y++;                        // 2
+                ms_v = ms_scenery[Y++];     // 9
+                
+                X = ms_id_p[1];             // 3 [29/76]
+                if (Y < ms_sprite_y[X] + 8) { // 11/13 [40/76]
+                    h1 = kernel_repo1();          // 6 [46/76] 
+                } else {
+                    // This one will be skipped. Let's set it as prioritary for next time
+                    strobe(WSYNC);                      // 3
+                    ms_id_p[1] = -1;
+
+                    ms_mark_as_removed();
+                    goto repo1_try_again;
+                }
+            }
+        }
+    }
+    X = ms_scenery[Y++];                // 8
+    strobe(WSYNC);                      // 3
+    
+    VSYNC[X] = ms_v;                    // 7
+
+    if (y0 < y1) {                      // 8/9
+        void_kernel(y0);
+        *GRP0 = ms_grp0ptr[Y];
+        *COLUP0 = ms_colup0ptr[Y];
+        ms_tmp = y0 + h0;
+        if (ms_tmp < y1) {
+            p0_kernel(ms_tmp);
+            y0 = 255;
+            goto repo0_kernel; 
+        } else {
+            X = y1 + h1;
+            if (X < ms_tmp) {
+                p0_kernel(y1);
+                p0_p1_kernel(X);
+                p0_kernel(ms_tmp);
+                y0 = 255;
+                y1 = 255;
+                goto repo0_kernel;
+            } else {
+                p0_kernel(y1);
+                p0_p1_kernel(ms_tmp);
+                p1_kernel(X);
+                y0 = 255;
+                y1 = 255;
+                goto repo0_kernel;
+            }
+        }
+    } else if (y1 < y0) { // 8 / 9
+        void_kernel(y1);
+        *GRP1 = ms_grp1ptr[Y];
+        *COLUP1 = ms_colup1ptr[Y];
+        ms_tmp = y1 + h1;
+        if (ms_tmp < y0) {
+            p1_kernel(ms_tmp);
+            y1 = 255;
+            goto repo_kernel; 
+        } else {
+            X = y0 + h0;
+            if (X < ms_tmp) {
+                p1_kernel(y0);
+                p0_p1_kernel(X);
+                p1_kernel(ms_tmp);
+                y0 = 255;
+                y1 = 255;
+                goto repo0_kernel;
+            } else {
+                p1_kernel(y0);
+                p0_p1_kernel(ms_tmp);
+                p0_kernel(X);
+                y0 = 255;
+                y1 = 255;
+                goto repo0_kernel;
+            }
+        }
+    } else {
+        if (y0 != 255) {
+            void_kernel(y0);
+            *GRP0 = ms_grp0ptr[Y];
+            *GRP1 = ms_grp1ptr[Y];
+            *COLUP0 = ms_colup0ptr[Y];
+            *COLUP1 = ms_colup1ptr[Y];
+            ms_tmp = y0 + h0;
+            X = y1 + h1;
+            if (X < ms_tmp) {
+                p0_p1_kernel(X);
+                p0_kernel(ms_tmp);
+                y0 = 255;
+                y1 = 255;
+                goto repo0_kernel;
+            } else {
+                p0_p1_kernel(ms_tmp);
+                p1_kernel(X);
+                y0 = 255;
+                y1 = 255;
+                goto repo0_kernel;
+            }
+        }
+    }
+/*
 void_kernel:
     if (Y < ms_tmp) {       // 5/6
         do { 
@@ -498,4 +660,5 @@ kernel_start:
 
     if (Y < MS_PLAYFIELD_HEIGHT + 2)
         goto kernel_start;
+*/
 }
