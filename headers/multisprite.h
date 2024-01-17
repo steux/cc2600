@@ -24,6 +24,9 @@
 
 #ifndef MS_OFFSCREEN_BANK
 #define MS_OFFSCREEN_BANK
+#define ms_grptr_offscreen ms_grptr
+#define ms_coluptr_offscreen ms_coluptr
+#define ms_height_offscreen ms_height
 #endif
 
 #ifndef MS_KERNEL_BANK
@@ -404,9 +407,9 @@ MS_OFFSCREEN_BANK void multisprite_kernel_prep()
         *REFP0 = *NUSIZ0; 
         Y = ms_sprite_model[X];
         y0 = ms_sprite_y[X];
-        ms_grp0ptr = ms_grptr[Y] - y0;   // 21
-        ms_colup0ptr = ms_coluptr[Y] - y0; // 21
-        h0 = ms_height[Y];
+        ms_grp0ptr = ms_grptr_offscreen[Y] - y0;   // 21
+        ms_colup0ptr = ms_coluptr_offscreen[Y] - y0; // 21
+        h0 = ms_height_offscreen[Y];
         X = ms_sprite_x[X];             // 6
         strobe(WSYNC);                  // 3
         
@@ -426,9 +429,9 @@ MS_OFFSCREEN_BANK void multisprite_kernel_prep()
         *REFP1 = *NUSIZ1; 
         Y = ms_sprite_model[X];
         y1 = ms_sprite_y[X];
-        ms_grp1ptr = ms_grptr[Y] - y1;   // 21
-        ms_colup1ptr = ms_coluptr[Y] - y1; // 21
-        h1 = ms_height[Y];
+        ms_grp1ptr = ms_grptr_offscreen[Y] - y1;   // 21
+        ms_colup1ptr = ms_coluptr_offscreen[Y] - y1; // 21
+        h1 = ms_height_offscreen[Y];
         X = ms_sprite_x[X];             // 6
         *HMP0 = 0;                      // 3
         strobe(WSYNC);                  // 3

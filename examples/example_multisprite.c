@@ -42,7 +42,7 @@ void main()
 {
     char xpos = 100, ypos = 170, scrolling = 0;
     multisprite_init(playfield);
-    multisprite_new(0, xpos, ypos, 0);
+    multisprite_new(0, xpos, ypos, 3);
     do {
         *VBLANK = 2; // Enable VBLANK
         *VSYNC = 2; // Set VSYNC
@@ -54,8 +54,8 @@ void main()
         // Blank
         *TIM64T = ((BLANK - 3) * 76) / 64;
         // Do some logic here
-        if (!(*SWCHA & 0x80) && xpos < 158) { xpos++; } // Right
-        if (!(*SWCHA & 0x40) && xpos > 0) { xpos--; } // Left
+        if (!(*SWCHA & 0x80) && xpos < 158) { xpos++; ms_nusiz[0] = 0; } // Right
+        if (!(*SWCHA & 0x40) && xpos > 0) { xpos--; ms_nusiz[0] = 8; } // Left
         if (!(*SWCHA & 0x20) && ypos < 200 - 20) { ypos++; } // Down
         if (!(*SWCHA & 0x10) && ypos > 0) { ypos--; }// Up
 
