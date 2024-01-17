@@ -1,7 +1,7 @@
 #include "vcs_colors.h"
 
-const char garfield[22] = { 0x12, 0x36, 0x4a, 0x33, 0x55, 0x33, 0xcb, 0xb6, 0x48, 0x3e, 0x5e, 0x6e, 0x76, 0x36, 0x84, 0xbc, 0x3a, 0x76, 0x66, 0x66, 0, 0};
-const char garfield_colors[20] = { 0x3c, 0x3c, 0x3c, 0x0e, 0x0e, 0x0e, 0x3c, 0x3c, 0x3c, 0x3c, 0x38, 0x2c, 0x3c, 0x3c, 0x38, 0x38, 0x2c, 0x2c, 0x12, 0x12};
+const char garfield[22] = { 0, 0x12, 0x36, 0x4a, 0x33, 0x55, 0x33, 0xcb, 0xb6, 0x48, 0x3e, 0x5e, 0x6e, 0x76, 0x36, 0x84, 0xbc, 0x3a, 0x76, 0x66, 0x66, 0};
+const char garfield_colors[21] = { 0, 0x3c, 0x3c, 0x3c, 0x0e, 0x0e, 0x0e, 0x3c, 0x3c, 0x3c, 0x3c, 0x38, 0x2c, 0x3c, 0x3c, 0x38, 0x38, 0x2c, 0x2c, 0x12, 0x12};
 
 #define MS_NB_SPRITES_DEF 1
 const char *ms_grptr[MS_NB_SPRITES_DEF] = {garfield};
@@ -20,7 +20,7 @@ const char ms_height[MS_NB_SPRITES_DEF] = {22};
 #define REG_PF1     0x0e
 #define REG_PF2     0x0f
 
-const char playfield[194] = {
+const char playfield[194 + 32] = {
     VCS_RED, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, 
     VCS_RED, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, 
     VCS_RED, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, 
@@ -29,6 +29,8 @@ const char playfield[194] = {
     VCS_RED, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, 
     VCS_RED, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, 
     VCS_RED, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, 
+    VCS_RED, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, 
+    VCS_RED, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK,
     VCS_RED, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, 
     VCS_RED, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK,
     VCS_RED, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, 
@@ -38,9 +40,9 @@ const char playfield[194] = {
 
 void main()
 {
-    char xs = 0, dir = 0;
+    char xpos = 100, ypos = 170, scrolling = 0;
     multisprite_init(playfield);
-    multisprite_new(0, 0, 100, 0);
+    multisprite_new(0, xpos, ypos, 0);
     do {
         *VBLANK = 2; // Enable VBLANK
         *VSYNC = 2; // Set VSYNC
@@ -52,18 +54,20 @@ void main()
         // Blank
         *TIM64T = ((BLANK - 3) * 76) / 64;
         // Do some logic here
-        if (!dir) {
-            xs++;
-            if (xs == 159) dir = 1;
-        } else {
-            xs--;
-            if (xs == 0) dir = 0;
-        }
-        multisprite_move(0, xs, 100);
-        
+        if (!(*SWCHA & 0x80) && xpos < 158) { xpos++; } // Right
+        if (!(*SWCHA & 0x40) && xpos > 0) { xpos--; } // Left
+        if (!(*SWCHA & 0x20) && ypos < 200 - 20) { ypos++; } // Down
+        if (!(*SWCHA & 0x10) && ypos > 0) { ypos--; }// Up
+
+        multisprite_move(0, xpos, ypos);
+
+        ms_scenery = playfield + scrolling;
+        scrolling -= 2;
+        if (scrolling < 0) scrolling = 30;
+
         multisprite_kernel_prep();
         while (*INTIM); // Wait for end of blank
-        
+ 
         multisprite_kernel();
         
         // Overscan

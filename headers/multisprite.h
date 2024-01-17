@@ -541,20 +541,25 @@ repo1_try_again:
     }
     
     if (y0 < y1) {                      // 8/9
-        void_kernel(y0);
-        *GRP0 = ms_grp0ptr[Y];
-        *COLUP0 = ms_colup0ptr[Y];
+        if (Y < y0) {
+            void_kernel(y0);
+        }
         ms_tmp = y0 + h0;
+        if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 3) ms_tmp = MS_PLAYFIELD_HEIGHT - 4;
         if (ms_tmp < y1) {
             _ms_p0_kernel(ms_tmp);
             y0 = 255;
+            *GRP0 = 0;
             goto repo0_kernel; 
         } else {
             X = y1 + h1;
+            if (X >= MS_PLAYFIELD_HEIGHT - 3) X = MS_PLAYFIELD_HEIGHT - 4;
             if (X < ms_tmp) {
                 _ms_p0_kernel(y1);
                 _ms_p0_p1_kernel(X);
                 _ms_p0_kernel(ms_tmp);
+                *GRP0 = 0;
+                *GRP1 = 0;
                 y0 = 255;
                 y1 = 255;
                 goto repo0_kernel;
@@ -562,16 +567,19 @@ repo1_try_again:
                 _ms_p0_kernel(y1);
                 _ms_p0_p1_kernel(ms_tmp);
                 _ms_p1_kernel(X);
+                *GRP0 = 0;
+                *GRP1 = 0;
                 y0 = 255;
                 y1 = 255;
                 goto repo0_kernel;
             }
         }
     } else if (y1 < y0) { // 8 / 9
-        void_kernel(y1);
-        *GRP1 = ms_grp1ptr[Y];
-        *COLUP1 = ms_colup1ptr[Y];
+        if (Y < y1) {
+            void_kernel(y1);
+        }
         ms_tmp = y1 + h1;
+        if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 3) ms_tmp = MS_PLAYFIELD_HEIGHT - 4;
         if (ms_tmp < y0) {
             _ms_p1_kernel(ms_tmp);
             y1 = 255;
@@ -579,10 +587,13 @@ repo1_try_again:
             goto repo_kernel; 
         } else {
             X = y0 + h0;
+            if (X >= MS_PLAYFIELD_HEIGHT - 3) X = MS_PLAYFIELD_HEIGHT - 4;
             if (X < ms_tmp) {
                 _ms_p1_kernel(y0);
                 _ms_p0_p1_kernel(X);
                 _ms_p1_kernel(ms_tmp);
+                *GRP0 = 0;
+                *GRP1 = 0;
                 y0 = 255;
                 y1 = 255;
                 goto repo0_kernel;
@@ -590,6 +601,8 @@ repo1_try_again:
                 _ms_p1_kernel(y0);
                 _ms_p0_p1_kernel(ms_tmp);
                 _ms_p0_kernel(X);
+                *GRP0 = 0;
+                *GRP1 = 0;
                 y0 = 255;
                 y1 = 255;
                 goto repo0_kernel;
@@ -597,18 +610,26 @@ repo1_try_again:
         }
     } else {
         if (y0 != 255) {
-            void_kernel(y0);
+            if (Y < y0) {
+                void_kernel(y0);
+            }
             ms_tmp = y0 + h0; // 11 [26/76]
+            if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 3) ms_tmp = MS_PLAYFIELD_HEIGHT - 4;
             X = y1 + h1;      // 10 [36/76]
+            if (X >= MS_PLAYFIELD_HEIGHT - 3) X = MS_PLAYFIELD_HEIGHT - 4;
             if (X < ms_tmp) { // 5/6 [42/76]
                 _ms_p0_p1_kernel(X); // 12 [54/76]
                 _ms_p0_kernel(ms_tmp);
+                *GRP0 = 0;
+                *GRP1 = 0;
                 y0 = 255;
                 y1 = 255;
                 goto repo0_kernel;
             } else {
                 _ms_p0_p1_kernel(ms_tmp);
                 _ms_p1_kernel(X);
+                *GRP0 = 0;
+                *GRP1 = 0;
                 y0 = 255;
                 y1 = 255;
                 goto repo0_kernel;
