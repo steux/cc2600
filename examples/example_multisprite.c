@@ -1,17 +1,16 @@
 #include "vcs_colors.h"
 
-const char garfield[20] = { 0x12, 0x36, 0x4a, 0x33, 0x55, 0x33, 0xcb, 0xb6, 0x48, 0x3e, 0x5e, 0x6e, 0x76, 0x36, 0x84, 0xbc, 0x3a, 0x76, 0x66, 0x66};
+const char garfield[22] = { 0x12, 0x36, 0x4a, 0x33, 0x55, 0x33, 0xcb, 0xb6, 0x48, 0x3e, 0x5e, 0x6e, 0x76, 0x36, 0x84, 0xbc, 0x3a, 0x76, 0x66, 0x66, 0, 0};
 const char garfield_colors[20] = { 0x3c, 0x3c, 0x3c, 0x0e, 0x0e, 0x0e, 0x3c, 0x3c, 0x3c, 0x3c, 0x38, 0x2c, 0x3c, 0x3c, 0x38, 0x38, 0x2c, 0x2c, 0x12, 0x12};
 
 #define MS_NB_SPRITES_DEF 1
 const char *ms_grptr[MS_NB_SPRITES_DEF] = {garfield};
 const char *ms_coluptr[MS_NB_SPRITES_DEF] = {garfield_colors};
-const char ms_height[MS_NB_SPRITES_DEF] = {20};
+const char ms_height[MS_NB_SPRITES_DEF] = {22};
 
 #include "multisprite.h"
 
 #define BLANK 40
-#define KERNAL 192
 #define OVERSCAN 30
 
 #define REG_COLUPF  0x08
@@ -39,7 +38,9 @@ const char playfield[194] = {
 
 void main()
 {
+    char xs = 0, dir = 0;
     multisprite_init(playfield);
+    multisprite_new(0, 0, 100, 0);
     do {
         *VBLANK = 2; // Enable VBLANK
         *VSYNC = 2; // Set VSYNC
@@ -49,19 +50,28 @@ void main()
         *VSYNC = 0; // Turn VSYNC Off
         
         // Blank
-        *TIM64T = ((BLANK - 3) * 76 + 13) / 64;
+        *TIM64T = ((BLANK - 3) * 76) / 64;
         // Do some logic here
+        if (!dir) {
+            xs++;
+            if (xs == 159) dir = 1;
+        } else {
+            xs--;
+            if (xs == 0) dir = 0;
+        }
+        multisprite_move(0, xs, 100);
+        
         multisprite_kernel_prep();
-        while (*INTIM);
+        while (*INTIM); // Wait for end of blank
         
         multisprite_kernel();
         
         // Overscan
         strobe(WSYNC);
         *VBLANK = 2; // Enable VBLANK
-        *TIM64T = (OVERSCAN * 76 + 13) / 64;
+        *TIM64T = (OVERSCAN * 76) / 64;
         // Do some logic here
-        while (*INTIM);
+        while (*INTIM); // Wait for end of overscan
     } while(1);
 }
 
