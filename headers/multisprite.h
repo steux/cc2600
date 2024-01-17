@@ -1,3 +1,5 @@
+#ifndef _MS
+
 #include "vcs.h"
 
 #ifndef kernel_short_macro
@@ -33,7 +35,7 @@ char *ms_colup0ptr, *ms_colup1ptr, *ms_grp0ptr, *ms_grp1ptr, *ms_scenery;
 char ms_sprite_iter;
 char ms_sprite_x[MS_MAX_NB_SPRITES];
 char ms_sprite_y[MS_MAX_NB_SPRITES];
-char ms_sprite_id[MS_MAX_NB_SPRITES];
+char ms_sprite_model[MS_MAX_NB_SPRITES];
 char ms_nusiz[MS_MAX_NB_SPRITES];
 char ms_sorted_by_y[MS_MAX_NB_SPRITES];
 char ms_id_p[2];
@@ -42,7 +44,96 @@ char ms_nb_sprites;
 const char ms_sprite_wait[153] = {1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13};
 const char ms_sprite_hm[153] = {0x70, 0x60, 0x50, 0x40, 0x30, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00, 0xf0, 0xe0, 0xd0, 0xc0, 0xb0};
 
-MS_OFFSCREEN_BANK void ms_select_sprites()
+MS_OFFSCREEN_BANK void multisprite_init()
+{
+    ms_nb_sprites = 0;
+}
+
+// Create a new sprite at nx, ny (model and nusiz provided)
+MS_OFFSCREEN_BANK char multisprite_new(char model, char nx, char ny, char nusiz)
+{
+    // Look for right ny position
+    for (X = ms_nb_sprites; X != 0; X--) {
+        X--;
+        Y = ms_sorted_by_y[X] & 0x7f;
+        X++;
+        if (ny >= ms_sprite_y[Y]) break;
+        ms_sorted_by_y[X] = Y;
+    }
+
+    // Put new sprite data
+    // Look for a free place
+    for (Y = 0; Y != ms_nb_sprites; Y++) {
+        if (ms_sprite_model[Y] == -1) break;
+    }
+
+    ms_sorted_by_y[X] = Y;
+    ms_sprite_x[Y] = nx;
+    ms_sprite_y[Y] = ny;
+    ms_sprite_model[Y] = model;
+    ms_nusiz[Y] = nusiz;
+
+    // Update number of sprites
+    ms_nb_sprites++;
+    return Y;
+}
+
+MS_OFFSCREEN_BANK void multisprite_delete(char i)
+{
+    // Remove from ms_sorted_by_y array
+    for (X = 0; X != ms_nb_sprites; X++) {
+        if ((ms_sorted_by_y[X] & 0x7f) == i) break;
+    }
+    for (; X < ms_nb_sprites - 1; X++) {
+        Y = ++X;
+        X--;
+        ms_sorted_by_y[X] = ms_sorted_by_y[Y];
+    }
+    ms_sprite_model[X = i] = -1; // Mark as free
+    ms_nb_sprites--;
+}
+
+MS_OFFSCREEN_BANK void multisprite_move(char i, char nx, char ny)
+{
+    ms_sprite_x[X = i] = nx;
+    if (ms_sprite_y[X] == ny) return; // No vertical move, so nothing to check
+    Y = 0;
+    while ((ms_sorted_by_y[Y] & 0x7f) != i) Y++;
+    // Update ms_sorted_by_y if needed    
+    if (ms_sprite_y[X] < ny) {
+        // We have gone downwards
+        ms_sprite_y[X] = ny;
+        for (; Y != ms_nb_sprites; Y++) {
+            Y++;
+            X = ms_sorted_by_y[Y] & 0x7f;
+            Y--;
+            if (ny > ms_sprite_y[X]) {
+                Y++;
+                X = ms_sorted_by_y[Y];
+                Y--;
+                ms_sorted_by_y[Y] = X;
+            } else break;
+        }
+        ms_sorted_by_y[Y] = i;
+    } else {
+        // We have gone upwards
+        ms_sprite_y[X] = ny;
+        for (; Y != 0; Y--) {
+            Y--;
+            X = ms_sorted_by_y[Y] & 0x7f;
+            Y++;
+            if (ny < ms_sprite_y[X]) {
+                Y--;
+                X = ms_sorted_by_y[Y];
+                Y++;
+                ms_sorted_by_y[Y] = X;
+            } else break;
+        }
+        ms_sorted_by_y[Y] = i;
+    }
+}
+
+inline void _ms_select_sprites()
 {
     Y = 0;
     ms_sorted_by_y[Y] &= 0x7f; // Display this one (a priori)
@@ -53,7 +144,7 @@ MS_OFFSCREEN_BANK void ms_select_sprites()
             // Let's see if this candidate overlaps with our previous candidate
             char y2 = ms_sprite_y[X = candidate2 & 0x7f];
             char y1 = ms_sprite_y[X = candidate1 & 0x7f];
-            char height1 = ms_height[X = ms_sprite_id[X]];
+            char height1 = ms_height[X = ms_sprite_model[X]];
             if (y1 + height1 + 8 >= y2) {
                 // Yes. It overlaps. Skip candidate1 and set it as prioritary for next time
                 ms_sorted_by_y[--Y] |= 0x80;
@@ -65,7 +156,7 @@ MS_OFFSCREEN_BANK void ms_select_sprites()
     }
 }
 
-inline char ms_allocate_sprite()
+inline char _ms_allocate_sprite()
 {
     char ms_tmp;
     X = ms_sprite_iter;
@@ -83,7 +174,7 @@ inline char ms_allocate_sprite()
     return -1;
 }
 
-MS_KERNEL_BANK char ms_mark_as_removed()
+MS_KERNEL_BANK char _ms_mark_as_removed()
 {
     X = ms_sprite_iter;
     ms_sorted_by_y[--X] |= 0x80;
@@ -94,7 +185,7 @@ MS_KERNEL_BANK char ms_mark_as_removed()
     Y++;                                // 2
 }
 
-MS_KERNEL_BANK char kernel_repo0()
+MS_KERNEL_BANK char _ms_kernel_repo0()
 {
     char ms_tmp;
 
@@ -115,7 +206,7 @@ MS_KERNEL_BANK char kernel_repo0()
     VSYNC[X] = ms_v;                    // 7 [10]
     X = ms_id_p[0];                     // 3 
     y0 = ms_sprite_y[X];                // 7 [20]
-    X = ms_sprite_id[X];                // 6 [26]
+    X = ms_sprite_model[X];                // 6 [26]
     ms_grp0ptr = ms_grptr[X] - y0;      // 21 [47]
     ms_colup0ptr = ms_coluptr[X] - y0;  // 21 [68]
     Y++;                                // 2 [70]
@@ -128,7 +219,7 @@ MS_KERNEL_BANK char kernel_repo0()
     // Must leave at < [53/76]
 } // RTS: 6
 
-MS_KERNEL_BANK char kernel_repo1()
+MS_KERNEL_BANK char _ms_kernel_repo1()
 {
     char ms_tmp;
 
@@ -149,7 +240,7 @@ MS_KERNEL_BANK char kernel_repo1()
     VSYNC[X] = ms_v;                    // 7 [10]
     X = ms_id_p[1];                     // 3 
     y1 = ms_sprite_y[X];                // 7 [20]
-    X = ms_sprite_id[X];                // 6 [26]
+    X = ms_sprite_model[X];                // 6 [26]
     ms_grp1ptr = ms_grptr[X] - y1;      // 21 [47]
     ms_colup1ptr = ms_coluptr[X] - y1;  // 21 [68]
     Y++;                                // 2 [70]
@@ -162,7 +253,7 @@ MS_KERNEL_BANK char kernel_repo1()
     // Must leave at < [53/76]
 } // RTS: 6
 
-MS_KERNEL_BANK void p0_kernel(char stop)
+MS_KERNEL_BANK void _ms_p0_kernel(char stop)
 {
     do {
         ms_v = ms_scenery[Y];       // 9
@@ -184,7 +275,7 @@ MS_KERNEL_BANK void p0_kernel(char stop)
     // [32/76] including RTS
 }
 
-MS_KERNEL_BANK void p1_kernel(char stop)
+MS_KERNEL_BANK void _ms_p1_kernel(char stop)
 {
     do {
         ms_v = ms_scenery[Y];       // 9
@@ -206,12 +297,12 @@ MS_KERNEL_BANK void p1_kernel(char stop)
     // [32/76] including RTS
 }
 
-MS_KERNEL_BANK void p0_p1_kernel(char stop)
+MS_KERNEL_BANK void _ms_p0_p1_kernel(char stop)
 {
     char ms_colup0, ms_colup1;
 
     *VDELP0 = 1;                    // 5
-    // [46/76] when coming from p0/p1 kernel
+    // [46/76] when coming from p0/p1 multisprite_kernel
     ms_v = ms_scenery[Y];           // 9
     *GRP0 = ms_grp0ptr[Y];          // 9
     *COLUP1 = ms_colup1ptr[Y];      // 9
@@ -288,22 +379,21 @@ MS_KERNEL_BANK void void_kernel(char stop)
     }
 } //[15/76] when getting out (including RTS)
 
-MS_OFFSCREEN_BANK void kernel_prep()
+MS_OFFSCREEN_BANK void multisprite_kernel_prep()
 {
     char ms_tmp;
-    ms_select_sprites();
+    _ms_select_sprites();
     
-    // Phase 1: before the kernel actually starts, allocates and positions sprites p0 and p1.
+    // Phase 1: before the multisprite_kernel actually starts, allocates and positions sprites p0 and p1.
     ms_sprite_iter = 0;
     y0 = 255;
     y1 = 255;
-    *GRP0 = 0;
     *VDELP0 = 0;
-    X = ms_allocate_sprite(); // 47
+    X = _ms_allocate_sprite(); // 47
     // Position sprite 0
     if (X != -1) {
         ms_id_p[0] = X;
-        Y = ms_sprite_id[X];
+        Y = ms_sprite_model[X];
         y0 = ms_sprite_y[X];
         ms_grp0ptr = ms_grptr[Y] - y0;   // 21
         ms_colup0ptr = ms_coluptr[Y] - y0; // 21
@@ -318,12 +408,11 @@ MS_OFFSCREEN_BANK void kernel_prep()
         strobe(WSYNC);                  // 3
         strobe(HMOVE);
     }
-    *GRP1 = 0;
-    X = ms_allocate_sprite(); // 47
+    X = _ms_allocate_sprite(); // 47
     // Position sprite 1
     if (X != -1) {
         ms_id_p[1] = X;
-        Y = ms_sprite_id[X];
+        Y = ms_sprite_model[X];
         y1 = ms_sprite_y[X];
         ms_grp1ptr = ms_grptr[Y] - y1;   // 21
         ms_colup1ptr = ms_coluptr[Y] - y1; // 21
@@ -339,20 +428,21 @@ MS_OFFSCREEN_BANK void kernel_prep()
         strobe(HMOVE);
     }
 
-    // Prepare for drawing
     Y = 0;
-    ms_v = ms_scenery[Y];               // 9
-    Y++;                                // 2
-    X = ms_scenery[Y++];                // 10 
+    *GRP1 = 0;
+    *GRP0 = 0;
     *HMP0 = 0;
     *HMP1 = 0;
-    VSYNC[X] = ms_v;                    // 7
 }
 
-MS_KERNEL_BANK void kernel()
+MS_KERNEL_BANK void multisprite_kernel()
 {
     char ms_tmp;
 
+    // Prepare for drawing
+    ms_v = ms_scenery[Y++];             // 11
+    X = ms_scenery[Y++];                // 10 
+    VSYNC[X] = ms_v;                    // 7
     strobe(WSYNC);                      // 3
 
 repo_kernel:
@@ -365,7 +455,7 @@ repo0_try_again:
 
             ms_v = ms_scenery[Y];           // 9
             Y++;                            // 2
-            X = ms_allocate_sprite();       // 47 [58/76]
+            X = _ms_allocate_sprite();       // 47 [58/76]
             if (X != -1) {                  // 5/7
                 // Check if y position is compatible
                 ms_id_p[0] = X;             // 3
@@ -378,13 +468,13 @@ repo0_try_again:
                 
                 X = ms_id_p[0];             // 3 [29/76]
                 if (Y < ms_sprite_y[X] + 8) { // 11/13 [40/76]
-                    h0 = kernel_repo0();          // 6 [46/76] 
+                    h0 = _ms_kernel_repo0();          // 6 [46/76] 
                 } else {
                     // This one will be skipped. Let's set it as prioritary for next time
                     strobe(WSYNC);                      // 3
                     ms_id_p[0] = -1;
 
-                    ms_mark_as_removed();
+                    _ms_mark_as_removed();
                     goto repo0_try_again;
                 }
             }
@@ -395,7 +485,7 @@ repo0_try_again:
         }
     }
 
-    // Repo kernel 1
+    // Repo multisprite_kernel 1
     if (y1 == 255) { // 7. There is no sprite 1. Allocate 1 ?
 repo1_kernel:
         if (y0 == 255 || Y < y0 + 8) {      // 22                                             
@@ -404,7 +494,7 @@ repo1_try_again:
 
             ms_v = ms_scenery[Y];           // 9
             Y++;                            // 2
-            X = ms_allocate_sprite();       // 47 [58/76]
+            X = _ms_allocate_sprite();      // 47 [58/76]
             if (X != -1) {                  // 4/5
                 // Check if y position is compatible
                 ms_id_p[1] = X;             // 3
@@ -417,13 +507,13 @@ repo1_try_again:
                 
                 X = ms_id_p[1];             // 3 [29/76]
                 if (Y < ms_sprite_y[X] + 8) { // 11/13 [40/76]
-                    h1 = kernel_repo1();          // 6 [46/76] 
+                    h1 = _ms_kernel_repo1();          // 6 [46/76] 
                 } else {
                     // This one will be skipped. Let's set it as prioritary for next time
                     strobe(WSYNC);                      // 3
                     ms_id_p[1] = -1;
 
-                    ms_mark_as_removed();
+                    _ms_mark_as_removed();
                     goto repo1_try_again;
                 }
             }
@@ -440,22 +530,22 @@ repo1_try_again:
         *COLUP0 = ms_colup0ptr[Y];
         ms_tmp = y0 + h0;
         if (ms_tmp < y1) {
-            p0_kernel(ms_tmp);
+            _ms_p0_kernel(ms_tmp);
             y0 = 255;
             goto repo0_kernel; 
         } else {
             X = y1 + h1;
             if (X < ms_tmp) {
-                p0_kernel(y1);
-                p0_p1_kernel(X);
-                p0_kernel(ms_tmp);
+                _ms_p0_kernel(y1);
+                _ms_p0_p1_kernel(X);
+                _ms_p0_kernel(ms_tmp);
                 y0 = 255;
                 y1 = 255;
                 goto repo0_kernel;
             } else {
-                p0_kernel(y1);
-                p0_p1_kernel(ms_tmp);
-                p1_kernel(X);
+                _ms_p0_kernel(y1);
+                _ms_p0_p1_kernel(ms_tmp);
+                _ms_p1_kernel(X);
                 y0 = 255;
                 y1 = 255;
                 goto repo0_kernel;
@@ -467,22 +557,22 @@ repo1_try_again:
         *COLUP1 = ms_colup1ptr[Y];
         ms_tmp = y1 + h1;
         if (ms_tmp < y0) {
-            p1_kernel(ms_tmp);
+            _ms_p1_kernel(ms_tmp);
             y1 = 255;
             goto repo_kernel; 
         } else {
             X = y0 + h0;
             if (X < ms_tmp) {
-                p1_kernel(y0);
-                p0_p1_kernel(X);
-                p1_kernel(ms_tmp);
+                _ms_p1_kernel(y0);
+                _ms_p0_p1_kernel(X);
+                _ms_p1_kernel(ms_tmp);
                 y0 = 255;
                 y1 = 255;
                 goto repo0_kernel;
             } else {
-                p1_kernel(y0);
-                p0_p1_kernel(ms_tmp);
-                p0_kernel(X);
+                _ms_p1_kernel(y0);
+                _ms_p0_p1_kernel(ms_tmp);
+                _ms_p0_kernel(X);
                 y0 = 255;
                 y1 = 255;
                 goto repo0_kernel;
@@ -494,20 +584,20 @@ repo1_try_again:
             ms_tmp = y0 + h0; // 11 [26/76]
             X = y1 + h1;      // 10 [36/76]
             if (X < ms_tmp) { // 5/6 [42/76]
-                p0_p1_kernel(X); // 12 [54/76]
-                p0_kernel(ms_tmp);
+                _ms_p0_p1_kernel(X); // 12 [54/76]
+                _ms_p0_kernel(ms_tmp);
                 y0 = 255;
                 y1 = 255;
                 goto repo0_kernel;
             } else {
-                p0_p1_kernel(ms_tmp);
-                p1_kernel(X);
+                _ms_p0_p1_kernel(ms_tmp);
+                _ms_p1_kernel(X);
                 y0 = 255;
                 y1 = 255;
                 goto repo0_kernel;
             }
         } else {
-            // This is the end of the kernel. Fill with void.
+            // This is the end of the multisprite kernel. Fill with void.
             void_kernel(MS_PLAYFIELD_HEIGHT + 1);
         }
     }

@@ -9,7 +9,8 @@ const char ms_height[MS_NB_SPRITES_DEF] = {8};
 
 void main()
 {
-    kernel_prep();
-    kernel();
+    multisprite_init();
+    multisprite_kernel_prep();
+    multisprite_kernel();
 }
 
