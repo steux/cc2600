@@ -39,7 +39,7 @@ const char playfield[192 + 32] = {
 
 void main()
 {
-    char xpos = 100, ypos = 170, scrolling = 0;
+    char xpos = 100, ypos = 100, scrolling = 0;
     multisprite_init(playfield);
     multisprite_new(0, xpos, ypos, 3);
     do {
@@ -55,13 +55,13 @@ void main()
         // Do some logic here
         if (!(*SWCHA & 0x80) && xpos < 158) { xpos++; ms_nusiz[0] = 0; } // Right
         if (!(*SWCHA & 0x40) && xpos > 0) { xpos--; ms_nusiz[0] = 8; } // Left
-        if (!(*SWCHA & 0x20) && ypos < 200 - 20) { ypos++; } // Down
+        if (!(*SWCHA & 0x20) && ypos < 190) { ypos++; } // Down
         if (!(*SWCHA & 0x10) && ypos > 0) { ypos--; }// Up
 
         multisprite_move(0, xpos, ypos);
 
         ms_scenery = playfield + scrolling;
-        scrolling -= 2;
+        //scrolling -= 2;
         if (scrolling < 0) scrolling = 30;
 
         multisprite_kernel_prep();
@@ -71,10 +71,10 @@ void main()
         
         // Overscan
         strobe(WSYNC);
+        strobe(WSYNC);
         *VBLANK = 2; // Enable VBLANK
         *TIM64T = ((OVERSCAN) * 76) / 64 + 2;
         // Do some logic here
         while (*INTIM); // Wait for end of overscan
     } while(1);
 }
-
