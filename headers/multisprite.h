@@ -548,7 +548,7 @@ repo1_try_again:
             void_kernel(y0);
         }
         ms_tmp = y0 + h0;
-        if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 3) ms_tmp = MS_PLAYFIELD_HEIGHT - 4;
+        if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 5) ms_tmp = MS_PLAYFIELD_HEIGHT - 6;
         if (ms_tmp < y1) {
             _ms_p0_kernel(ms_tmp);
             y0 = 255;
@@ -556,7 +556,7 @@ repo1_try_again:
             goto repo0_kernel; 
         } else {
             X = y1 + h1;
-            if (X >= MS_PLAYFIELD_HEIGHT - 3) X = MS_PLAYFIELD_HEIGHT - 4;
+            if (X >= MS_PLAYFIELD_HEIGHT - 5) X = MS_PLAYFIELD_HEIGHT - 6;
             if (X < ms_tmp) {
                 _ms_p0_kernel(y1);
                 _ms_p0_p1_kernel(X);
@@ -582,7 +582,7 @@ repo1_try_again:
             void_kernel(y1);
         }
         ms_tmp = y1 + h1;
-        if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 3) ms_tmp = MS_PLAYFIELD_HEIGHT - 4;
+        if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 5) ms_tmp = MS_PLAYFIELD_HEIGHT - 6;
         if (ms_tmp < y0) {
             _ms_p1_kernel(ms_tmp);
             y1 = 255;
@@ -590,7 +590,7 @@ repo1_try_again:
             goto repo_kernel; 
         } else {
             X = y0 + h0;
-            if (X >= MS_PLAYFIELD_HEIGHT - 3) X = MS_PLAYFIELD_HEIGHT - 4;
+            if (X >= MS_PLAYFIELD_HEIGHT - 5) X = MS_PLAYFIELD_HEIGHT - 6;
             if (X < ms_tmp) {
                 _ms_p1_kernel(y0);
                 _ms_p0_p1_kernel(X);
@@ -617,9 +617,9 @@ repo1_try_again:
                 void_kernel(y0);
             }
             ms_tmp = y0 + h0; // 11 [26/76]
-            if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 3) ms_tmp = MS_PLAYFIELD_HEIGHT - 4;
+            if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 5) ms_tmp = MS_PLAYFIELD_HEIGHT - 6;
             X = y1 + h1;      // 10 [36/76]
-            if (X >= MS_PLAYFIELD_HEIGHT - 3) X = MS_PLAYFIELD_HEIGHT - 4;
+            if (X >= MS_PLAYFIELD_HEIGHT - 5) X = MS_PLAYFIELD_HEIGHT - 6;
             if (X < ms_tmp) { // 5/6 [42/76]
                 _ms_p0_p1_kernel(X); // 12 [54/76]
                 _ms_p0_kernel(ms_tmp);
@@ -639,7 +639,8 @@ repo1_try_again:
             }
         } else {
             // This is the end of the multisprite kernel. Fill with void.
-            void_kernel(MS_PLAYFIELD_HEIGHT + 1);
+            void_kernel(MS_PLAYFIELD_HEIGHT);
+            strobe(WSYNC);
         }
     }
 }
