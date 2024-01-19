@@ -411,6 +411,10 @@ MS_OFFSCREEN_BANK void multisprite_kernel_prep()
         y0 = ms_sprite_y[X];
         ms_grp0ptr = ms_grptr_offscreen[Y] - y0;   // 21
         ms_colup0ptr = ms_coluptr_offscreen[Y] - y0; // 21
+        if (y0 >= MS_PLAYFIELD_HEIGHT + 1) {
+            ms_grp0ptr += 256;
+            ms_colup0ptr += 256;    
+        } 
         h0 = ms_height_offscreen[Y];
         X = ms_sprite_x[X];             // 6
         strobe(WSYNC);                  // 3
@@ -433,6 +437,10 @@ MS_OFFSCREEN_BANK void multisprite_kernel_prep()
         y1 = ms_sprite_y[X];
         ms_grp1ptr = ms_grptr_offscreen[Y] - y1;   // 21
         ms_colup1ptr = ms_coluptr_offscreen[Y] - y1; // 21
+        if (y1 >= MS_PLAYFIELD_HEIGHT + 1) {
+            ms_grp1ptr += 256;
+            ms_colup1ptr += 256;    
+        } 
         h1 = ms_height_offscreen[Y];
         X = ms_sprite_x[X];             // 6
         *HMP0 = 0;                      // 3
@@ -464,7 +472,37 @@ MS_KERNEL_BANK void multisprite_kernel()
     strobe(WSYNC);                      // 3
     *VBLANK = 0;
 
- display_sprites:    
+display_sprites:
+    if (y0 != MS_UNALLOCATED) {
+        if (y1 != MS_UNALLOCATED) {
+            // Display both p0 and p1
+        }
+        if (Y < y0 && y0 < MS_PLAYFIELD_HEIGHT) {
+            void_kernel(y0);
+        }
+        X = y0 + h0;
+        if (X >= MS_PLAYFIELD_HEIGHT - 1) {
+            _ms_p0_kernel(MS_PLAYFIELD_HEIGHT);
+            return;
+        }
+        if (X >= MS_PLAYFIELD_HEIGHT - 5) X = MS_PLAYFIELD_HEIGHT - 6;
+        _ms_p0_kernel(X);
+        y0 = MS_UNALLOCATED;
+        *GRP0 = 0;
+        goto repo0_kernel; 
+    } else {
+        if (y1 != MS_UNALLOCATED) {
+            // Display p1
+        } else {
+            // This is the end of the multisprite kernel.Fill with void.
+finish:
+            void_kernel(MS_PLAYFIELD_HEIGHT);
+            return;
+        }
+    }
+
+/*
+display_sprites:    
     if (y0 < y1) {                      // 8/9
         if (Y < y0) {
             void_kernel(y0);
@@ -577,6 +615,7 @@ finish:
             return;
         }
     }
+*/
 
 repo_kernel:
     if (y0 == MS_UNALLOCATED) { // 8. There is no sprite 0. Allocate 1 ?
