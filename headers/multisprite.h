@@ -33,7 +33,8 @@
 #define MS_KERNEL_BANK
 #endif
 
-#define MS_UNALLOCATED (MS_PLAYFIELD_HEIGHT + 24) 
+#define MS_UNALLOCATED 255
+#define MS_OFFSET 32
 
 char ms_v, y0, y1, h0, h1;
 char *ms_colup0ptr, *ms_colup1ptr, *ms_grp0ptr, *ms_grp1ptr, *ms_scenery;
@@ -63,6 +64,7 @@ MS_OFFSCREEN_BANK void multisprite_init(char *scenery)
 // Create a new sprite at nx, ny (model and nusiz provided)
 MS_OFFSCREEN_BANK char multisprite_new(char model, char nx, char ny, char nusiz)
 {
+    ny += MS_OFFSET;
     // Look for right ny position
     for (X = ms_nb_sprites; X != 0; X--) {
         X--;
@@ -106,6 +108,7 @@ MS_OFFSCREEN_BANK void multisprite_delete(char i)
 
 MS_OFFSCREEN_BANK void multisprite_move(char i, char nx, char ny)
 {
+    ny += MS_OFFSET;
     ms_sprite_x[X = i] = nx;
     if (ms_sprite_y[X] == ny) return; // No vertical move, so nothing to check
     Y = 0;
@@ -411,10 +414,6 @@ MS_OFFSCREEN_BANK void multisprite_kernel_prep()
         y0 = ms_sprite_y[X];
         ms_grp0ptr = ms_grptr_offscreen[Y] - y0;   // 21
         ms_colup0ptr = ms_coluptr_offscreen[Y] - y0; // 21
-        if (y0 >= MS_PLAYFIELD_HEIGHT + 1) {
-            ms_grp0ptr += 256;
-            ms_colup0ptr += 256;    
-        } 
         h0 = ms_height_offscreen[Y];
         X = ms_sprite_x[X];             // 6
         strobe(WSYNC);                  // 3
@@ -437,10 +436,6 @@ MS_OFFSCREEN_BANK void multisprite_kernel_prep()
         y1 = ms_sprite_y[X];
         ms_grp1ptr = ms_grptr_offscreen[Y] - y1;   // 21
         ms_colup1ptr = ms_coluptr_offscreen[Y] - y1; // 21
-        if (y1 >= MS_PLAYFIELD_HEIGHT + 1) {
-            ms_grp1ptr += 256;
-            ms_colup1ptr += 256;    
-        } 
         h1 = ms_height_offscreen[Y];
         X = ms_sprite_x[X];             // 6
         *HMP0 = 0;                      // 3
@@ -455,7 +450,7 @@ MS_OFFSCREEN_BANK void multisprite_kernel_prep()
         strobe(HMOVE);
     }
 
-    Y = 0;
+    Y = MS_OFFSET;
     *GRP1 = 0;
     *GRP0 = 0;
 }
@@ -465,157 +460,14 @@ MS_KERNEL_BANK void multisprite_kernel()
     char ms_tmp;
 
     // Prepare for drawing
-    ms_v = ms_scenery[Y++];             // 11
+    ms_tmp = ms_scenery[Y++];           // 11
     X = ms_scenery[Y++];                // 10 
-    VSYNC[X] = ms_v;                    // 7
-    strobe(HMCLR);                       // 3
+    VSYNC[X] = ms_tmp;                  // 7
+    strobe(HMCLR);                      // 3
     strobe(WSYNC);                      // 3
     *VBLANK = 0;
 
-display_sprites:
-    if (y0 != MS_UNALLOCATED) {
-        if (y1 != MS_UNALLOCATED) {
-            // Display both p0 and p1
-        }
-        if (Y < y0 && y0 < MS_PLAYFIELD_HEIGHT) {
-            void_kernel(y0);
-        }
-        X = y0 + h0;
-        if (X >= MS_PLAYFIELD_HEIGHT - 1) {
-            _ms_p0_kernel(MS_PLAYFIELD_HEIGHT);
-            return;
-        }
-        if (X >= MS_PLAYFIELD_HEIGHT - 5) X = MS_PLAYFIELD_HEIGHT - 6;
-        _ms_p0_kernel(X);
-        y0 = MS_UNALLOCATED;
-        *GRP0 = 0;
-        goto repo0_kernel; 
-    } else {
-        if (y1 != MS_UNALLOCATED) {
-            // Display p1
-        } else {
-            // This is the end of the multisprite kernel.Fill with void.
-finish:
-            void_kernel(MS_PLAYFIELD_HEIGHT);
-            return;
-        }
-    }
-
-/*
-display_sprites:    
-    if (y0 < y1) {                      // 8/9
-        if (Y < y0) {
-            void_kernel(y0);
-        }
-        ms_tmp = y0 + h0;
-        if (ms_tmp < y1) {
-            if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 1) {
-                _ms_p0_kernel(MS_PLAYFIELD_HEIGHT);
-                return;
-            }
-            if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 5) ms_tmp = MS_PLAYFIELD_HEIGHT - 6;
-            _ms_p0_kernel(ms_tmp);
-            y0 = MS_UNALLOCATED;
-            *GRP0 = 0;
-            goto repo0_kernel; 
-        } else {
-            if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 5) ms_tmp = MS_PLAYFIELD_HEIGHT - 6;
-            y0 = y1 + h1;
-            if (y0 < ms_tmp) {
-                _ms_p0_kernel(y1);
-                _ms_p0_p1_kernel(y0);
-                _ms_p0_kernel(ms_tmp);
-                *GRP0 = 0;
-                *GRP1 = 0;
-                y0 = MS_UNALLOCATED;
-                y1 = MS_UNALLOCATED;
-                goto repo0_kernel;
-            } else {
-                if (y0 >= MS_PLAYFIELD_HEIGHT - 5) y0 = MS_PLAYFIELD_HEIGHT - 6;
-                _ms_p0_kernel(y1);
-                _ms_p0_p1_kernel(ms_tmp);
-                _ms_p1_kernel(y0);
-                *GRP0 = 0;
-                *GRP1 = 0;
-                y0 = MS_UNALLOCATED;
-                y1 = MS_UNALLOCATED;
-                goto repo0_kernel;
-            }
-        }
-    } else if (y1 < y0) { // 8 / 9
-        if (Y < y1) {
-            void_kernel(y1);
-        }
-        ms_tmp = y1 + h1;
-        if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 5) ms_tmp = MS_PLAYFIELD_HEIGHT - 6;
-        if (ms_tmp < y0) {
-            if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 1) {
-                _ms_p1_kernel(MS_PLAYFIELD_HEIGHT);
-                return;
-            }
-            if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 5) ms_tmp = MS_PLAYFIELD_HEIGHT - 6;
-            _ms_p1_kernel(ms_tmp);
-            y1 = MS_UNALLOCATED;
-            *GRP1 = 0;
-            goto repo_kernel; 
-        } else {
-            if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 5) ms_tmp = MS_PLAYFIELD_HEIGHT - 6;
-            y1 = y0 + h0;
-            if (X < ms_tmp) {
-                _ms_p1_kernel(y0);
-                _ms_p0_p1_kernel(y1);
-                _ms_p1_kernel(ms_tmp);
-                *GRP0 = 0;
-                *GRP1 = 0;
-                y0 = MS_UNALLOCATED;
-                y1 = MS_UNALLOCATED;
-                goto repo0_kernel;
-            } else {
-                if (y1 >= MS_PLAYFIELD_HEIGHT - 5) y1 = MS_PLAYFIELD_HEIGHT - 6;
-                _ms_p1_kernel(y0);
-                _ms_p0_p1_kernel(ms_tmp);
-                _ms_p0_kernel(y1);
-                *GRP0 = 0;
-                *GRP1 = 0;
-                y0 = MS_UNALLOCATED;
-                y1 = MS_UNALLOCATED;
-                goto repo0_kernel;
-            }
-        }
-    } else {
-        if (y0 != MS_UNALLOCATED) {
-            if (Y < y0) {
-                void_kernel(y0);
-            }
-            ms_tmp = y0 + h0; // 11 [26/76]
-            if (ms_tmp >= MS_PLAYFIELD_HEIGHT - 5) ms_tmp = MS_PLAYFIELD_HEIGHT - 6;
-            X = y1 + h1;      // 10 [36/76]
-            if (X >= MS_PLAYFIELD_HEIGHT - 5) X = MS_PLAYFIELD_HEIGHT - 6;
-            if (X < ms_tmp) { // 5/6 [42/76]
-                _ms_p0_p1_kernel(X); // 12 [54/76]
-                _ms_p0_kernel(ms_tmp);
-                *GRP0 = 0;
-                *GRP1 = 0;
-                y0 = MS_UNALLOCATED;
-                y1 = MS_UNALLOCATED;
-                goto repo0_kernel;
-            } else {
-                _ms_p0_p1_kernel(ms_tmp);
-                _ms_p1_kernel(X);
-                *GRP0 = 0;
-                *GRP1 = 0;
-                y0 = MS_UNALLOCATED;
-                y1 = MS_UNALLOCATED;
-                goto repo0_kernel;
-            }
-        } else {
-            // This is the end of the multisprite kernel.Fill with void.
-finish:
-            void_kernel(MS_PLAYFIELD_HEIGHT);
-            return;
-        }
-    }
-*/
+    goto display_sprites2;
 
 repo_kernel:
     if (y0 == MS_UNALLOCATED) { // 8. There is no sprite 0. Allocate 1 ?
@@ -696,5 +548,116 @@ repo1_try_again:
             VSYNC[X] = ms_v;                // 7
         }
     }
-    goto display_sprites;
+
+display_sprites:    
+    if (y0 < y1) {                      // 8/9
+display_sprites2:
+        if (Y < y0) {
+            void_kernel(y0);
+        }
+        ms_tmp = y0 + h0;
+        if (ms_tmp < y1) {
+            if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
+                return;
+            }
+            if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) ms_tmp = MS_OFFSET + MS_PLAYFIELD_HEIGHT - 6;
+            _ms_p0_kernel(ms_tmp);
+            y0 = MS_UNALLOCATED;
+            *GRP0 = 0;
+            goto repo0_kernel; 
+        } else {
+            if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) ms_tmp = MS_OFFSET + MS_PLAYFIELD_HEIGHT - 6;
+            y0 = y1 + h1;
+            if (y0 < ms_tmp) {
+                _ms_p0_kernel(y1);
+                _ms_p0_p1_kernel(y0);
+                _ms_p0_kernel(ms_tmp);
+                *GRP0 = 0;
+                *GRP1 = 0;
+                y0 = MS_UNALLOCATED;
+                y1 = MS_UNALLOCATED;
+                goto repo0_try_again;
+            } else {
+                if (y0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) y0 = MS_OFFSET + MS_PLAYFIELD_HEIGHT - 6;
+                _ms_p0_kernel(y1);
+                _ms_p0_p1_kernel(ms_tmp);
+                _ms_p1_kernel(y0);
+                *GRP0 = 0;
+                *GRP1 = 0;
+                y0 = MS_UNALLOCATED;
+                y1 = MS_UNALLOCATED;
+                goto repo0_try_again;
+            }
+        }
+    } else if (y1 < y0) { // 8 / 9
+        if (Y < y1) {
+            void_kernel(y1);
+        }
+        ms_tmp = y1 + h1;
+        if (ms_tmp < y0) {
+            if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
+                return;
+            }
+            if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) ms_tmp = MS_OFFSET + MS_PLAYFIELD_HEIGHT - 6;
+            _ms_p1_kernel(ms_tmp);
+            y1 = MS_UNALLOCATED;
+            *GRP1 = 0;
+            goto repo_kernel; 
+        } else {
+            if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) ms_tmp = MS_OFFSET + MS_PLAYFIELD_HEIGHT - 6;
+            y1 = y0 + h0;
+            if (X < ms_tmp) {
+                _ms_p1_kernel(y0);
+                _ms_p0_p1_kernel(y1);
+                _ms_p1_kernel(ms_tmp);
+                *GRP0 = 0;
+                *GRP1 = 0;
+                y0 = MS_UNALLOCATED;
+                y1 = MS_UNALLOCATED;
+                goto repo0_try_again;
+            } else {
+                if (y1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) y1 = MS_OFFSET + MS_PLAYFIELD_HEIGHT - 6;
+                _ms_p1_kernel(y0);
+                _ms_p0_p1_kernel(ms_tmp);
+                _ms_p0_kernel(y1);
+                *GRP0 = 0;
+                *GRP1 = 0;
+                y0 = MS_UNALLOCATED;
+                y1 = MS_UNALLOCATED;
+                goto repo0_try_again;
+            }
+        }
+    } else {
+        if (y0 != MS_UNALLOCATED) {
+            void_kernel(y0);
+            ms_tmp = y0 + h0; // 11 [26/76]
+            if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) ms_tmp = MS_OFFSET + MS_PLAYFIELD_HEIGHT - 6;
+            X = y1 + h1;      // 10 [36/76]
+            if (X >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) X = MS_OFFSET + MS_PLAYFIELD_HEIGHT - 6;
+            if (X < ms_tmp) { // 5/6 [42/76]
+                _ms_p0_p1_kernel(X); // 12 [54/76]
+                _ms_p0_kernel(ms_tmp);
+                *GRP0 = 0;
+                *GRP1 = 0;
+                y0 = MS_UNALLOCATED;
+                y1 = MS_UNALLOCATED;
+                goto repo0_try_again;
+            } else {
+                _ms_p0_p1_kernel(ms_tmp);
+                _ms_p1_kernel(X);
+                *GRP0 = 0;
+                *GRP1 = 0;
+                y0 = MS_UNALLOCATED;
+                y1 = MS_UNALLOCATED;
+                goto repo0_try_again;
+            }
+        } else {
+            // This is the end of the multisprite kernel.Fill with void.
+finish:
+            void_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
+            return;
+        }
+    }
 }
