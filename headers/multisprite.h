@@ -1,4 +1,29 @@
-#ifndef _MS
+/*
+    cc2600 Multisprite Library 
+    Copyright (C) 2024 Bruno STEUX 
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+    Contact info: bruno.steux@gmail.com
+*/
+
+// v0.1: Initial version
+// TODO: Add support for SARA chip
+// TODO: Add support for single color (3 bits of model_id)
+//
+#ifndef __MULTISPRITE_H__
+#define __MULTISPRITE_H__
 
 #include "vcs.h"
 
@@ -732,3 +757,4 @@ check_collisions_and_return:
         ms_nusiz[X = ms_id_p[1]] |= 0x80;
     }
 }
+#endif // __MULTISPRITE_H__
