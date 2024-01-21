@@ -151,7 +151,9 @@ inline void _ms_select_sprites()
 {
     Y = 0;
     ms_sorted_by_y[Y] &= 0x7f; // Display this one (a priori)
-    char candidate1 = ms_sorted_by_y[Y];
+    X = ms_sorted_by_y[Y];
+    ms_nusiz[X] &= 0x3f; // Reset collision
+    char candidate1 = X;
     for (Y = 1; Y < ms_nb_sprites; Y++) {
         char candidate2 = ms_sorted_by_y[Y];
         if (candidate2 & 0x80) { // If it was not displayed at previous iteration
@@ -164,7 +166,10 @@ inline void _ms_select_sprites()
                 ms_sorted_by_y[--Y] |= 0x80;
                 Y++;
             } 
-            ms_sorted_by_y[Y] &= 0x7f;
+            ms_sorted_by_y[Y] = candidate2 & 0x7f;
+        } else {
+            X = candidate2 & 0x7f;
+            ms_nusiz[X] &= 0x3f; // Reset collision
         }
         candidate1 = candidate2;
     }
@@ -578,15 +583,16 @@ display_sprites2:
         if (Y < y0) {
             void_kernel(y0);
         }
+        strobe(CXCLR); // Clear collisions
         ms_tmp = y0 + h0;
         if (ms_tmp < y1) {
             if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                 _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                *GRP0 = 0;
-                return;
+                goto check_collisions_and_return;
             }
             _ms_p0_kernel(ms_tmp);
             *GRP0 = 0;
+            if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= 0x40;
             if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) goto finish;
             y0 = MS_UNALLOCATED;
             goto repo0_kernel; 
@@ -596,44 +602,28 @@ display_sprites2:
                 _ms_p0_kernel(y1);
                 if (y0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    *GRP0 = 0;
-                    *GRP1 = 0;
-                    return;
+                    goto check_collisions_and_return;
                 }
                 _ms_p0_p1_kernel(y0);
                 if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    *GRP0 = 0;
-                    return;
+                    goto check_collisions_and_return;
                 }
                 _ms_p0_kernel(ms_tmp);
-                *GRP0 = 0;
-                *GRP1 = 0;
-                if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) goto finish;
-                y0 = MS_UNALLOCATED;
-                y1 = MS_UNALLOCATED;
-                goto repo0_try_again;
+                goto repo_try_again;
             } else {
                 _ms_p0_kernel(y1);
                 if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    *GRP0 = 0;
-                    *GRP1 = 0;
-                    return;
+                    goto check_collisions_and_return;
                 }
                 _ms_p0_p1_kernel(ms_tmp);
                 if (y0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    *GRP1 = 0;
-                    return;
+                    goto check_collisions_and_return;
                 }
                 _ms_p1_kernel(y0);
-                *GRP0 = 0;
-                *GRP1 = 0;
-                if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) goto finish;
-                y0 = MS_UNALLOCATED;
-                y1 = MS_UNALLOCATED;
-                goto repo0_try_again;
+                goto repo_try_again;
             }
         }
     } else if (y1 < y0) { // 8 / 9
@@ -644,11 +634,11 @@ display_sprites2:
         if (ms_tmp < y0) {
             if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                 _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                *GRP1 = 0;
-                return;
+                goto check_collisions_and_return;
             }
             _ms_p1_kernel(ms_tmp);
             *GRP1 = 0;
+            if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= 0x40;
             if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) goto finish;
             y1 = MS_UNALLOCATED;
             goto repo_kernel; 
@@ -658,44 +648,28 @@ display_sprites2:
                 _ms_p1_kernel(y0);
                 if (y1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    *GRP0 = 0;
-                    *GRP1 = 0;
-                    return;
+                    goto check_collisions_and_return;
                 }
                 _ms_p0_p1_kernel(y1);
                 if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    *GRP1 = 0;
-                    return;
+                    goto check_collisions_and_return;
                 }
                 _ms_p1_kernel(ms_tmp);
-                *GRP0 = 0;
-                *GRP1 = 0;
-                if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) goto finish;
-                y0 = MS_UNALLOCATED;
-                y1 = MS_UNALLOCATED;
-                goto repo0_try_again;
+                goto repo_try_again;
             } else {
                 _ms_p1_kernel(y0);
                 if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    *GRP0 = 0;
-                    *GRP1 = 0;
-                    return;
+                    goto check_collisions_and_return;
                 }
                 _ms_p0_p1_kernel(ms_tmp);
                 if (y1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    *GRP0 = 0;
-                    return;
+                    goto check_collisions_and_return;
                 }
                 _ms_p0_kernel(y1);
-                *GRP0 = 0;
-                *GRP1 = 0;
-                if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) goto finish;
-                y0 = MS_UNALLOCATED;
-                y1 = MS_UNALLOCATED;
-                goto repo0_try_again;
+                goto repo_try_again;
             }
         }
     } else {
@@ -706,43 +680,27 @@ display_sprites2:
             if (y0 < ms_tmp) { // 5/6 [42/76]
                 if (y0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    *GRP0 = 0;
-                    *GRP1 = 0;
-                    return;
+                    goto check_collisions_and_return;
                 }
                 _ms_p0_p1_kernel(y0); // 12 [54/76]
                 if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    *GRP0 = 0;
-                    return;
+                    goto check_collisions_and_return;
                 }
                 _ms_p0_kernel(ms_tmp);
-                *GRP0 = 0;
-                *GRP1 = 0;
-                if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) goto finish;
-                y0 = MS_UNALLOCATED;
-                y1 = MS_UNALLOCATED;
-                goto repo0_try_again;
+                goto repo_try_again;
             } else {
                 if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    *GRP0 = 0;
-                    *GRP1 = 0;
-                    return;
+                    goto check_collisions_and_return;
                 }
                 _ms_p0_p1_kernel(ms_tmp);
                 if (y0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    *GRP1 = 0;
-                    return;
+                    goto check_collisions_and_return;
                 }
                 _ms_p1_kernel(y0);
-                *GRP0 = 0;
-                *GRP1 = 0;
-                if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) goto finish;
-                y0 = MS_UNALLOCATED;
-                y1 = MS_UNALLOCATED;
-                goto repo0_try_again;
+                goto repo_try_again;
             }
         } else {
             // This is the end of the multisprite kernel.Fill with void.
@@ -750,5 +708,27 @@ finish:
             void_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
             return;
         }
+    }
+repo_try_again:
+    *GRP0 = 0;
+    *GRP1 = 0;
+    if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= 0x40;
+    if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= 0x40;
+    if (*CXPPMM & 0x80) {
+        ms_nusiz[X = ms_id_p[0]] |= 0x80;
+        ms_nusiz[X = ms_id_p[1]] |= 0x80;
+    }
+    if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 5) goto finish;
+    y0 = MS_UNALLOCATED;
+    y1 = MS_UNALLOCATED;
+    goto repo0_try_again;
+check_collisions_and_return:
+    *GRP0 = 0;
+    *GRP1 = 0;
+    if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= 0x40;
+    if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= 0x40;
+    if (*CXPPMM & 0x80) {
+        ms_nusiz[X = ms_id_p[0]] |= 0x80;
+        ms_nusiz[X = ms_id_p[1]] |= 0x80;
     }
 }
