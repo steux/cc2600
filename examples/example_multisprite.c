@@ -3,13 +3,6 @@
 const char garfield[22] = { 0, 0x12, 0x36, 0x4a, 0x33, 0x55, 0x33, 0xcb, 0xb6, 0x48, 0x3e, 0x5e, 0x6e, 0x76, 0x36, 0x84, 0xbc, 0x3a, 0x76, 0x66, 0x66, 0};
 const char garfield_colors[21] = { 0, 0x3c, 0x3c, 0x3c, 0x0e, 0x0e, 0x0e, 0x3c, 0x3c, 0x3c, 0x3c, 0x38, 0x2c, 0x3c, 0x3c, 0x38, 0x38, 0x2c, 0x2c, 0x12, 0x12};
 
-#define MS_NB_SPRITES_DEF 1
-const char *ms_grptr[MS_NB_SPRITES_DEF] = {garfield};
-const char *ms_coluptr[MS_NB_SPRITES_DEF] = {garfield_colors};
-const char ms_height[MS_NB_SPRITES_DEF] = {22};
-
-#include "multisprite.h"
-
 #define BLANK 40
 #define OVERSCAN 30
 
@@ -20,6 +13,8 @@ const char ms_height[MS_NB_SPRITES_DEF] = {22};
 #define REG_PF1     0x0e
 #define REG_PF2     0x0f
 
+#define MS_NB_SPRITES_DEF 1
+aligned(256) const char *ms_grptr[MS_NB_SPRITES_DEF] = {garfield};
 const char playfield[192 + 32] = {
     VCS_RED, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_YELLOW, REG_COLUBK, 
     VCS_RED, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_YELLOW, REG_COLUBK, 
@@ -36,6 +31,10 @@ const char playfield[192 + 32] = {
     VCS_RED, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_YELLOW, REG_COLUBK, 
     VCS_RED, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_YELLOW, REG_COLUBK
 };
+aligned(256) const char *ms_coluptr[MS_NB_SPRITES_DEF] = {garfield_colors};
+const char ms_height[MS_NB_SPRITES_DEF] = {22};
+
+#include "multisprite.h"
 
 void main()
 {
