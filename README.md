@@ -17,7 +17,7 @@ Note that this compiler is for writing "old school" code for ATARI 2600. It's no
 code on the Melody/Harmony cart) development, where the 6507 code is reduced to the minimum. On the contrary, it was
 designed to write code the classical atari way, possibly with DPC or DPC+ accelerators or a superchip for more RAM.
 
-cc2600 should not be a starting point for writing ATARI 2600. You'll first have to learn writing games
+cc2600 should not be a starting point for writing your first Atari 2600 game. You'll first have to learn writing games
 in assembler (I definitely recommand reading "Making Games For The Atari 2600", by Steven Hugg, see https://8bitworkshop.com/docs/books).
 On the other hand, if you're an experienced ASM code writer, you may gain a lot of time using cc2600 for your
 next game developement, since cc2600 will enable you to leverage the use of structural code writing.
@@ -87,7 +87,7 @@ DPC coprocessor support is implmented. Use "dpc.h" header to activate it. 2kB di
 
 #### DPC+ bankswitching
 
-DPC+ coprocessor is also supported, and opens up to 4KB of display RAM, 2B of music/frequency ROM (prefilled using `dpcplus_frequencies.h`), and 24KB of data for your game. Think big. DPC+ generate code work as it on Stella, but you'll have to prepend the ARM code "driver" (DPC+.arm) to make it work on Harmony cart or CartPlus (though the latter doesn't uses it). Cry for help on AtariAge forum if you don't understand a word about that.
+DPC+ coprocessor is also supported, and opens up to 4KB of display RAM, 2B of music/frequency ROM (prefilled using `dpcplus_frequencies.h`), and 24KB of data for your game. Think big. DPC+ generated code works as it is on Stella, but you'll have to prepend the ARM code "driver" (DPC+.arm) to make it work on Harmony cart or CartPlus (though the latter doesn't uses it). Cry for help on AtariAge forum if you don't understand a word about that.
 
 
 ### Superchip
