@@ -41,7 +41,7 @@ void main()
     char xpos = 50, ypos = 50, scrolling = 0;
     multisprite_init(playfield);
     multisprite_new(0, xpos, ypos, 0);
-    multisprite_new(0, 50, 50, 3);
+    multisprite_new(0, 50, 160, 3);
     do {
         *VBLANK = 2; // Enable VBLANK
         *VSYNC = 2; // Set VSYNC
@@ -70,7 +70,6 @@ void main()
         multisprite_kernel();
         
         // Overscan
-        strobe(WSYNC);
         strobe(WSYNC);
         *VBLANK = 2; // Enable VBLANK
         *TIM64T = ((OVERSCAN) * 76) / 64 + 2;
