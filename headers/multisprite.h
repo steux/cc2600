@@ -565,7 +565,7 @@ repo0_try_again:
                 ms_v = ms_scenery[Y++];     // 9
                 
                 X = ms_id_p[0];             // 3 [29/76]
-                if (Y < ms_sprite_y[X] + 8) { // 11/13 [40/76]
+                if (Y < ms_sprite_y[X] - 8) { // 11/13 [40/76]
                     h0 = _ms_kernel_repo0();// 6 [46/76] 
                 } else {
                     // This one will be skipped. Let's set it as prioritary for next time
@@ -611,7 +611,7 @@ repo1_try_again:
                 ms_v = ms_scenery[Y++];     // 9
                 
                 X = ms_id_p[1];             // 3 [29/76]
-                if (Y < ms_sprite_y[X] + 8) { // 11/13 [40/76]
+                if (Y < ms_sprite_y[X] - 8) { // 11/13 [40/76]
                     h1 = _ms_kernel_repo1();          // 6 [46/76] 
                 } else {
                     // This one will be skipped. Let's set it as prioritary for next time
