@@ -575,7 +575,7 @@ repo0_try_again:
                     ms_id_p[0] = -1;
 
                     _ms_mark_as_removed();
-                    goto repo0_try_again;
+                    goto repo0_kernel;
                 }
                 *HMP0 = 0x80;               // 5
                 //strobe(HMCLR);              // 3
@@ -622,7 +622,7 @@ repo1_try_again:
                     ms_id_p[1] = -1;
 
                     _ms_mark_as_removed();
-                    goto repo1_try_again;
+                    goto repo1_kernel;
                 }
                 *HMP1 = 0x80;               // 5
                 //strobe(HMCLR);            // 3
@@ -637,6 +637,7 @@ repo1_try_again:
     }
             
     X = ms_scenery[Y++];            // 10
+    ms_tmp = y1 + h1;
     strobe(WSYNC);                  // 3
 
     VSYNC[X] = ms_v;                // 7
@@ -667,6 +668,7 @@ shortcut_sprite0:
             store(VSYNC[X]);                // 4
 
             if (Y < ms_tmp) goto repo0_kernel;
+            ms_tmp = y1 + h1;
             goto display_sprite1; 
         } else {
             y0 = y1 + h1;
@@ -700,7 +702,6 @@ shortcut_sprite0:
         }
     } else if (y1 < y0) { // 8 / 9
 display_sprite1:
-        ms_tmp = y1 + h1;
         if (Y < y1) _ms_void_kernel(y1);
         if (ms_tmp < y0) {
             if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
