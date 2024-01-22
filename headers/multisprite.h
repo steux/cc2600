@@ -148,6 +148,7 @@ MS_OFFSCREEN_BANK void multisprite_move(char i, char nx, char ny)
     if (ms_sprite_y[X] == ny) return; // No vertical move, so nothing to check
     Y = 0;
     while ((ms_sorted_by_y[Y] & 0x7f) != i) Y++;
+    char j = ms_sorted_by_y[Y];
     // Update ms_sorted_by_y if needed    
     if (ms_sprite_y[X] < ny) {
         // We have gone downwards
@@ -163,7 +164,7 @@ MS_OFFSCREEN_BANK void multisprite_move(char i, char nx, char ny)
                 ms_sorted_by_y[Y] = X;
             } else break;
         }
-        ms_sorted_by_y[Y] = i;
+        ms_sorted_by_y[Y] = j;
     } else {
         // We have gone upwards
         ms_sprite_y[X] = ny;
@@ -178,7 +179,7 @@ MS_OFFSCREEN_BANK void multisprite_move(char i, char nx, char ny)
                 ms_sorted_by_y[Y] = X;
             } else break;
         }
-        ms_sorted_by_y[Y] = i;
+        ms_sorted_by_y[Y] = j;
     }
 }
 
@@ -196,7 +197,7 @@ inline void _ms_select_sprites()
             char y2 = ms_sprite_y[X = candidate2 & 0x7f];
             char y1 = ms_sprite_y[X = candidate1 & 0x7f];
             char height1 = ms_height[X = ms_sprite_model[X]];
-            if (y1 + height1 + 8 >= y2) {
+            if (y1 + height1 + 13 >= y2) {
                 // Yes. It overlaps. Skip candidate1 and set it as prioritary for next time
                 ms_sorted_by_y[--Y] |= 0x80;
                 Y++;
@@ -521,7 +522,8 @@ MS_KERNEL_BANK void multisprite_kernel()
     ms_tmp = ms_scenery[Y++];           // 11
     X = ms_scenery[Y++];                // 10 
     VSYNC[X] = ms_tmp;                  // 7
-    strobe(HMCLR);                      // 3
+    *HMP0 = 0x80;
+    *HMP1 = 0x80;
     ms_tmp = y0 + h0;
     strobe(WSYNC);                      // 3
     *VBLANK = 0;
@@ -548,7 +550,7 @@ MS_KERNEL_BANK void multisprite_kernel()
 repo_kernel:
     if (y0 == MS_UNALLOCATED) { // 8. There is no sprite 0. Allocate 1 ?
 repo0_kernel:
-        if (y1 == MS_UNALLOCATED || Y < y1 - 8) {      // 22                                              
+        if (y1 == MS_UNALLOCATED || Y < y1 - 6) {      // 22                                              
 repo0_try_again: 
             strobe(WSYNC);                  // 3 
 
@@ -565,7 +567,7 @@ repo0_try_again:
                 ms_v = ms_scenery[Y++];     // 9
                 
                 X = ms_id_p[0];             // 3 [29/76]
-                if (Y < ms_sprite_y[X] - 8) { // 11/13 [40/76]
+                if (Y < ms_sprite_y[X] - 6) { // 11/13 [40/76]
                     h0 = _ms_kernel_repo0();// 6 [46/76] 
                 } else {
                     // This one will be skipped. Let's set it as prioritary for next time
@@ -575,7 +577,8 @@ repo0_try_again:
                     _ms_mark_as_removed();
                     goto repo0_try_again;
                 }
-                strobe(HMCLR);              // 3
+                *HMP0 = 0x80;               // 5
+                //strobe(HMCLR);              // 3
             }
         } else {
             strobe(WSYNC);                  // 3 
@@ -593,7 +596,7 @@ repo0_try_again:
     // Repo multisprite_kernel 1
     if (y1 == MS_UNALLOCATED) { // 7. There is no sprite 1. Allocate 1 ?
 repo1_kernel:
-        if (y0 == MS_UNALLOCATED || Y < y0 + 8) {      // 22                                             
+        if (y0 == MS_UNALLOCATED || Y < y0 - 6) {      // 22                                             
 repo1_try_again: 
             strobe(WSYNC);                  // 3 
 
@@ -611,7 +614,7 @@ repo1_try_again:
                 ms_v = ms_scenery[Y++];     // 9
                 
                 X = ms_id_p[1];             // 3 [29/76]
-                if (Y < ms_sprite_y[X] - 8) { // 11/13 [40/76]
+                if (Y < ms_sprite_y[X] - 6) { // 11/13 [40/76]
                     h1 = _ms_kernel_repo1();          // 6 [46/76] 
                 } else {
                     // This one will be skipped. Let's set it as prioritary for next time
@@ -621,7 +624,8 @@ repo1_try_again:
                     _ms_mark_as_removed();
                     goto repo1_try_again;
                 }
-                strobe(HMCLR);              // 3
+                *HMP1 = 0x80;               // 5
+                //strobe(HMCLR);            // 3
             }
         } else {
             strobe(WSYNC);                  // 3 
