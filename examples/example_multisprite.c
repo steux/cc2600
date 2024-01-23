@@ -43,6 +43,9 @@ void main()
     multisprite_new(0, xpos, ypos, 0);
     multisprite_new(0, 50, 50, 3);
     multisprite_new(0, 100, 50, 3);
+    multisprite_new(0, 30, -10, 3);
+    multisprite_new(0, 30, 170, 3);
+    //multisprite_new(0, 50, 180, 3);
     do {
         *VBLANK = 2; // Enable VBLANK
         *VSYNC = 2; // Set VSYNC
@@ -61,9 +64,9 @@ void main()
 
         multisprite_move(0, xpos, ypos);
 
-        ms_scenery = playfield + scrolling;
+        ms_scenery = playfield - MS_OFFSET + scrolling;
         //scrolling -= 2;
-        if (scrolling < 0) scrolling = 30;
+        //if (scrolling < 0) scrolling = 32;
 
         multisprite_kernel_prep();
         while (*INTIM); // Wait for end of blank

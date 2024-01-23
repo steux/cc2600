@@ -93,7 +93,7 @@ MS_KERNEL_BANK aligned(256) const char ms_sprite_hm[160] = {0x40, 0x30, 0x20, 0x
 MS_OFFSCREEN_BANK void multisprite_init(char *scenery)
 {
     ms_nb_sprites = 0;
-    ms_scenery = scenery;
+    ms_scenery = scenery - MS_OFFSET;
 }
 
 // Create a new sprite at nx, ny (model and nusiz provided)
@@ -211,6 +211,24 @@ inline void _ms_select_sprites()
     }
 }
 
+MS_OFFSCREEN_BANK char _ms_allocate_sprite_ex()
+{
+    char ms_tmp;
+    X = ms_sprite_iter;
+    if (X != ms_nb_sprites) {
+        ms_tmp = ms_sorted_by_y[X];
+        if (ms_tmp & 0x80) { // was removed
+            X++;
+            if (X == ms_nb_sprites) return -1;
+            ms_tmp = ms_sorted_by_y[X] & 0x7f;
+        }
+        X++;
+        ms_sprite_iter = X;
+        return ms_tmp;
+    }
+    return -1;
+}
+
 inline char _ms_allocate_sprite()
 {
     char ms_tmp;
@@ -220,7 +238,7 @@ inline char _ms_allocate_sprite()
         if (ms_tmp & 0x80) { // was removed
             X++;
             if (X == ms_nb_sprites) return -1;
-            ms_tmp = ms_sorted_by_y[X];
+            ms_tmp = ms_sorted_by_y[X] & 0x7f;
         }
         X++;
         ms_sprite_iter = X;
@@ -446,7 +464,7 @@ MS_OFFSCREEN_BANK void multisprite_kernel_prep()
     *VDELP0 = 0;
     y0 = MS_UNALLOCATED;
     y1 = MS_UNALLOCATED;
-    X = _ms_allocate_sprite(); // 47
+    X = _ms_allocate_sprite_ex();
     // Position sprite 0
     if (X != -1) {
         ms_id_p[0] = X;
@@ -468,7 +486,7 @@ MS_OFFSCREEN_BANK void multisprite_kernel_prep()
         strobe(WSYNC);                  // 3
         strobe(HMOVE);
     }
-    X = _ms_allocate_sprite(); // 47
+    X = _ms_allocate_sprite_ex();
     // Position sprite 1
     if (X != -1) {
         ms_id_p[1] = X;
@@ -504,13 +522,14 @@ MS_OFFSCREEN_BANK void multisprite_kernel_prep()
 
 MS_KERNEL_BANK _ms_check_collisions()
 {
-    if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= 0x40; // 8/20
-    if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= 0x40;
+    //if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= 0x40; // 8/20
+    //if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= 0x40;
     strobe(WSYNC);                  // 3
-    if (*CXPPMM & 0x80) {
+    /*if (*CXPPMM & 0x80) {
         ms_nusiz[X = ms_id_p[0]] |= 0x80;
         ms_nusiz[X = ms_id_p[1]] |= 0x80;
     }
+    */
     strobe(CXCLR);
 }
 
@@ -559,9 +578,9 @@ repo0_try_again:
             if (X != -1) {                  // 5/7
                 // Check if y position is compatible
                 ms_id_p[0] = X;             // 3
+                X = ms_scenery[Y];          // 8
                 strobe(WSYNC);              // 3
                
-                X = ms_scenery[Y];          // 8
                 VSYNC[X] = ms_v;            // 7
                 Y++;                        // 2
                 ms_v = ms_scenery[Y++];     // 9
@@ -606,9 +625,9 @@ repo1_try_again:
             if (X != -1) {                  // 4/5
                 // Check if y position is compatible
                 ms_id_p[1] = X;             // 3
+                X = ms_scenery[Y];          // 8
                 strobe(WSYNC);              // 3
                
-                X = ms_scenery[Y];          // 8
                 VSYNC[X] = ms_v;            // 7
                 Y++;                        // 2
                 ms_v = ms_scenery[Y++];     // 9
@@ -798,12 +817,12 @@ finish:
         }
     }
 repo_try_again:
+    y0 = MS_UNALLOCATED;
+    y1 = MS_UNALLOCATED;
     _ms_check_collisions();
     ms_v = ms_scenery[Y];           // 9
     Y++;                            // 2
     X = ms_scenery[Y++];            // 10 
-    y0 = MS_UNALLOCATED;
-    y1 = MS_UNALLOCATED;
     load(ms_v);                     // 3
     strobe(WSYNC);                  // 3
     store(VSYNC[X]);                // 4
