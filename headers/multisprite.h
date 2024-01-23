@@ -21,7 +21,7 @@
 // v0.1: Initial version
 // TODO: Add support for SARA chip
 // TODO: Add support for single color (3 bits of model_id)
-//
+// TODO: Test with bankswitching
 #ifndef __MULTISPRITE_H__
 #define __MULTISPRITE_H__
 
