@@ -68,6 +68,7 @@
 
 #define MS_UNALLOCATED 255
 #define MS_OFFSET 32
+#define MS_END_OF_SCREEN (MS_PLAYFIELD_HEIGHT + MS_OFFSET - 2)
 
 char ms_v, y0, y1, h0, h1;
 char *ms_colup0ptr, *ms_colup1ptr, *ms_grp0ptr, *ms_grp1ptr, *ms_scenery;
@@ -613,10 +614,10 @@ repo0_try_again:
 repo1_kernel:
         if (y0 == MS_UNALLOCATED || Y < y0 - 6) {      // 22                                             
 repo1_try_again: 
+            load(ms_scenery[Y++]);          // 8 
             strobe(WSYNC);                  // 3 
+            store(ms_v);                    // 3
 
-            ms_v = ms_scenery[Y];           // 9
-            Y++;                            // 2
             X = _ms_allocate_sprite();      // 47 [58/76]
             if (X != -1) {                  // 4/5
                 // Check if y position is compatible
@@ -664,7 +665,7 @@ display_sprites:
 display_sprite0:    
         if (Y < y0) _ms_void_kernel(y0);
         if (ms_tmp0 < y1) {
-            if (ms_tmp0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+            if (ms_tmp0 >= MS_END_OF_SCREEN) {
                 _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                 goto check_collisions_and_return;
             }
@@ -687,12 +688,12 @@ display_sprite0:
         } else {
             if (ms_tmp0 < ms_tmp1) {
                 _ms_p0_kernel(y1);
-                if (ms_tmp0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                if (ms_tmp0 >= MS_END_OF_SCREEN) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
                 _ms_p0_p1_kernel(ms_tmp0);
-                if (ms_tmp1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                if (ms_tmp1 >= MS_END_OF_SCREEN) {
                     _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
@@ -700,12 +701,12 @@ display_sprite0:
                 goto repo_try_again;
             } else {
                 _ms_p0_kernel(y1);
-                if (ms_tmp1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                if (ms_tmp1 >= MS_END_OF_SCREEN) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
                 _ms_p0_p1_kernel(ms_tmp1);
-                if (ms_tmp0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                if (ms_tmp0 >= MS_END_OF_SCREEN) {
                     _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
@@ -719,12 +720,12 @@ display_sprite1:
         if (ms_tmp1 >= y0) {
             if (ms_tmp0 < ms_tmp1) {
                 _ms_p1_kernel(y0);
-                if (ms_tmp0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                if (ms_tmp0 >= MS_END_OF_SCREEN) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
                 _ms_p0_p1_kernel(ms_tmp0);
-                if (ms_tmp1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                if (ms_tmp1 >= MS_END_OF_SCREEN) {
                     _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
@@ -732,12 +733,12 @@ display_sprite1:
                 goto repo_try_again;
             } else {
                 _ms_p1_kernel(y0);
-                if (ms_tmp1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                if (ms_tmp1 >= MS_END_OF_SCREEN) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
                 _ms_p0_p1_kernel(ms_tmp1);
-                if (ms_tmp0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                if (ms_tmp0 >= MS_END_OF_SCREEN) {
                     _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
@@ -745,7 +746,7 @@ display_sprite1:
                 goto repo_try_again;
             }
         } else {
-            if (ms_tmp1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+            if (ms_tmp1 >= MS_END_OF_SCREEN) {
                 _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                 goto check_collisions_and_return;
             }
@@ -770,13 +771,13 @@ display_sprite1:
         if (y0 != MS_UNALLOCATED) {
             _ms_void_kernel(y0);
             if (ms_tmp0 < ms_tmp1) { // 5/6 [42/76]
-                if (ms_tmp0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                if (ms_tmp0 >= MS_END_OF_SCREEN) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
                 _ms_p0_p1_kernel(ms_tmp0); // 12 [54/76]
                 if (Y < ms_tmp1) {
-                    if (ms_tmp1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                    if (ms_tmp1 >= MS_END_OF_SCREEN ) {
                         _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                         goto check_collisions_and_return;
                     }
@@ -784,13 +785,13 @@ display_sprite1:
                 }
                 goto repo_try_again;
             } else {
-                if (ms_tmp1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                if (ms_tmp1 >= MS_END_OF_SCREEN) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
                 _ms_p0_p1_kernel(ms_tmp1);
                 if (Y < ms_tmp0) {
-                    if (ms_tmp0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                    if (ms_tmp0 >= MS_END_OF_SCREEN) {
                         _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                         goto check_collisions_and_return;
                     }
@@ -803,8 +804,7 @@ display_sprite1:
 finish:
             if (Y < MS_OFFSET + MS_PLAYFIELD_HEIGHT)
                 _ms_void_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-            strobe(WSYNC);
-            return;
+            goto check_collisions_and_return;
         }
     }
 repo_try_again:
@@ -823,6 +823,9 @@ check_collisions_and_return:
     *GRP0 = 0;
     *GRP1 = 0;
     _ms_check_collisions();
+    for (X = ms_sprite_iter; X != ms_nb_sprites; X++) {
+        ms_sorted_by_y[X] |= 0x80;
+    }
 }
 
 #endif // __MULTISPRITE_H__
