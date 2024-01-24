@@ -455,7 +455,6 @@ MS_KERNEL_BANK void _ms_void_kernel(char stop)
 
 MS_OFFSCREEN_BANK void multisprite_kernel_prep()
 {
-    char ms_tmp;
     _ms_select_sprites();
     
     // Phase 1: before the multisprite_kernel actually starts, allocates and positions sprites p0 and p1.
@@ -535,32 +534,29 @@ MS_KERNEL_BANK _ms_check_collisions()
 
 MS_KERNEL_BANK void multisprite_kernel()
 {
-    char ms_tmp, ms_tmp2;
+    char ms_tmp1, ms_tmp0;
 
     // Prepare for drawing
-    ms_tmp = ms_scenery[Y++];           // 11
+    ms_tmp1 = ms_scenery[Y++];           // 11
     X = ms_scenery[Y++];                // 10 
-    VSYNC[X] = ms_tmp;                  // 7
+    VSYNC[X] = ms_tmp1;                  // 7
     *HMP0 = 0x80;
     *HMP1 = 0x80;
-    ms_tmp = y0 + h0;
+    ms_tmp0 = y0 + h0;
+    ms_tmp1 = y1 + h1;
     strobe(WSYNC);                      // 3
     *VBLANK = 0;
 
     if (ms_v == 0) {
-        goto shortcut_sprite0;
+        goto display_sprite0;
     } else {
-        y0 += h0;
-        y1 += h1;
         if (ms_v == 1) {
-            _ms_p0_p1_kernel(y1);
-            _ms_p0_kernel(y0);
+            _ms_p0_p1_kernel(ms_tmp1);
+            _ms_p0_kernel(ms_tmp0);
         } else {
-            _ms_p0_p1_kernel(y0);
-            _ms_p1_kernel(y1);
+            _ms_p0_p1_kernel(ms_tmp0);
+            _ms_p1_kernel(ms_tmp1);
         }
-        *GRP0 = 0;
-        *GRP1 = 0;
         y0 = MS_UNALLOCATED;
         y1 = MS_UNALLOCATED;
         goto repo0_try_again;
@@ -657,8 +653,8 @@ repo1_try_again:
     }
             
     X = ms_scenery[Y++];            // 10
-    ms_tmp = y1 + h1;
-    ms_tmp2 = y0 + h0;
+    ms_tmp0 = y0 + h0;
+    ms_tmp1 = y1 + h1;
     load(ms_v);                     // 3
     strobe(WSYNC);                  // 3
 
@@ -667,20 +663,18 @@ repo1_try_again:
 display_sprites:    
     if (y0 < y1) {                      // 8/9
 display_sprite0:    
-        ms_tmp = y0 + h0;
-shortcut_sprite0:
         if (Y < y0) _ms_void_kernel(y0);
-        if (ms_tmp < y1) {
-            if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+        if (ms_tmp0 < y1) {
+            if (ms_tmp0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                 _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                 goto check_collisions_and_return;
             }
-            _ms_p0_kernel(ms_tmp);
+            _ms_p0_kernel(ms_tmp0);
             if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 6) goto finish;
             strobe(WSYNC);                  // 3
             if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= 0x40;
             strobe(CXCLR); // Clear collisions
-            ms_tmp = y1 - 4;
+            ms_tmp0 = y1 - 4;
             y0 = MS_UNALLOCATED;
             ms_v = ms_scenery[Y];           // 9
             Y++;                            // 2
@@ -689,81 +683,79 @@ shortcut_sprite0:
             strobe(WSYNC);                  // 3
             store(VSYNC[X]);                // 4
 
-            if (Y < ms_tmp) goto repo0_kernel;
-            ms_tmp = y1 + h1;
+            if (Y < ms_tmp0) goto repo0_kernel;
             goto display_sprite1; 
         } else {
-            y0 = y1 + h1;
-            if (y0 < ms_tmp) {
+            if (ms_tmp0 < ms_tmp1) {
                 _ms_p0_kernel(y1);
-                if (y0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                if (ms_tmp0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
-                _ms_p0_p1_kernel(y0);
-                if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
-                    _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    goto check_collisions_and_return;
-                }
-                _ms_p0_kernel(ms_tmp);
-                goto repo_try_again;
-            } else {
-                _ms_p0_kernel(y1);
-                if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
-                    _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    goto check_collisions_and_return;
-                }
-                _ms_p0_p1_kernel(ms_tmp);
-                if (y0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                _ms_p0_p1_kernel(ms_tmp0);
+                if (ms_tmp1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
-                _ms_p1_kernel(y0);
+                _ms_p1_kernel(ms_tmp1);
+                goto repo_try_again;
+            } else {
+                _ms_p0_kernel(y1);
+                if (ms_tmp1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                    _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
+                    goto check_collisions_and_return;
+                }
+                _ms_p0_p1_kernel(ms_tmp1);
+                if (ms_tmp0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                    _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
+                    goto check_collisions_and_return;
+                }
+                _ms_p0_kernel(ms_tmp0);
                 goto repo_try_again;
             }
         }
     } else if (y1 < y0) { // 8 / 9
 display_sprite1:
         if (Y < y1) _ms_void_kernel(y1);
-        if (ms_tmp >= y0) {
-            if (ms_tmp2 < ms_tmp) {
+        if (ms_tmp1 >= y0) {
+            if (ms_tmp0 < ms_tmp1) {
                 _ms_p1_kernel(y0);
-                if (y1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                if (ms_tmp0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
-                _ms_p0_p1_kernel(ms_tmp2);
-                if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                _ms_p0_p1_kernel(ms_tmp0);
+                if (ms_tmp1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
-                _ms_p1_kernel(ms_tmp);
+                _ms_p1_kernel(ms_tmp1);
                 goto repo_try_again;
             } else {
                 _ms_p1_kernel(y0);
-                if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                if (ms_tmp1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
-                _ms_p0_p1_kernel(ms_tmp);
-                if (y1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                _ms_p0_p1_kernel(ms_tmp1);
+                if (ms_tmp0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
-                _ms_p0_kernel(ms_tmp2);
+                _ms_p0_kernel(ms_tmp0);
                 goto repo_try_again;
             }
         } else {
-            if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+            if (ms_tmp1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                 _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                 goto check_collisions_and_return;
             }
-            _ms_p1_kernel(ms_tmp);
+            _ms_p1_kernel(ms_tmp1);
             if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 6) goto finish;
             strobe(WSYNC);                  // 3
             if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= 0x40;
             strobe(CXCLR); // Clear collisions
-            ms_tmp = y0 - 4;
+            ms_tmp1 = y0 - 4;
             y1 = MS_UNALLOCATED;
             ms_v = ms_scenery[Y];           // 9
             Y++;                            // 2
@@ -772,40 +764,38 @@ display_sprite1:
             strobe(WSYNC);                  // 3
             store(VSYNC[X]);                // 4
 
-            if (Y < ms_tmp) goto repo_kernel;
+            if (Y < ms_tmp1) goto repo_kernel;
             goto display_sprite0; 
         }
     } else {
         if (y0 != MS_UNALLOCATED) {
-            ms_tmp = y0 + h0; // 11 [26/76]
             _ms_void_kernel(y0);
-            y0 = y1 + h1;      // 10 [36/76]
-            if (y0 < ms_tmp) { // 5/6 [42/76]
-                if (y0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+            if (ms_tmp0 < ms_tmp1) { // 5/6 [42/76]
+                if (ms_tmp0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
-                _ms_p0_p1_kernel(y0); // 12 [54/76]
-                if (Y < ms_tmp) {
-                    if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                _ms_p0_p1_kernel(ms_tmp0); // 12 [54/76]
+                if (Y < ms_tmp1) {
+                    if (ms_tmp1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                         _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                         goto check_collisions_and_return;
                     }
-                    _ms_p0_kernel(ms_tmp);
+                    _ms_p0_kernel(ms_tmp1);
                 }
                 goto repo_try_again;
             } else {
-                if (ms_tmp >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                if (ms_tmp1 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                     goto check_collisions_and_return;
                 }
-                _ms_p0_p1_kernel(ms_tmp);
-                if (Y < y0) {
-                    if (y0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
+                _ms_p0_p1_kernel(ms_tmp1);
+                if (Y < ms_tmp0) {
+                    if (ms_tmp0 >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 1) {
                         _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                         goto check_collisions_and_return;
                     }
-                    _ms_p1_kernel(y0);
+                    _ms_p1_kernel(ms_tmp0);
                 }
                 goto repo_try_again;
             }
