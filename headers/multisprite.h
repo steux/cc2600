@@ -521,14 +521,13 @@ MS_OFFSCREEN_BANK void multisprite_kernel_prep()
 
 MS_KERNEL_BANK _ms_check_collisions()
 {
-    //if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= 0x40; // 8/20
-    //if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= 0x40;
-    strobe(WSYNC);                  // 3
-    /*if (*CXPPMM & 0x80) {
+    if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= 0x40; // 8/20
+    if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= 0x40;
+    //strobe(WSYNC);                  // 3
+    if (*CXPPMM & 0x80) {
         ms_nusiz[X = ms_id_p[0]] |= 0x80;
         ms_nusiz[X = ms_id_p[1]] |= 0x80;
     }
-    */
     strobe(CXCLR);
 }
 
