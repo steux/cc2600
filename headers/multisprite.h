@@ -201,14 +201,14 @@ MS_KERNEL_BANK multisprite_select_sprites()
         if (candidate2 & 0x80) { // If it was not displayed at previous iteration
             // Let's see if this candidate overlaps with our previous candidate
             char y2 = ms_sprite_y[X = candidate2 & 0x7f];
-            char ms_y1 = ms_sprite_y[X = candidate1 & 0x7f];
+            ms_sorted_by_y[Y] = X;
+            char y1 = ms_sprite_y[X = candidate1 & 0x7f] + 13;
             char height1 = ms_height[X = ms_sprite_model[X]];
-            if (ms_y1 + height1 + 13 >= y2) {
+            if (y1 + height1 >= y2) {
                 // Yes. It overlaps. Skip candidate1 and set it as prioritary for next time
                 ms_sorted_by_y[--Y] |= 0x80;
                 Y++;
             } 
-            ms_sorted_by_y[Y] = candidate2 & 0x7f;
         } else {
             X = candidate2 & 0x7f;
             ms_nusiz[X] &= 0x3f; // Reset collision
@@ -414,20 +414,19 @@ MS_KERNEL_BANK void _ms_p0_p1_kernel(char stop)
             store(*GRP1);                   // 3
             *COLUP0 = ms_colup0;            // 6 
             *COLUP1 = ms_colup1;            // 6
-            kernel_short_macro;             // Max 15 cycles
+            kernel_short_macro;             // Max 13 cycles
             Y++;                            // 2
             X = ms_scenery[Y];              // 8
             ms_colup0 = ms_colup0ptr[Y];    // 9
             ms_colup1 = ms_colup1ptr[Y];    // 9
             *GRP0 = ms_grp0ptr[Y];          // 9
-            load(ms_grp1ptr[Y]);            // 6
+            load(ms_grp1ptr[Y++]);          // 6
             strobe(WSYNC);                  // 3: Total (2) = 61 
 
             store(*GRP1);                   // 3
             *COLUP0 = ms_colup0;            // 6
             *COLUP1 = ms_colup1;            // 6
             VSYNC[X] = ms_v;                // 7
-            Y++;                            // 2
         } while (Y < stop);                 // 5/6
     }
     *VDELP0 = 0;                        // 5
@@ -795,10 +794,10 @@ display_sprite1:
                 _ms_p0_p1_kernel(ms_tmp0); // 12 [54/76]
                 if (Y < ms_tmp1) {
                     if (ms_tmp1 >= MS_END_OF_SCREEN ) {
-                        _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
+                        _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                         goto check_collisions_and_return;
                     }
-                    _ms_p0_kernel(ms_tmp1);
+                    _ms_p1_kernel(ms_tmp1);
                 }
                 goto repo_try_again;
             } else {
@@ -809,10 +808,10 @@ display_sprite1:
                 _ms_p0_p1_kernel(ms_tmp1);
                 if (Y < ms_tmp0) {
                     if (ms_tmp0 >= MS_END_OF_SCREEN) {
-                        _ms_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
+                        _ms_p0_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
                         goto check_collisions_and_return;
                     }
-                    _ms_p1_kernel(ms_tmp0);
+                    _ms_p0_kernel(ms_tmp0);
                 }
                 goto repo_try_again;
             }
