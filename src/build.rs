@@ -68,7 +68,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
 
     // Let's identitfy superchip
     for v in compiler_state.sorted_variables().iter() {
-        if !v.1.var_const && v.1.memory == VariableMemory::Superchip && v.1.def == VariableDefinition::None {
+        if v.1.memory == VariableMemory::Superchip && v.1.def == VariableDefinition::None {
             superchip = true;
         }
     }
@@ -334,6 +334,9 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
                     println!(" - {} ({} byte{})", v.0, sx, if sx > 1 {"s"} else {""});
                 }
             }
+        }
+        if args.verbose {
+            println!("Superchip RAM usage: {}/128", filled);
         }
     }
 
