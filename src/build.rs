@@ -38,9 +38,9 @@ fn compute_function_level(function_name: &String, node: &str, current_level: usi
         }
         // Look at the lower levels if it is possible to find it also
         for nodex in calls {
-            debug!("Function name: {}, {:?}", function_name, nodex);
+            //debug!("Function name: {}, {:?}", function_name, nodex);
             if already_seen.contains(nodex) {
-                debug!("Function {} has already been seen", nodex);
+                //debug!("Function {} has already been seen", nodex);
                 return None;
             }
             already_seen.insert(nodex.clone());
@@ -172,7 +172,8 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
             if f.1.bank != 0 {
                 nb_banked_functions += 1;
             }
-
+        
+            gstate.current_bank = f.1.bank;
             gstate.local_label_counter_for = 0;
             gstate.local_label_counter_if = 0;
 
@@ -574,7 +575,7 @@ Powerup
         // Generate functions code
         for f in compiler_state.sorted_functions().iter() {
             if f.1.code.is_some() && !f.1.inline && f.1.bank == bank && gstate.functions_actually_in_use.get(f.0).is_some() {
-                debug!("Generating code for function #{}", f.0);
+                debug!("Generating code for function {}", f.0);
 
                 gstate.write(&format!("\n{}\tSUBROUTINE\n", f.0))?;
                 gstate.write_function(f.0)?;

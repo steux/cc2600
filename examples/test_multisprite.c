@@ -42,7 +42,7 @@ void main()
     multisprite_init(playfield);
     multisprite_new(0, xpos, ypos, 0);
     multisprite_new(0, 50, 50, 3);
-    multisprite_new(0, 100, 50, 3);
+    //multisprite_new(0, 100, 50, 3);
     multisprite_new(0, 30, -10, 3);
     multisprite_new(0, 30, 170, 3);
     multisprite_new(0, 50, 180, 3);
@@ -55,7 +55,7 @@ void main()
         *VSYNC = 0; // Turn VSYNC Off
         
         // Blank
-        *TIM64T = ((BLANK - 3) * 76) / 64;
+        *TIM64T = ((BLANK - 3) * 76) / 64 - 3;
         // Do some logic here
         if (!(*SWCHA & 0x80) && xpos < 158) { xpos++; ms_nusiz[0] = 0; } // Right
         if (!(*SWCHA & 0x40) && xpos > 0) { xpos--; ms_nusiz[0] = 8; } // Left
@@ -68,6 +68,7 @@ void main()
         scrolling -= 2;
         if (scrolling < 0) scrolling = 32;
 
+        multisprite_select_sprites();
         multisprite_kernel_prep();
         while (*INTIM); // Wait for end of blank
  
