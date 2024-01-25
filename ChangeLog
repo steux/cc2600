@@ -1,6 +1,7 @@
 v0.4.3 (01/2525/2024) :
     - Corrected broken bankswitching function calls
     - Fixed bug with array allocations in superchip
+    - Optimized bankswitching code (removed CallXXX for functions never called from bank0)
 
 v0.4.2 (01/08/2024) :
     - Added support for constant address in array of pointers

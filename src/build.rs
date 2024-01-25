@@ -63,7 +63,7 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
 {
     let mut superchip = false;
     let mut bankswitching_scheme = "4K";
-    
+    let mut banked_functions = HashSet::<String>::new(); 
     // Try to figure out what is the bankswitching method
 
     // Let's identitfy superchip
@@ -164,15 +164,10 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         }
     }
     
-    let mut nb_banked_functions = 0;
     let mut banked_function_address = 0;
     
     for f in compiler_state.sorted_functions().iter() {
         if f.1.code.is_some() {
-            if f.1.bank != 0 {
-                nb_banked_functions += 1;
-            }
-        
             gstate.current_bank = f.1.bank;
             gstate.local_label_counter_for = 0;
             gstate.local_label_counter_if = 0;
@@ -190,6 +185,22 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
     }
 
     gstate.compute_functions_actually_in_use()?;
+
+    for f in compiler_state.sorted_functions().iter() {
+        if f.1.code.is_some() {
+            if f.1.bank == 0 {
+                // Compute banked functions
+                if let Some(called_functions) = gstate.functions_call_tree.get(f.0) {
+                    for i in called_functions {
+                        let fx = compiler_state.functions.get(i).unwrap();
+                        if fx.bank != 0 {
+                            banked_functions.insert(i.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     gstate.write("\n\tSEG.U VARS\n\tORG $80\n\n")?;
     
@@ -737,8 +748,8 @@ Powerup
             }
         }
         else {
-            let end_of_memory = if nb_banked_functions != 0 {
-                0x1fef - nb_banked_functions * 10
+            let end_of_memory = if banked_functions.len() != 0 {
+                0x1fef - banked_functions.len() * 10
             } else {
                 if compiler_state.variables.get("PLUSROM_API").is_some() {
                     0x1fef
@@ -751,9 +762,9 @@ Powerup
         ", end_of_memory, bank))?;
 
             if bank == 0 {
-                if nb_banked_functions > 0 {
+                if banked_functions.len() > 0 {
                     // Generate bankswitching functions code
-                    banked_function_address = 0x0FEF - nb_banked_functions * 10;
+                    banked_function_address = 0x0FEF - banked_functions.len() * 10;
                     debug!("Banked function address={:04x}", banked_function_address);
                     gstate.write(&format!("
         ORG ${:04x}
@@ -761,7 +772,7 @@ Powerup
         banked_function_address, 0x1000 + banked_function_address))?;
                     for bank_ex in 1..=maxbank {
                         for f in compiler_state.sorted_functions().iter() {
-                            if f.1.code.is_some() && !f.1.inline && f.1.bank == bank_ex {
+                            if f.1.code.is_some() && !f.1.inline && f.1.bank == bank_ex && banked_functions.contains(f.0) {
                                 gstate.write(&format!("
 Call{}
         LDX ${:04x}+{}
@@ -780,14 +791,14 @@ Call{}
             } else {
                 for f in compiler_state.sorted_functions().iter() {
                     let address = banked_function_address;
-                    if f.1.code.is_some() && !f.1.inline && f.1.bank == bank {
+                    if f.1.code.is_some() && !f.1.inline && f.1.bank == bank && banked_functions.contains(f.0) {
                         debug!("#{} Banked function address={:04x}", bank, banked_function_address);
                         gstate.write(&format!("
         ORG ${:04x}
         RORG ${:04x}
         JSR {}
         LDX ${:04x}
-                    ", address + f.1.bank * 0x1000 + 3, 0x1000 + address + 3, f.0, bankswitching_address))?;
+                    ", address + f.1.bank as usize * 0x1000 + 3, 0x1000 + address + 3, f.0, bankswitching_address))?;
                     banked_function_address += 10;
                     }
                 }

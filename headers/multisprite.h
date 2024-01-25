@@ -19,9 +19,9 @@
 */
 
 // v0.1: Initial version
-// TODO: Add support for SARA chip
+// DONE: Add support for SARA chip
+// DONE: Test with bankswitching
 // TODO: Add support for single color (3 bits of model_id)
-// TODO: Test with bankswitching
 #ifndef __MULTISPRITE_H__
 #define __MULTISPRITE_H__
 
@@ -512,6 +512,8 @@ MS_OFFSCREEN_BANK void multisprite_kernel_prep()
 
 MS_KERNEL_BANK _ms_check_collisions()
 {
+    ms_y0 = MS_UNALLOCATED;
+    ms_y1 = MS_UNALLOCATED;
     if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= 0x40; // 8/20
     if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= 0x40;
     //strobe(WSYNC);                  // 3
@@ -823,8 +825,6 @@ finish:
         }
     }
 repo_try_again:
-    ms_y0 = MS_UNALLOCATED;
-    ms_y1 = MS_UNALLOCATED;
     _ms_check_collisions();
     ms_v = ms_scenery[Y];           // 9
     Y++;                            // 2

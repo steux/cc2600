@@ -41,11 +41,13 @@ void main()
     char xpos = 50, ypos = 50, scrolling = 0;
     multisprite_init(playfield);
     multisprite_new(0, xpos, ypos, 0);
+    /*
     multisprite_new(0, 50, 50, 3);
-    //multisprite_new(0, 100, 50, 3);
+    multisprite_new(0, 100, 50, 3);
     multisprite_new(0, 30, -10, 3);
     multisprite_new(0, 30, 170, 3);
     multisprite_new(0, 50, 180, 3);
+    */
     do {
         *VBLANK = 2; // Enable VBLANK
         *VSYNC = 2; // Set VSYNC
