@@ -156,16 +156,18 @@ MS_OFFSCREEN_BANK void multisprite_move(char i, char nx, char ny)
     if (ms_sprite_y[X] < ny) {
         // We have gone downwards
         ms_sprite_y[X] = ny;
-        for (; Y != ms_nb_sprites; Y++) {
+        i = ms_nb_sprites - 1;
+        for (; Y != i; Y++) {
             Y++;
             X = ms_sorted_by_y[Y] & 0x7f;
-            Y--;
             if (ny > ms_sprite_y[X]) {
-                Y++;
                 X = ms_sorted_by_y[Y];
                 Y--;
                 ms_sorted_by_y[Y] = X;
-            } else break;
+            } else {
+                Y--;
+                break;
+            }
         }
         ms_sorted_by_y[Y] = j;
     } else {
@@ -174,13 +176,14 @@ MS_OFFSCREEN_BANK void multisprite_move(char i, char nx, char ny)
         for (; Y != 0; Y--) {
             Y--;
             X = ms_sorted_by_y[Y] & 0x7f;
-            Y++;
             if (ny < ms_sprite_y[X]) {
-                Y--;
                 X = ms_sorted_by_y[Y];
                 Y++;
                 ms_sorted_by_y[Y] = X;
-            } else break;
+            } else {
+                Y++;
+                break;
+            }
         }
         ms_sorted_by_y[Y] = j;
     }
@@ -225,7 +228,10 @@ MS_OFFSCREEN_BANK char _ms_allocate_sprite_ex()
         ms_tmp = ms_sorted_by_y[X];
         if (ms_tmp & 0x80) { // was removed
             X++;
-            if (X == ms_nb_sprites) return -1;
+            if (X == ms_nb_sprites) {
+                ms_sprite_iter = X;
+                return -1;
+            }
             ms_tmp = ms_sorted_by_y[X] & 0x7f;
         }
         X++;
@@ -243,7 +249,10 @@ inline char _ms_allocate_sprite()
         ms_tmp = ms_sorted_by_y[X];
         if (ms_tmp & 0x80) { // was removed
             X++;
-            if (X == ms_nb_sprites) return -1;
+            if (X == ms_nb_sprites) {
+                ms_sprite_iter = X;
+                return -1;
+            }
             ms_tmp = ms_sorted_by_y[X] & 0x7f;
         }
         X++;
