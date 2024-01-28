@@ -57,7 +57,7 @@ void init_sprites()
         x += 10;
         y += 20;
         i++;
-        multisprite_new(1, x, y, 3 | 8);
+        multisprite_new(1, x, y, 3 | MS_REFLECTED);
         x += 10;
         y += 20;
     }

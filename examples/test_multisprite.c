@@ -1,7 +1,5 @@
 #include "vcs_colors.h"
 
-const char garfield[24] = { 0, 0, 0x12, 0x36, 0x4a, 0x33, 0x55, 0x33, 0xcb, 0xb6, 0x48, 0x3e, 0x5e, 0x6e, 0x76, 0x36, 0x84, 0xbc, 0x3a, 0x76, 0x66, 0x66, 0, 0};
-
 #define BLANK 40
 #define OVERSCAN 30
 
@@ -13,7 +11,13 @@ const char garfield[24] = { 0, 0, 0x12, 0x36, 0x4a, 0x33, 0x55, 0x33, 0xcb, 0xb6
 #define REG_PF2     0x0f
 
 #define MS_NB_SPRITES_DEF 1
-aligned(256) const char *ms_grptr[MS_NB_SPRITES_DEF] = {garfield};
+#define MS_KERNEL_DATA \
+const char garfield[24] = { 0, 0, 0x12, 0x36, 0x4a, 0x33, 0x55, 0x33, 0xcb, 0xb6, 0x48, 0x3e, 0x5e, 0x6e, 0x76, 0x36, 0x84, 0xbc, 0x3a, 0x76, 0x66, 0x66, 0, 0}; \
+const char garfield_colors[22] = { 0, 0, 0x3c, 0x3c, 0x3c, 0x0e, 0x0e, 0x0e, 0x3c, 0x3c, 0x3c, 0x3c, 0x38, 0x2c, 0x3c, 0x3c, 0x38, 0x38, 0x2c, 0x2c, 0x12, 0x12}; \
+const char *ms_grptr[MS_NB_SPRITES_DEF] = {garfield}; \
+const char *ms_coluptr[MS_NB_SPRITES_DEF] = {garfield_colors}; \
+const char ms_height[MS_NB_SPRITES_DEF] = {24};
+
 const char playfield[192 + 32] = {
     VCS_RED, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_YELLOW, REG_COLUBK, 
     VCS_RED, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_YELLOW, REG_COLUBK, 
@@ -30,9 +34,6 @@ const char playfield[192 + 32] = {
     VCS_RED, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_YELLOW, REG_COLUBK, 
     VCS_RED, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_YELLOW, REG_COLUBK
 };
-const char garfield_colors[22] = { 0, 0, 0x3c, 0x3c, 0x3c, 0x0e, 0x0e, 0x0e, 0x3c, 0x3c, 0x3c, 0x3c, 0x38, 0x2c, 0x3c, 0x3c, 0x38, 0x38, 0x2c, 0x2c, 0x12, 0x12};
-const char ms_height[MS_NB_SPRITES_DEF] = {24};
-aligned(256) const char *ms_coluptr[MS_NB_SPRITES_DEF] = {garfield_colors};
 
 #include "multisprite.h"
 
@@ -41,13 +42,12 @@ void main()
     char xpos = 50, ypos = 50, scrolling = 0;
     multisprite_init(playfield);
     multisprite_new(0, xpos, ypos, 0);
-    /*
     multisprite_new(0, 50, 50, 3);
     multisprite_new(0, 100, 50, 3);
     multisprite_new(0, 30, -10, 3);
     multisprite_new(0, 30, 170, 3);
     multisprite_new(0, 50, 180, 3);
-    */
+    
     do {
         *VBLANK = 2; // Enable VBLANK
         *VSYNC = 2; // Set VSYNC

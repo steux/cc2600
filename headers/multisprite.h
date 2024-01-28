@@ -21,7 +21,9 @@
 // v0.1: Initial version
 // DONE: Add support for SARA chip
 // DONE: Test with bankswitching
+// TODO: multisprite_new: look for the right place in both directions 
 // TODO: Add support for single color (3 bits of model_id)
+// TODO: Implement bidir search in multisprite_move
 #ifndef __MULTISPRITE_H__
 #define __MULTISPRITE_H__
 
@@ -70,6 +72,10 @@
 #define MS_UNALLOCATED 255
 #define MS_OFFSET 32
 #define MS_END_OF_SCREEN (MS_PLAYFIELD_HEIGHT + MS_OFFSET - 2)
+
+#define MS_REFLECTED 8
+#define MS_PF_COLLISION 0x40
+#define MS_COLLISION 0x80
 
 char ms_y0, ms_y1, ms_h0, ms_h1, ms_v;
 char *ms_colup0ptr, *ms_colup1ptr, *ms_grp0ptr, *ms_grp1ptr, *ms_scenery;
@@ -149,8 +155,10 @@ MS_OFFSCREEN_BANK void multisprite_move(char i, char nx, char ny)
     ny += MS_OFFSET;
     ms_sprite_x[X = i] = nx;
     if (ms_sprite_y[X] == ny) return; // No vertical move, so nothing to check
+
     Y = 0;
     while ((ms_sorted_by_y[Y] & 0x7f) != i) Y++;
+
     char j = ms_sorted_by_y[Y];
     // Update ms_sorted_by_y if needed    
     if (ms_sprite_y[X] < ny) {
@@ -522,12 +530,12 @@ MS_KERNEL_BANK _ms_check_collisions()
 {
     ms_y0 = MS_UNALLOCATED;
     ms_y1 = MS_UNALLOCATED;
-    if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= 0x40; // 8/20
-    if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= 0x40;
+    if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= MS_PF_COLLISION; // 8/20
+    if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= MS_PF_COLLISION;
     //strobe(WSYNC);                  // 3
     if (*CXPPMM & 0x80) {
-        ms_nusiz[X = ms_id_p[0]] |= 0x80;
-        ms_nusiz[X = ms_id_p[1]] |= 0x80;
+        ms_nusiz[X = ms_id_p[0]] |= MS_COLLISION;
+        ms_nusiz[X = ms_id_p[1]] |= MS_COLLISION;
     }
     strobe(CXCLR);
 }
