@@ -21,9 +21,9 @@
 // v0.1: Initial version
 // DONE: Add support for SARA chip
 // DONE: Test with bankswitching
-// TODO: multisprite_new: look for the right place in both directions 
 // TODO: Add support for single color (3 bits of model_id)
-// TODO: Implement bidir search in multisprite_move
+// DONE: Implement bidir search in multisprite_move
+
 #ifndef __MULTISPRITE_H__
 #define __MULTISPRITE_H__
 
@@ -108,20 +108,21 @@ MS_OFFSCREEN_BANK void multisprite_init(char *scenery)
 // Create a new sprite at nx, ny (model and nusiz provided)
 MS_OFFSCREEN_BANK char multisprite_new(char model, char nx, char ny, char nusiz)
 {
+    char i;
     ny += MS_OFFSET;
     // Look for right ny position
     for (X = ms_nb_sprites; X != 0; X--) {
         X--;
-        Y = ms_sorted_by_y[X] & 0x7f;
+        i = ms_sorted_by_y[X];
         X++;
-        if (ny >= ms_sprite_y[Y]) break;
-        ms_sorted_by_y[X] = Y;
+        if (ny >= ms_sprite_y[Y = i & 0x7f]) break;
+        ms_sorted_by_y[X] = i;
     }
 
     // Put new sprite data
     // Look for a free place
     for (Y = 0; Y != ms_nb_sprites; Y++) {
-        if (ms_sprite_model[Y] == -1) break;
+        if (ms_sprite_y[Y] == MS_UNALLOCATED) break;
     }
 
     ms_sorted_by_y[X] = Y;
@@ -138,28 +139,44 @@ MS_OFFSCREEN_BANK char multisprite_new(char model, char nx, char ny, char nusiz)
 MS_OFFSCREEN_BANK void multisprite_delete(char i)
 {
     // Remove from ms_sorted_by_y array
-    for (X = 0; X != ms_nb_sprites; X++) {
-        if ((ms_sorted_by_y[X] & 0x7f) == i) break;
+    X = i;
+    if (ms_sprite_y[X] >= MS_OFFSET + MS_PLAYFIELD_HEIGHT / 2) {
+        for (X = ms_nb_sprites - 1; X != 0; X--) {
+            if ((ms_sorted_by_y[X] & 0x7f) == i) break;
+        }
+    } else {
+        for (X = 0; X != ms_nb_sprites; X++) {
+            if ((ms_sorted_by_y[X] & 0x7f) == i) break;
+        }
     }
     Y = X;
     Y++;
     for (; X < ms_nb_sprites - 1; X++, Y++) {
         ms_sorted_by_y[X] = ms_sorted_by_y[Y];
     }
-    ms_sprite_model[X = i] = -1; // Mark as free
+    ms_sprite_y[X = i] = MS_UNALLOCATED; // Mark as free
     ms_nb_sprites--;
 }
 
 MS_OFFSCREEN_BANK void multisprite_move(char i, char nx, char ny)
 {
+    char j;
     ny += MS_OFFSET;
     ms_sprite_x[X = i] = nx;
     if (ms_sprite_y[X] == ny) return; // No vertical move, so nothing to check
 
-    Y = 0;
-    while ((ms_sorted_by_y[Y] & 0x7f) != i) Y++;
+    if (ms_sprite_y[X] >= MS_OFFSET + MS_PLAYFIELD_HEIGHT / 2) {
+        for (Y = ms_nb_sprites - 1; Y != 0; Y--) {
+            if ((ms_sorted_by_y[Y] & 0x7f) == i) break;
+        }
+    } else {
+        j = ms_nb_sprites - 1;
+        for (Y = 0; Y != j; Y++) {
+            if ((ms_sorted_by_y[Y] & 0x7f) == i) break;
+        }
+    }
 
-    char j = ms_sorted_by_y[Y];
+    j = ms_sorted_by_y[Y];
     // Update ms_sorted_by_y if needed    
     if (ms_sprite_y[X] < ny) {
         // We have gone downwards
