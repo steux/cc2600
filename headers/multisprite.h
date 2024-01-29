@@ -433,6 +433,7 @@ MS_KERNEL_BANK char _ms_kernel_repo0()
     X = ms_sprite_x[X];                 // 6
     *HMP0 = ms_sprite_hm[X];            // 7
     X = ms_sprite_wait[X];              // 6 [19/76]
+    // Critical loop. Must not cross page boundary. 
     if (X) do { X--; } while (X);       // 3 for X = 0. 1 + X * 5 cycles. 
     strobe(RESP0);                      // 3. Minimum = 26 cycles
     strobe(WSYNC);                      // 3
@@ -467,6 +468,7 @@ MS_KERNEL_BANK char _ms_kernel_repo1()
     X = ms_sprite_x[X];                 // 6
     *HMP1 = ms_sprite_hm[X];            // 7
     X = ms_sprite_wait[X];              // 6 [19/76]
+    // Critical loop. Must not cross page boundary. 
     if (X) do { X--; } while (X);       // 3 for X = 0. 1 + X * 5 cycles. 
     strobe(RESP1);                      // 3. Minimum = 26 cycles
     strobe(WSYNC);                      // 3
@@ -615,8 +617,6 @@ MS_KERNEL_BANK void _ms_void_kernel(char stop)
 
 MS_OFFSCREEN_BANK void _ms_kernel_prep()
 {
-    strobe(WSYNC);                  // 3
-    
     // Phase 1: before the multisprite_kernel actually starts, allocates and positions sprites p0 and p1.
     ms_sprite_iter = 0;
     ms_v = 0;
@@ -636,6 +636,7 @@ MS_OFFSCREEN_BANK void _ms_kernel_prep()
         *HMP0 = ms_sprite_hm_offscreen[X];  // 7
         X = ms_sprite_wait_offscreen[X]; // 6
         csleep(4);                      // 4 [17/76]
+        // Critical loop. Must not cross page boundary. 
         if (X) do { X--; } while (X);   // 3 for X = 0. 1 + X * 5 cycles. 
         strobe(RESP0);                  // 3. Minimum = 23 cycles
         strobe(WSYNC);                  // 3
@@ -655,6 +656,7 @@ MS_OFFSCREEN_BANK void _ms_kernel_prep()
         *HMP1 = ms_sprite_hm_offscreen[X];// 7 [13/76]
         X = ms_sprite_wait_offscreen[X];  // 6
         csleep(4);                      // 4 [17/76]
+        // Critical loop. Must not cross page boundary. 
         if (X) do { X--; } while (X);   // 3 for X = 0. 1 + X * 5 cycles. 
         strobe(RESP1);                  // 3. Minimum = 23 cycles
         strobe(WSYNC);                  // 3

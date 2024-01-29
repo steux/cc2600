@@ -5,9 +5,9 @@
 #define MS_EXTRA_RAM superchip
 #define MS_MAX_NB_SPRITES 16 
 
-MS_KERNEL_BANK const unsigned char spaceship_gfx[21] = { 0, 0, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3c, 0x18, 0x18, 0x3c, 0xbd, 0xff, 0xdb, 0xdb, 0xdb, 0x66, 0x66, 0, 0, 0};
+MS_KERNEL_BANK const unsigned char spaceship_gfx[20] = { 0, 0, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3c, 0x18, 0x18, 0x3c, 0xbd, 0xff, 0xdb, 0xdb, 0xdb, 0x66, 0x66, 0, 0};
 MS_KERNEL_BANK const unsigned char spaceship_colors[18] = { 0, 0, 0x04, 0x04, 0x84, 0x80, 0x90, 0x06, 0x08, 0x08, 0x0a, 0x0a, 0x0a, 0x0c, 0x0c, 0x0e, 0x0e, 0x44};
-MS_KERNEL_BANK const unsigned char meteorite_gfx[17] = { 0, 0, 0x1c, 0x36, 0x7a, 0x7f, 0xfd, 0xfd, 0xfd, 0xff, 0xfe, 0x7e, 0x7c, 0x38, 0, 0, 0};
+MS_KERNEL_BANK const unsigned char meteorite_gfx[16] = { 0, 0, 0x1c, 0x36, 0x7a, 0x7f, 0xfd, 0xfd, 0xfd, 0xff, 0xfe, 0x7e, 0x7c, 0x38, 0, 0};
 MS_KERNEL_BANK const unsigned char meteorite_colors[14] = { 0, 0, 0x1e, 0x2a, 0x2a, 0x36, 0x36, 0x42, 0x42, 0x42, 0x40, 0x40, 0x40, 0x40};
 
 #define BLANK 40
@@ -24,7 +24,7 @@ MS_KERNEL_BANK const unsigned char meteorite_colors[14] = { 0, 0, 0x1e, 0x2a, 0x
 #define MS_KERNEL_DATA \
 MS_KERNEL_BANK const char *ms_grptr[MS_NB_SPRITES_DEF] = {spaceship_gfx, meteorite_gfx}; \
 MS_KERNEL_BANK const char *ms_coluptr[MS_NB_SPRITES_DEF] = {spaceship_colors, meteorite_colors}; \
-MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {20, 16};
+MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {19, 15};
 
 MS_KERNEL_BANK const char playfield[192 + 32] = {
     VCS_RED, REG_COLUBK, VCS_BLACK, REG_COLUBK, VCS_BLACK, REG_COLUBK, VCS_BLACK, REG_COLUBK, VCS_BLACK, REG_COLUBK, VCS_BLACK, REG_COLUBK, VCS_BLACK, REG_COLUBK, VCS_YELLOW, REG_COLUBK, 
@@ -43,7 +43,7 @@ MS_KERNEL_BANK const char playfield[192 + 32] = {
     VCS_RED, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_YELLOW, REG_COLUBK
 };
 
-//#define MS_SELECT_FAST
+#define MS_SELECT_FAST
 #include "multisprite.h"
 
 const signed char dx[8] = {-2, -1, 0, 1, 2, 1, 0, -1};
