@@ -70,7 +70,6 @@ void main()
         scrolling -= 2;
         if (scrolling < 0) scrolling = 32;
 
-        multisprite_select_sprites();
         multisprite_kernel_prep();
         while (*INTIM); // Wait for end of blank
  

@@ -3,7 +3,7 @@
 #define MS_OFFSCREEN_BANK bank0
 #define MS_KERNEL_BANK bank1
 #define MS_EXTRA_RAM superchip
-#define MS_MAX_NB_SPRITES 25 
+#define MS_MAX_NB_SPRITES 16 
 
 MS_KERNEL_BANK const unsigned char spaceship_gfx[21] = { 0, 0, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3c, 0x18, 0x18, 0x3c, 0xbd, 0xff, 0xdb, 0xdb, 0xdb, 0x66, 0x66, 0, 0, 0};
 MS_KERNEL_BANK const unsigned char spaceship_colors[18] = { 0, 0, 0x04, 0x04, 0x84, 0x80, 0x90, 0x06, 0x08, 0x08, 0x0a, 0x0a, 0x0a, 0x0c, 0x0c, 0x0e, 0x0e, 0x44};
@@ -43,6 +43,7 @@ MS_KERNEL_BANK const char playfield[192 + 32] = {
     VCS_RED, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_YELLOW, REG_COLUBK
 };
 
+//#define MS_SELECT_FAST
 #include "multisprite.h"
 
 const signed char dx[8] = {-2, -1, 0, 1, 2, 1, 0, -1};
@@ -52,7 +53,7 @@ void init_sprites()
 {
     char i;
     char x = 20, y = 0;
-    for (i = 0; i != 4; i++) {
+    for (i = 0; i != 8; i++) {
         multisprite_new(1, x, y, 3);
         x += 10;
         y += 20;
@@ -96,12 +97,16 @@ void main()
         if (!(*SWCHA & 0x10)) { ypos--; }// Up
 
         multisprite_move(0, xpos, ypos);
+        
+        move_sprite(i);
+        i++; if (i == 9) i = 1;
+        move_sprite(i);
+        i++; if (i == 9) i = 1;
 
         ms_scenery = playfield - MS_OFFSET + scrolling;
         scrolling -= 2;
         if (scrolling < 0) scrolling = 32;
 
-        multisprite_select_sprites();
         multisprite_kernel_prep();
         while (*INTIM); // Wait for end of blank
  
@@ -112,8 +117,6 @@ void main()
         *VBLANK = 2; // Enable VBLANK
         *TIM64T = ((OVERSCAN) * 76) / 64 + 2;
         // Do some logic here
-        move_sprite(i);
-        i++; if (i == 5) i = 1;
         while (*INTIM); // Wait for end of overscan
     } while(1);
 }

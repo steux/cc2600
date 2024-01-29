@@ -141,9 +141,9 @@ MS_OFFSCREEN_BANK void multisprite_delete(char i)
     for (X = 0; X != ms_nb_sprites; X++) {
         if ((ms_sorted_by_y[X] & 0x7f) == i) break;
     }
-    for (; X < ms_nb_sprites - 1; X++) {
-        Y = ++X;
-        X--;
+    Y = X;
+    Y++;
+    for (; X < ms_nb_sprites - 1; X++, Y++) {
         ms_sorted_by_y[X] = ms_sorted_by_y[Y];
     }
     ms_sprite_model[X = i] = -1; // Mark as free
@@ -197,7 +197,93 @@ MS_OFFSCREEN_BANK void multisprite_move(char i, char nx, char ny)
     }
 }
 
-MS_KERNEL_BANK multisprite_select_sprites()
+// See https://stackoverflow.com/questions/1557894/non-recursive-merge-sort for reference
+void _ms_mergesort()
+{
+    char left, rght, wid, rend;
+    char ai, aj, yi, yj;
+    char j, k, m;
+    char b[MS_MAX_NB_SPRITES];
+    char end = ms_nb_sprites - 1;
+    for (Y = 0; Y < end; ) {
+        ai = ms_sorted_by_y[Y++];
+        yi = ms_sprite_y[X = ai & 0x7f];
+        aj = ms_sorted_by_y[Y++];
+        yj = ms_sprite_y[X = aj & 0x7f];
+        if (yj < yi) {
+            ms_sorted_by_y[--Y] = ai;
+            ms_sorted_by_y[--Y] = aj;
+            Y++; Y++;
+        }
+    }
+    for (k = 2; k < ms_nb_sprites; k <<= 1) {
+        end = ms_nb_sprites - k;
+        for (left = 0; left < end; left += (k << 1)) {
+            rght = left + k;
+            rend = rght + k;
+            if (ms_nb_sprites < rend) rend = ms_nb_sprites;
+            m = left; Y = left; j = rght;
+            if (j < rend) {
+                ai = ms_sorted_by_y[Y];
+                yi = ms_sprite_y[X = ai & 0x7f];
+                aj = ms_sorted_by_y[X = j];
+                yj = ms_sprite_y[X = aj & 0x7f];
+                X = m;
+                do {
+                    if (yi < yj) {
+                        b[X++] = ai; Y++; 
+                        if (Y >= rght) break;
+                        m = X;
+                        ai = ms_sorted_by_y[Y];
+                        yi = ms_sprite_y[X = ai & 0x7f];
+                    } else {
+                        b[X++] = aj; j++; m = X;
+                        aj = ms_sorted_by_y[X = j];
+                        yj = ms_sprite_y[X = aj & 0x7f];
+                    }
+                    X = m;
+                } while (j < rend);
+            }
+            while (Y < rght) {
+                b[X++] = ms_sorted_by_y[Y++];
+            }
+            Y = j;
+            while (Y < rend) {
+                b[X++] =  ms_sorted_by_y[Y++];
+            }
+            for (X = left; X < rend; X++) {
+                ms_sorted_by_y[X] = b[X];
+            }
+        }
+    }
+}
+
+#ifdef MS_SELECT_FAST
+MS_OFFSCREEN_BANK _ms_select_sprites()
+{
+    for (X = ms_sprite_iter; X != ms_nb_sprites; X++) {
+        ms_sorted_by_y[X] |= 0x80;
+    }
+    Y = 0;
+    ms_sorted_by_y[Y] &= 0x7f; // Display this one (a priori)
+    X = ms_sorted_by_y[Y];
+    ms_nusiz[X] &= 0x3f; // Reset collision
+    for (Y = 1; Y < ms_nb_sprites; Y++) {
+        char candidate = ms_sorted_by_y[Y];
+        if (candidate & 0x80) { // If it was not displayed at previous iteration
+            ms_sorted_by_y[Y] = candidate & 0x7f;
+            // Yes. It overlaps. Skip candidate1 and set it as prioritary for next time
+            ms_sorted_by_y[--Y] |= 0x80;
+            Y++;
+        } else {
+            X = candidate & 0x7f;
+            ms_nusiz[X] &= 0x3f; // Reset collision
+        }
+    }
+}
+#else
+#ifdef MS_SELECT_ACCURATE
+MS_KERNEL_BANK _ms_select_sprites()
 {
     for (X = ms_sprite_iter; X != ms_nb_sprites; X++) {
         ms_sorted_by_y[X] |= 0x80;
@@ -227,6 +313,41 @@ MS_KERNEL_BANK multisprite_select_sprites()
         candidate1 = candidate2;
     }
 }
+#else
+#ifndef MS_OVERLAP_MARGIN
+#define MS_OVERLAP_MARGIN 30
+#endif
+MS_OFFSCREEN_BANK _ms_select_sprites()
+{
+    for (X = ms_sprite_iter; X != ms_nb_sprites; X++) {
+        ms_sorted_by_y[X] |= 0x80;
+    }
+    Y = 0;
+    ms_sorted_by_y[Y] &= 0x7f; // Display this one (a priori)
+    X = ms_sorted_by_y[Y];
+    ms_nusiz[X] &= 0x3f; // Reset collision
+    char candidate1 = X;
+    for (Y = 1; Y < ms_nb_sprites; Y++) {
+        char candidate2 = ms_sorted_by_y[Y];
+        if (candidate2 & 0x80) { // If it was not displayed at previous iteration
+            // Let's see if this candidate overlaps with our previous candidate
+            char y2 = ms_sprite_y[X = candidate2 & 0x7f];
+            ms_sorted_by_y[Y] = X;
+            char y1 = ms_sprite_y[X = candidate1 & 0x7f];
+            if (y1 + MS_OVERLAP_MARGIN >= y2) {
+                // Yes. It overlaps. Skip candidate1 and set it as prioritary for next time
+                ms_sorted_by_y[--Y] |= 0x80;
+                Y++;
+            } 
+        } else {
+            X = candidate2 & 0x7f;
+            ms_nusiz[X] &= 0x3f; // Reset collision
+        }
+        candidate1 = candidate2;
+    }
+}
+#endif
+#endif
 
 MS_OFFSCREEN_BANK char _ms_allocate_sprite_ex()
 {
@@ -475,8 +596,10 @@ MS_KERNEL_BANK void _ms_void_kernel(char stop)
     }
 } //[15/76] when getting out (including RTS)
 
-MS_OFFSCREEN_BANK void multisprite_kernel_prep()
+MS_OFFSCREEN_BANK void _ms_kernel_prep()
 {
+    strobe(WSYNC);                  // 3
+    
     // Phase 1: before the multisprite_kernel actually starts, allocates and positions sprites p0 and p1.
     ms_sprite_iter = 0;
     ms_v = 0;
@@ -524,6 +647,12 @@ MS_OFFSCREEN_BANK void multisprite_kernel_prep()
     Y = MS_OFFSET;
     *GRP1 = 0;
     *GRP0 = 0;
+}
+
+void multisprite_kernel_prep()
+{
+    _ms_select_sprites();
+    _ms_kernel_prep();
 }
 
 MS_KERNEL_BANK _ms_check_collisions()
@@ -624,6 +753,7 @@ repo0_try_again:
                     ms_id_p[0] = -1;
 
                     _ms_mark_as_removed();
+                    if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 10) goto display_sprites;
                     goto repo0_kernel;
                 }
                 *HMP0 = 0x80;               // 5
@@ -671,6 +801,7 @@ repo1_try_again:
                     ms_id_p[1] = -1;
 
                     _ms_mark_as_removed();
+                    if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 10) goto display_sprites;
                     goto repo1_kernel;
                 }
                 *HMP1 = 0x80;               // 5
@@ -836,6 +967,7 @@ display_sprite1:
             // This is the end of the multisprite kernel.Fill with void.
 finish:
             if (Y < MS_OFFSET + MS_PLAYFIELD_HEIGHT)
+finish2:
                 _ms_void_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
             goto check_collisions_and_return;
         }
