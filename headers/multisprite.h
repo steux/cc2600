@@ -161,8 +161,8 @@ MS_OFFSCREEN_BANK void multisprite_delete(char i)
 MS_OFFSCREEN_BANK void multisprite_move(char i, char nx, char ny)
 {
     char j;
+    if (nx != -1)  ms_sprite_x[X = i] = nx;
     ny += MS_OFFSET;
-    ms_sprite_x[X = i] = nx;
     if (ms_sprite_y[X] == ny) return; // No vertical move, so nothing to check
 
     if (ms_sprite_y[X] >= MS_OFFSET + MS_PLAYFIELD_HEIGHT / 2) {
@@ -278,9 +278,6 @@ void _ms_mergesort()
 #ifdef MS_SELECT_FAST
 MS_OFFSCREEN_BANK _ms_select_sprites()
 {
-    for (X = ms_sprite_iter; X != ms_nb_sprites; X++) {
-        ms_sorted_by_y[X] |= 0x80;
-    }
     Y = 0;
     ms_sorted_by_y[Y] &= 0x7f; // Display this one (a priori)
     X = ms_sorted_by_y[Y];
@@ -302,9 +299,6 @@ MS_OFFSCREEN_BANK _ms_select_sprites()
 #ifdef MS_SELECT_ACCURATE
 MS_KERNEL_BANK _ms_select_sprites()
 {
-    for (X = ms_sprite_iter; X != ms_nb_sprites; X++) {
-        ms_sorted_by_y[X] |= 0x80;
-    }
     Y = 0;
     ms_sorted_by_y[Y] &= 0x7f; // Display this one (a priori)
     X = ms_sorted_by_y[Y];
@@ -336,9 +330,6 @@ MS_KERNEL_BANK _ms_select_sprites()
 #endif
 MS_OFFSCREEN_BANK _ms_select_sprites()
 {
-    for (X = ms_sprite_iter; X != ms_nb_sprites; X++) {
-        ms_sorted_by_y[X] |= 0x80;
-    }
     Y = 0;
     ms_sorted_by_y[Y] &= 0x7f; // Display this one (a priori)
     X = ms_sorted_by_y[Y];
@@ -614,6 +605,13 @@ MS_KERNEL_BANK void _ms_void_kernel(char stop)
         } while (Y < stop);                 // 5/6
     }
 } //[15/76] when getting out (including RTS)
+    
+MS_OFFSCREEN_BANK void multisprite_kernel_post()
+{
+    for (X = ms_sprite_iter; X < ms_nb_sprites; X++) {
+        ms_sorted_by_y[X] |= 0x80;
+    }
+}
 
 MS_OFFSCREEN_BANK void _ms_kernel_prep()
 {

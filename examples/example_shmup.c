@@ -9,6 +9,14 @@ MS_KERNEL_BANK const unsigned char spaceship_gfx[20] = { 0, 0, 0x18, 0x18, 0x18,
 MS_KERNEL_BANK const unsigned char spaceship_colors[18] = { 0, 0, 0x04, 0x04, 0x84, 0x80, 0x90, 0x06, 0x08, 0x08, 0x0a, 0x0a, 0x0a, 0x0c, 0x0c, 0x0e, 0x0e, 0x44};
 MS_KERNEL_BANK const unsigned char meteorite_gfx[16] = { 0, 0, 0x1c, 0x36, 0x7a, 0x7f, 0xfd, 0xfd, 0xfd, 0xff, 0xfe, 0x7e, 0x7c, 0x38, 0, 0};
 MS_KERNEL_BANK const unsigned char meteorite_colors[14] = { 0, 0, 0x1e, 0x2a, 0x2a, 0x36, 0x36, 0x42, 0x42, 0x42, 0x40, 0x40, 0x40, 0x40};
+MS_KERNEL_BANK const unsigned char missile_gfx[16] = { 0, 0, 0x42, 0xe7, 0xe7, 0xc3, 0x42, 0x42, 0x42, 0x00, 0x42, 0x42, 0x00, 0x42, 0, 0};
+MS_KERNEL_BANK const unsigned char missile_colors[14] = { 0, 0, 0x42, 0x44, 0x36, 0x36, 0x18, 0x18, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c};
+MS_KERNEL_BANK const unsigned char explosion_colors[14] = { 0, 0, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c};
+MS_KERNEL_BANK const unsigned char explosion0_gfx[16] = { 0, 0, 0x00, 0x00, 0x00, 0x08, 0x34, 0x24, 0x0c, 0x18, 0x00, 0x00, 0x00, 0x00, 0, 0};
+MS_KERNEL_BANK const unsigned char explosion1_gfx[16] = { 0, 0, 0x00, 0x00, 0x08, 0x30, 0x2e, 0x6c, 0x26, 0x12, 0x3c, 0x08, 0x00, 0x00, 0, 0};
+MS_KERNEL_BANK const unsigned char explosion2_gfx[16] = { 0, 0, 0x1e, 0x6a, 0x48, 0xf5, 0x41, 0xd3, 0x93, 0xa3, 0xcf, 0x77, 0x68, 0x06, 0, 0};
+MS_KERNEL_BANK const unsigned char explosion3_gfx[16] = { 0, 0, 0x52, 0x76, 0xf7, 0xa3, 0x86, 0x00, 0x40, 0x47, 0x84, 0xaa, 0xe5, 0x23, 0, 0};
+MS_KERNEL_BANK const unsigned char explosion4_gfx[16] = { 0, 0, 0x43, 0x64, 0x82, 0xc1, 0x00, 0x00, 0x00, 0x00, 0x81, 0x41, 0xc2, 0x25, 0, 0};
 
 #define BLANK 40
 #define OVERSCAN 30
@@ -20,35 +28,35 @@ MS_KERNEL_BANK const unsigned char meteorite_colors[14] = { 0, 0, 0x1e, 0x2a, 0x
 #define REG_PF1     0x0e
 #define REG_PF2     0x0f
 
-#define MS_NB_SPRITES_DEF 2
+#define MS_NB_SPRITES_DEF 8
 #define MS_KERNEL_DATA \
-MS_KERNEL_BANK const char *ms_grptr[MS_NB_SPRITES_DEF] = {spaceship_gfx, meteorite_gfx}; \
-MS_KERNEL_BANK const char *ms_coluptr[MS_NB_SPRITES_DEF] = {spaceship_colors, meteorite_colors}; \
-MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {19, 15};
+MS_KERNEL_BANK const char *ms_grptr[MS_NB_SPRITES_DEF] = {spaceship_gfx, meteorite_gfx, missile_gfx, explosion0_gfx, explosion1_gfx, explosion2_gfx, explosion3_gfx, explosion4_gfx}; \
+MS_KERNEL_BANK const char *ms_coluptr[MS_NB_SPRITES_DEF] = {spaceship_colors, meteorite_colors, missile_colors, explosion_colors, explosion_colors, explosion_colors, explosion_colors, explosion_colors}; \
+MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {19, 15, 15, 15, 15, 15, 15, 15};
 
 MS_KERNEL_BANK const char playfield[] = {
-    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_YELLOW, REG_COLUPF,
+    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_GREEN, REG_COLUPF,
     0xfc, REG_PF2, 0xff, REG_PF2, 0x03, REG_PF1, 0x0f, REG_PF1, 0x1f, REG_PF1, 0x3f, REG_PF1, 0x7f, REG_PF1, 0xff, REG_PF1,
     0x80, REG_PF0, 0, REG_PF2, 0xc0, REG_PF0, 0xf0, REG_PF1, 0xe0, REG_PF0, 0xe0, REG_PF1, 0xc0, REG_PF1,
     0xf0, REG_PF0, 0x80, REG_PF1, VCS_WHITE, REG_COLUPF, 0x00, REG_PF1, 1, REG_CTRLPF, 0x70, REG_PF0, VCS_LGREY, REG_COLUPF,
     0xf0, REG_PF0, 0xe0, REG_PF0, 0xc0, REG_PF1, VCS_GREY, REG_COLUPF, 0xf0, REG_PF1, 0xc0, REG_PF0, 0xff, REG_PF1, 0x0, REG_PF0, 0xff, REG_PF2,
     0x0f, REG_PF1, 0x04, REG_COLUPF, 0, REG_PF1, 0, REG_PF2,
 
-    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_YELLOW, REG_COLUPF,
+    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_GREEN, REG_COLUPF,
     0xfc, REG_PF2, 0xff, REG_PF2, 0x03, REG_PF1, 0x0f, REG_PF1, 0x1f, REG_PF1, 0x3f, REG_PF1, 0x7f, REG_PF1, 0xff, REG_PF1,
     0x80, REG_PF0, 0, REG_PF2, 0xc0, REG_PF0, 0xf0, REG_PF1, 0xe0, REG_PF0, 0xe0, REG_PF1, 0xc0, REG_PF1,
     0xf0, REG_PF0, 0x80, REG_PF1, VCS_WHITE, REG_COLUPF, 0x00, REG_PF1, 1, REG_CTRLPF, 0x70, REG_PF0, VCS_LGREY, REG_COLUPF,
     0xf0, REG_PF0, 0xe0, REG_PF0, 0xc0, REG_PF1, VCS_GREY, REG_COLUPF, 0xf0, REG_PF1, 0xc0, REG_PF0, 0xff, REG_PF1, 0x0, REG_PF0, 0xff, REG_PF2,
     0x0f, REG_PF1, 0x04, REG_COLUPF, 0, REG_PF1, 0, REG_PF2,
 
-    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_YELLOW, REG_COLUPF,
+    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_GREEN, REG_COLUPF,
     0xfc, REG_PF2, 0xff, REG_PF2, 0x03, REG_PF1, 0x0f, REG_PF1, 0x1f, REG_PF1, 0x3f, REG_PF1, 0x7f, REG_PF1, 0xff, REG_PF1,
     0x80, REG_PF0, 0, REG_PF2, 0xc0, REG_PF0, 0xf0, REG_PF1, 0xe0, REG_PF0, 0xe0, REG_PF1, 0xc0, REG_PF1,
     0xf0, REG_PF0, 0x80, REG_PF1, VCS_WHITE, REG_COLUPF, 0x00, REG_PF1, 1, REG_CTRLPF, 0x70, REG_PF0, VCS_LGREY, REG_COLUPF,
     0xf0, REG_PF0, 0xe0, REG_PF0, 0xc0, REG_PF1, VCS_GREY, REG_COLUPF, 0xf0, REG_PF1, 0xc0, REG_PF0, 0xff, REG_PF1, 0x0, REG_PF0, 0xff, REG_PF2,
     0x0f, REG_PF1, 0x04, REG_COLUPF, 0, REG_PF1, 0, REG_PF2,
 
-    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_YELLOW, REG_COLUPF,
+    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_GREEN, REG_COLUPF,
     0xfc, REG_PF2, 0xff, REG_PF2, 0x03, REG_PF1, 0x0f, REG_PF1, 0x1f, REG_PF1, 0x3f, REG_PF1, 0x7f, REG_PF1, 0xff, REG_PF1,
     0x80, REG_PF0, 0, REG_PF2, 0xc0, REG_PF0, 0xf0, REG_PF1, 0xe0, REG_PF0, 0xe0, REG_PF1, 0xc0, REG_PF1,
     0xf0, REG_PF0, 0x80, REG_PF1, VCS_WHITE, REG_COLUPF, 0x00, REG_PF1, 1, REG_CTRLPF, 0x70, REG_PF0, VCS_LGREY, REG_COLUPF,
@@ -98,11 +106,94 @@ MS_KERNEL_BANK prepare_background(char scrolling)
     }
 }
 
+char player_xpos, player_ypos, player_state, player_state2, player_timer;
+char button_pressed; 
+char missile_sprite;
+
+void game_init()
+{
+    player_xpos = 76;
+    player_ypos = 170;
+    player_state = 0;
+    missile_sprite = MS_UNALLOCATED;
+    button_pressed = 0;
+}
+
+void lose_one_life()
+{
+    player_state = 1;
+    player_state2 = 0;
+    player_timer = 10;
+}
+
+void game_logic()
+{
+    if (!(*SWCHA & 0x80) && player_xpos < 153) { player_xpos++; } // Right
+    if (!(*SWCHA & 0x40) && player_xpos > 0) { player_xpos--; } // Left
+    if (!(*SWCHA & 0x20) && player_ypos < 180) { player_ypos++; } // Down
+    if (!(*SWCHA & 0x10) && player_ypos > 0) { player_ypos--; } // Up
+    
+    multisprite_move(0, player_xpos, player_ypos);
+
+    if (player_state == 0) {
+        // Check collision with playfield
+        if (ms_nusiz[X = 0] & MS_PF_COLLISION) {
+            if (ms_sprite_x[X] < 12 || ms_sprite_x[X] >= 153 - 12) {
+                lose_one_life();
+            }
+        }
+    } else {
+        if (player_state == 1) {
+            ms_sprite_model[X = 0] = 3 + player_state2;
+            player_timer--;
+            if (player_timer == 0) {
+                player_timer = 10;
+                player_state2++;
+                if (player_state2 == 5) {
+                    player_state = 0;
+                    ms_sprite_model[X] = 0;
+                }
+            } 
+        }
+    }
+
+    if (!(*INPT4 & 0x80)) {
+        if (!button_pressed) {
+            button_pressed = 1;
+            if (missile_sprite == MS_UNALLOCATED) {
+                missile_sprite = multisprite_new(2, player_xpos, player_ypos - 16, 0);
+            }
+        }
+    } else button_pressed = 0;
+
+    if (missile_sprite != MS_UNALLOCATED) {
+        X = missile_sprite;
+        // Check for collision 
+        if (ms_nusiz[X] & MS_PF_COLLISION) {
+            if (ms_sprite_x[X] < 12 || ms_sprite_x[X] >= 153 - 12) {
+                multisprite_delete(missile_sprite);
+                missile_sprite = MS_UNALLOCATED;
+            }
+        }
+    }
+    if (missile_sprite != MS_UNALLOCATED) {
+        X = missile_sprite;
+        char y = ms_sprite_y[X] - (MS_OFFSET + 8);
+        if (y < 0) {
+            multisprite_delete(missile_sprite);
+            missile_sprite = MS_UNALLOCATED;
+        } else {
+            multisprite_move(missile_sprite, -1, y);
+        }
+    }
+}
+
 void main()
 {
-    char i = 1, j, k, xpos = 76, ypos = 170, scrolling = 0;
+    char scrolling = 0;
     multisprite_init(playfield);
-    multisprite_new(0, xpos, ypos, 0);
+    game_init();
+    multisprite_new(0, player_xpos, player_ypos, 0);
 
     //init_sprites();
     do {
@@ -116,17 +207,13 @@ void main()
         // Blank
         *TIM64T = ((BLANK - 3) * 76) / 64 - 3;
         // Do some logic here
-        if (!(*SWCHA & 0x80) && xpos < 158) { xpos++; ms_nusiz[0] = 0; } // Right
-        if (!(*SWCHA & 0x40) && xpos > 0) { xpos--; ms_nusiz[0] = 8; } // Left
-        if (!(*SWCHA & 0x20)) { ypos++; } // Down
-        if (!(*SWCHA & 0x10)) { ypos--; }// Up
+        game_logic();
 
-        multisprite_move(0, xpos, ypos);
-        
         ms_scenery = playfield - MS_OFFSET + 12;
         ms_scenery += scrolling;
 
         multisprite_kernel_prep();
+        
         prepare_background(scrolling);
         scrolling -= 2;
         if (scrolling < 0) scrolling = 82;
@@ -140,6 +227,7 @@ void main()
         *VBLANK = 2; // Enable VBLANK
         *TIM64T = ((OVERSCAN) * 76) / 64 + 2;
         // Do some logic here
+        multisprite_kernel_post();
         while (*INTIM); // Wait for end of overscan
     } while(1);
 }
