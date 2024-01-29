@@ -35,7 +35,7 @@ const char playfield[192 + 32] = {
     VCS_RED, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_GREEN, REG_COLUBK, VCS_YELLOW, REG_COLUBK
 };
 
-#define MS_SELECT_ACCURATE
+#define MS_SELECT_FAST
 #include "multisprite.h"
 
 void main()
@@ -69,7 +69,7 @@ void main()
         multisprite_move(0, xpos, ypos);
 
         ms_scenery = playfield - MS_OFFSET + scrolling;
-        //scrolling -= 2;
+        scrolling -= 2;
         if (scrolling < 0) scrolling = 32;
 
         multisprite_kernel_prep();
@@ -82,6 +82,7 @@ void main()
         *VBLANK = 2; // Enable VBLANK
         *TIM64T = ((OVERSCAN) * 76) / 64 + 2;
         // Do some logic here
+        multisprite_kernel_post();  
         while (*INTIM); // Wait for end of overscan
     } while(1);
 }

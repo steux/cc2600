@@ -6,7 +6,6 @@
 #define MS_MAX_NB_SPRITES 16 
 
 MS_KERNEL_BANK const unsigned char spaceship_gfx[20] = { 0, 0, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3c, 0x18, 0x18, 0x3c, 0xbd, 0xff, 0xdb, 0xdb, 0xdb, 0x66, 0x66, 0, 0};
-MS_KERNEL_BANK const unsigned char spaceship_colors[18] = { 0, 0, 0x04, 0x04, 0x84, 0x80, 0x90, 0x06, 0x08, 0x08, 0x0a, 0x0a, 0x0a, 0x0c, 0x0c, 0x0e, 0x0e, 0x44};
 MS_KERNEL_BANK const unsigned char meteorite_gfx[16] = { 0, 0, 0x1c, 0x36, 0x7a, 0x7f, 0xfd, 0xfd, 0xfd, 0xff, 0xfe, 0x7e, 0x7c, 0x38, 0, 0};
 MS_KERNEL_BANK const unsigned char meteorite_colors[14] = { 0, 0, 0x1e, 0x2a, 0x2a, 0x36, 0x36, 0x42, 0x42, 0x42, 0x40, 0x40, 0x40, 0x40};
 MS_KERNEL_BANK const unsigned char missile_gfx[16] = { 0, 0, 0x42, 0xe7, 0xe7, 0xc3, 0x42, 0x42, 0x42, 0x00, 0x42, 0x42, 0x00, 0x42, 0, 0};
@@ -17,7 +16,8 @@ MS_KERNEL_BANK const unsigned char explosion1_gfx[16] = { 0, 0, 0x00, 0x00, 0x08
 MS_KERNEL_BANK const unsigned char explosion2_gfx[16] = { 0, 0, 0x1e, 0x6a, 0x48, 0xf5, 0x41, 0xd3, 0x93, 0xa3, 0xcf, 0x77, 0x68, 0x06, 0, 0};
 MS_KERNEL_BANK const unsigned char explosion3_gfx[16] = { 0, 0, 0x52, 0x76, 0xf7, 0xa3, 0x86, 0x00, 0x40, 0x47, 0x84, 0xaa, 0xe5, 0x23, 0, 0};
 MS_KERNEL_BANK const unsigned char explosion4_gfx[16] = { 0, 0, 0x43, 0x64, 0x82, 0xc1, 0x00, 0x00, 0x00, 0x00, 0x81, 0x41, 0xc2, 0x25, 0, 0};
-
+MS_KERNEL_BANK const unsigned char spaceship_exhaust_gfx[28] = { 0, 0, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3c, 0x18, 0x18, 0x3c, 0xbd, 0xff, 0xdb, 0xdb, 0xdb, 0x66, 0x7e, 0xfe, 0x7f, 0xff, 0x76, 0x6e, 0x76, 0x66, 0x64, 0, 0};
+MS_KERNEL_BANK const unsigned char spaceship_colors[26] = { 0, 0, 0x04, 0x04, 0x84, 0x80, 0x90, 0x06, 0x08, 0x08, 0x0a, 0x0a, 0x0a, 0x0c, 0x0c, 0x0e, 0x0e, 0x30, 0x32, 0x34, 0x36, 0x28, 0x1a, 0x1c, 0x1e, 0x1e};
 #define BLANK 40
 #define OVERSCAN 30
 
@@ -28,11 +28,11 @@ MS_KERNEL_BANK const unsigned char explosion4_gfx[16] = { 0, 0, 0x43, 0x64, 0x82
 #define REG_PF1     0x0e
 #define REG_PF2     0x0f
 
-#define MS_NB_SPRITES_DEF 8
+#define MS_NB_SPRITES_DEF 9
 #define MS_KERNEL_DATA \
-MS_KERNEL_BANK const char *ms_grptr[MS_NB_SPRITES_DEF] = {spaceship_gfx, meteorite_gfx, missile_gfx, explosion0_gfx, explosion1_gfx, explosion2_gfx, explosion3_gfx, explosion4_gfx}; \
-MS_KERNEL_BANK const char *ms_coluptr[MS_NB_SPRITES_DEF] = {spaceship_colors, meteorite_colors, missile_colors, explosion_colors, explosion_colors, explosion_colors, explosion_colors, explosion_colors}; \
-MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {19, 15, 15, 15, 15, 15, 15, 15};
+MS_KERNEL_BANK const char *ms_grptr[MS_NB_SPRITES_DEF] = {spaceship_gfx, meteorite_gfx, missile_gfx, explosion0_gfx, explosion1_gfx, explosion2_gfx, explosion3_gfx, explosion4_gfx, spaceship_exhaust_gfx}; \
+MS_KERNEL_BANK const char *ms_coluptr[MS_NB_SPRITES_DEF] = {spaceship_colors, meteorite_colors, missile_colors, explosion_colors, explosion_colors, explosion_colors, explosion_colors, explosion_colors, spaceship_colors}; \
+MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {19, 15, 15, 15, 15, 15, 15, 15, 27};
 
 MS_KERNEL_BANK const char playfield[] = {
     5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_GREEN, REG_COLUPF,
@@ -96,10 +96,12 @@ void move_sprite(char i) {
 
 MS_KERNEL_BANK prepare_background(char scrolling)
 {
-    char j;
+    char j, start = 0;
     scrolling += 12;
+    if (scrolling >= 30) start = scrolling - 30;
+    *PF2 = 0;
     // Replay background to put the correct colors/regs
-    for (Y = 0; Y != scrolling;) {
+    for (Y = start; Y != scrolling;) {
         j = playfield[Y++];
         X = playfield[Y++];
         VSYNC[X] = j;
@@ -117,6 +119,7 @@ void game_init()
     player_state = 0;
     missile_sprite = MS_UNALLOCATED;
     button_pressed = 0;
+    player_timer = 1;
 }
 
 void lose_one_life()
@@ -128,11 +131,12 @@ void lose_one_life()
 
 void game_logic()
 {
+    X = 0;
     if (!(*SWCHA & 0x80) && player_xpos < 153) { player_xpos++; } // Right
     if (!(*SWCHA & 0x40) && player_xpos > 0) { player_xpos--; } // Left
     if (!(*SWCHA & 0x20) && player_ypos < 180) { player_ypos++; } // Down
-    if (!(*SWCHA & 0x10) && player_ypos > 0) { player_ypos--; } // Up
-    
+    if (!(*SWCHA & 0x10) && player_ypos > 0) { player_ypos--; ms_sprite_model[X] = 8;} // Up
+    else { ms_sprite_model[X] = 0; } 
     multisprite_move(0, player_xpos, player_ypos);
 
     if (player_state == 0) {
@@ -141,6 +145,15 @@ void game_logic()
             if (ms_sprite_x[X] < 12 || ms_sprite_x[X] >= 153 - 12) {
                 lose_one_life();
             }
+        }
+    }
+    if (player_state == 0) {
+        if (player_timer >= 1) {
+            player_timer = 0;
+            ms_nusiz[X] = 0;
+        } else {
+            player_timer = 1;
+            ms_nusiz[X] = MS_REFLECTED;
         }
     } else {
         if (player_state == 1) {
@@ -157,15 +170,6 @@ void game_logic()
         }
     }
 
-    if (!(*INPT4 & 0x80)) {
-        if (!button_pressed) {
-            button_pressed = 1;
-            if (missile_sprite == MS_UNALLOCATED) {
-                missile_sprite = multisprite_new(2, player_xpos, player_ypos - 16, 0);
-            }
-        }
-    } else button_pressed = 0;
-
     if (missile_sprite != MS_UNALLOCATED) {
         X = missile_sprite;
         // Check for collision 
@@ -178,7 +182,7 @@ void game_logic()
     }
     if (missile_sprite != MS_UNALLOCATED) {
         X = missile_sprite;
-        char y = ms_sprite_y[X] - (MS_OFFSET + 8);
+        char y = ms_sprite_y[X] - (MS_OFFSET + 6);
         if (y < 0) {
             multisprite_delete(missile_sprite);
             missile_sprite = MS_UNALLOCATED;
@@ -186,6 +190,15 @@ void game_logic()
             multisprite_move(missile_sprite, -1, y);
         }
     }
+
+    if (!(*INPT4 & 0x80)) {
+        if (!button_pressed) {
+            button_pressed = 1;
+            if (missile_sprite == MS_UNALLOCATED) {
+                missile_sprite = multisprite_new(2, player_xpos, player_ypos - 8, 0);
+            }
+        }
+    } else button_pressed = 0;
 }
 
 void main()
@@ -214,10 +227,6 @@ void main()
 
         multisprite_kernel_prep();
         
-        prepare_background(scrolling);
-        scrolling -= 2;
-        if (scrolling < 0) scrolling = 82;
-
         while (*INTIM); // Wait for end of blank
  
         multisprite_kernel();
@@ -228,6 +237,10 @@ void main()
         *TIM64T = ((OVERSCAN) * 76) / 64 + 2;
         // Do some logic here
         multisprite_kernel_post();
+        prepare_background(scrolling);
+        scrolling -= 2;
+        if (scrolling < 0) scrolling = 82;
+
         while (*INTIM); // Wait for end of overscan
     } while(1);
 }

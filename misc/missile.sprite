@@ -1,0 +1,35 @@
+;---Graphics Data from PlayerPal 2600---
+
+Frame0
+        .byte #%01000010;$42
+        .byte #%11100111;$44
+        .byte #%11100111;$36
+        .byte #%11000011;$36
+        .byte #%01000010;$18
+        .byte #%01000010;$18
+        .byte #%01000010;$1C
+        .byte #%00000000;$1C
+        .byte #%01000010;$1C
+        .byte #%01000010;$1C
+        .byte #%00000000;$1C
+        .byte #%01000010;$1C
+;---End Graphics Data---
+
+
+;---Color Data from PlayerPal 2600---
+
+ColorFrame0
+        .byte #$42;
+        .byte #$44;
+        .byte #$36;
+        .byte #$36;
+        .byte #$18;
+        .byte #$18;
+        .byte #$1C;
+        .byte #$1C;
+        .byte #$1C;
+        .byte #$1C;
+        .byte #$1C;
+        .byte #$1C;
+;---End Color Data---
+

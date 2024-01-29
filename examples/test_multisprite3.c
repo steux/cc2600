@@ -117,6 +117,7 @@ void main()
         *VBLANK = 2; // Enable VBLANK
         *TIM64T = ((OVERSCAN) * 76) / 64 + 2;
         // Do some logic here
+        multisprite_kernel_post();
         while (*INTIM); // Wait for end of overscan
     } while(1);
 }
