@@ -663,7 +663,6 @@ MS_OFFSCREEN_BANK void _ms_kernel_prep()
         strobe(HMOVE);
     }
 
-    Y = MS_OFFSET;
     *GRP1 = 0;
     *GRP0 = 0;
 }
@@ -681,7 +680,7 @@ MS_KERNEL_BANK _ms_check_collisions()
     if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= MS_PF_COLLISION; // 8/20
     if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= MS_PF_COLLISION;
     //strobe(WSYNC);                  // 3
-    if (*CXPPMM & 0x80) {
+    else if (*CXPPMM & 0x80) {
         ms_nusiz[X = ms_id_p[0]] |= MS_COLLISION;
         ms_nusiz[X = ms_id_p[1]] |= MS_COLLISION;
     }
@@ -691,6 +690,7 @@ MS_KERNEL_BANK _ms_check_collisions()
 MS_KERNEL_BANK void multisprite_kernel()
 {
     char ms_tmp0, ms_tmp1;
+    Y = MS_OFFSET;
     strobe(WSYNC);                      // 3
        
     // Prepare for drawing

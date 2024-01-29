@@ -34,5 +34,7 @@
 
 #define VCS_GRAY      0x06
 #define VCS_LGRAY     0x0C
+#define VCS_GREY      0x06
+#define VCS_LGREY     0x0C
 
 #endif // __VCS_COLORS_H__
