@@ -1,3 +1,4 @@
+#include "vcs.h"
 #include "vcs_colors.h"
 
 #define MS_OFFSCREEN_BANK bank0
@@ -64,8 +65,12 @@ MS_KERNEL_BANK const char playfield[] = {
     0x0f, REG_PF1, 0x04, REG_COLUPF, 0, REG_PF1, 0, REG_PF2
 };
 
+#define MS_PLAYFIELD_HEIGHT (192 - 12)
 #define MS_SELECT_FAST
 #include "multisprite.h"
+
+#define MK_ARMY_FONT
+#include "minikernel.h"
 
 const signed char dx[8] = {-2, -1, 0, 1, 2, 1, 0, -1};
 const signed char dy[8] = {0, 2, 3, 2, 0, -2, -3, -2};
@@ -100,6 +105,7 @@ MS_KERNEL_BANK prepare_background(char scrolling)
     scrolling += 12;
     if (scrolling >= 30) start = scrolling - 30;
     *PF2 = 0;
+    *COLUBK = 0;
     // Replay background to put the correct colors/regs
     for (Y = start; Y != scrolling;) {
         j = playfield[Y++];
@@ -208,6 +214,13 @@ void main()
     game_init();
     multisprite_new(0, player_xpos, player_ypos, 0);
 
+    mk_s0 = _mk_digits[0];
+    mk_s1 = _mk_digits[1];
+    mk_s2 = _mk_digits[2];
+    mk_s3 = _mk_digits[3];
+    mk_s4 = _mk_digits[4];
+    mk_s5 = _mk_digits[5];
+
     //init_sprites();
     do {
         *VBLANK = 2; // Enable VBLANK
@@ -233,10 +246,19 @@ void main()
         
         // Overscan
         strobe(WSYNC);
+        *COLUBK = VCS_RED;
+        *PF0 = 0; *PF1 = 0; *PF2 = 0;
+        *COLUP0 = VCS_WHITE; *COLUP1 = VCS_WHITE;
+         
+        mini_kernel_6_sprites();
+        strobe(WSYNC);
+        *COLUBK = VCS_RED;
+        strobe(WSYNC);
         *VBLANK = 2; // Enable VBLANK
         *TIM64T = ((OVERSCAN) * 76) / 64 + 2;
         // Do some logic here
         multisprite_kernel_post();
+        
         prepare_background(scrolling);
         scrolling -= 2;
         if (scrolling < 0) scrolling = 82;
