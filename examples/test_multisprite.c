@@ -5,10 +5,6 @@
 
 #define REG_COLUPF  0x08
 #define REG_COLUBK  0x09
-#define REG_CTRLPF  0x0a // LSB: Playfield priority / Score mode / Reflective playfield
-#define REG_PF0     0x0d
-#define REG_PF1     0x0e
-#define REG_PF2     0x0f
 
 #define MS_NB_SPRITES_DEF 1
 #define MS_KERNEL_DATA \
