@@ -54,6 +54,50 @@ const char *_mk_digits[10] = {
 };
 #endif
 
+MK_BANK void mini_kernel_update_score_4_digits(int score)
+{
+    char c;
+    if (score >= 10000) {
+        mk_s2 = _mk_digits[9];
+        mk_s3 = _mk_digits[9];
+        mk_s4 = _mk_digits[9];
+        mk_s5 = _mk_digits[9];
+        return;
+    }
+    X = 0;
+    if (score >= 1000) {
+        do {
+            X++;
+            score -= 1000;
+        } while (score >= 0);
+        X--;
+        score += 1000;
+    }
+    mk_s2 = _mk_digits[X];
+    X = 0;
+    if (score >= 100) {
+        do {
+            X++;
+            score -= 100;
+        } while (score >= 0);
+        X--;
+        score += 100;
+    }
+    mk_s3 = _mk_digits[X];
+    c = score;
+    X = 0;
+    if (c >= 10) {
+        do {
+            X++;
+            c -= 10;
+        } while (c >= 0);
+        X--;
+        c += 10;
+    }
+    mk_s4 = _mk_digits[X];
+    mk_s5 = _mk_digits[X = c];
+}
+
 MK_BANK void mini_kernel_6_sprites()
 {
     char i, j;

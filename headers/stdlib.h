@@ -10,13 +10,8 @@
 
 #define NULL 0
 
-#ifndef EXTRA_RAM
-#define EXTRA_RAM
-#endif
-
 short _libc_tmpshort;
 char *_libc_tmpptr;
-EXTRA_RAM char _save_x, _save_y;
 
 #define itoa(val,str,radix) \
     _libc_tmpshort = val; \
@@ -26,6 +21,7 @@ EXTRA_RAM char _save_x, _save_y;
 
 void _libc_itoa()
 {
+    char _save_x, _save_y, c;
     _save_x = X;
     _save_y = Y;
     Y = 0;
@@ -68,20 +64,20 @@ void _libc_itoa()
         }
         _libc_tmpptr[Y++] = X;
     }
-    _libc_tmp = _libc_tmpshort;
-    if (X || _libc_tmp >= 10) {
+    c = _libc_tmpshort;
+    if (X || c >= 10) {
         X = '0';
-        if (_libc_tmp >= 10) {
+        if (c >= 10) {
             do {
                 X++;
-                _libc_tmp -= 10;
-            } while (_libc_tmp >= 0);
+                c -= 10;
+            } while (c >= 0);
             X--;
-            _libc_tmp += 10;
+            c += 10;
         }
         _libc_tmpptr[Y++] = X;
     }
-    _libc_tmpptr[Y++] = '0' + _libc_tmp;
+    _libc_tmpptr[Y++] = '0' + c;
     _libc_tmpptr[Y] = 0;
     X = _save_x;
     Y = _save_y;

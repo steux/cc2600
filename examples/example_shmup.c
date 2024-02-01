@@ -72,33 +72,6 @@ MS_KERNEL_BANK const char playfield[] = {
 #define MK_ARMY_FONT
 #include "minikernel.h"
 
-const signed char dx[8] = {-2, -1, 0, 1, 2, 1, 0, -1};
-const signed char dy[8] = {0, 2, 3, 2, 0, -2, -3, -2};
-
-void init_sprites()
-{
-    char i;
-    char x = 20, y = 0;
-    for (i = 0; i != 8; i++) {
-        multisprite_new(1, x, y, 3);
-        x += 10;
-        y += 20;
-        i++;
-        multisprite_new(1, x, y, 3 | MS_REFLECTED);
-        x += 10;
-        y += 20;
-    }
-}
-
-void move_sprite(char i) {
-    char x, y;
-    x = ms_sprite_x[X = i] + dx[Y = i & 7];
-    if (x < 2) x = 150; else if (x >= 151) x = 2;
-    y = ms_sprite_y[X] - MS_OFFSET + dy[Y];
-    if (y < 3) y = 179; else if (y >= 180) y = 3;
-    multisprite_move(i, x, y);
-}
-
 MS_KERNEL_BANK prepare_background(char scrolling)
 {
     char j, start = 0;
@@ -114,12 +87,16 @@ MS_KERNEL_BANK prepare_background(char scrolling)
     }
 }
 
-char player_xpos, player_ypos, player_state, player_state2, player_timer;
-char button_pressed; 
-char missile_sprite;
+EXTRA_RAM char player_xpos, player_ypos, player_state, player_state2, player_timer;
+EXTRA_RAM char button_pressed; 
+EXTRA_RAM char missile_sprite;
+EXTRA_RAM int score;
+EXTRA_RAM char update_score;
 
 void game_init()
 {
+    score = 9000;
+    update_score = 1;
     player_xpos = 76;
     player_ypos = 170;
     player_state = 0;
@@ -205,6 +182,9 @@ void game_logic()
             }
         }
     } else button_pressed = 0;
+
+    score += 1;
+    update_score = 1;
 }
 
 void main()
@@ -215,13 +195,8 @@ void main()
     multisprite_new(0, player_xpos, player_ypos, 0);
 
     mk_s0 = _mk_digits[0];
-    mk_s1 = _mk_digits[1];
-    mk_s2 = _mk_digits[2];
-    mk_s3 = _mk_digits[3];
-    mk_s4 = _mk_digits[4];
-    mk_s5 = _mk_digits[5];
+    mk_s1 = _mk_digits[0];
 
-    //init_sprites();
     do {
         *VBLANK = 2; // Enable VBLANK
         *VSYNC = 2; // Set VSYNC
@@ -262,6 +237,11 @@ void main()
         prepare_background(scrolling);
         scrolling -= 2;
         if (scrolling < 0) scrolling = 82;
+
+        if (update_score) {
+            mini_kernel_update_score_4_digits(score);
+            update_score = 0;
+        }
 
         while (*INTIM); // Wait for end of overscan
     } while(1);
