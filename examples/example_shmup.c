@@ -1,9 +1,9 @@
 #include "vcs.h"
 #include "vcs_colors.h"
 
+#define EXTRA_RAM superchip
 #define MS_OFFSCREEN_BANK bank0
 #define MS_KERNEL_BANK bank1
-#define MS_EXTRA_RAM superchip
 #define MS_MAX_NB_SPRITES 16 
 
 MS_KERNEL_BANK const unsigned char spaceship_gfx[20] = { 0, 0, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3c, 0x18, 0x18, 0x3c, 0xbd, 0xff, 0xdb, 0xdb, 0xdb, 0x66, 0x66, 0, 0};

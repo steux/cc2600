@@ -29,6 +29,10 @@
 
 #include "vcs.h"
 
+#ifndef EXTRA_RAM
+#define EXTRA_RAM
+#endif
+
 #ifndef kernel_short_macro
 #define kernel_short_macro
 #endif
@@ -65,10 +69,6 @@
 #define MS_KERNEL_DATA
 #endif
 
-#ifndef MS_EXTRA_RAM
-#define MS_EXTRA_RAM
-#endif
-
 #define MS_UNALLOCATED 255
 #define MS_OFFSET 32
 #define MS_END_OF_SCREEN (MS_PLAYFIELD_HEIGHT + MS_OFFSET - 2)
@@ -80,11 +80,11 @@
 char ms_y0, ms_y1, ms_h0, ms_h1, ms_v;
 char *ms_colup0ptr, *ms_colup1ptr, *ms_grp0ptr, *ms_grp1ptr, *ms_scenery;
 char ms_sprite_iter;
-MS_EXTRA_RAM char ms_sprite_x[MS_MAX_NB_SPRITES];
-MS_EXTRA_RAM char ms_sprite_y[MS_MAX_NB_SPRITES];
-MS_EXTRA_RAM char ms_sprite_model[MS_MAX_NB_SPRITES];
-MS_EXTRA_RAM char ms_nusiz[MS_MAX_NB_SPRITES];
-MS_EXTRA_RAM char ms_sorted_by_y[MS_MAX_NB_SPRITES];
+EXTRA_RAM char ms_sprite_x[MS_MAX_NB_SPRITES];
+EXTRA_RAM char ms_sprite_y[MS_MAX_NB_SPRITES];
+EXTRA_RAM char ms_sprite_model[MS_MAX_NB_SPRITES];
+EXTRA_RAM char ms_nusiz[MS_MAX_NB_SPRITES];
+EXTRA_RAM char ms_sorted_by_y[MS_MAX_NB_SPRITES];
 char ms_id_p[2];
 char ms_nb_sprites;
 
