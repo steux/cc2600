@@ -40,7 +40,7 @@ MK_BANK aligned(256) const char _mk_digits_font[10 * 7] = {
     0x6c, 0x86, 0x8e, 0x68, 0xe4, 0xc4, 0x68, 0x68, 0x0c, 0x06, 0x6e, 0xc6, 0xc6, 0x6c 
 };
 
-const char *_mk_digits[10] = { 
+MK_BANK const char *_mk_digits[10] = { 
     _mk_digits_font + 0,
     _mk_digits_font + 7,
     _mk_digits_font + 14,

@@ -70,7 +70,15 @@ MS_KERNEL_BANK const char playfield[] = {
 #include "multisprite.h"
 
 #define MK_ARMY_FONT
+#define MK_BANK bank2
 #include "minikernel.h"
+MK_BANK const char lives31[7] = {0x02, 0x07, 0x57, 0xf9, 0xf9, 0x20, 0x20};
+MK_BANK const char lives32[7] = {0x80, 0xc0, 0xd4, 0x3e, 0x3e, 0x08, 0x08};
+MK_BANK const char lives22[7] = {0x80, 0xc0, 0xc0, 0x00, 0x00, 0x00, 0x00};
+MK_BANK const char livesdummy[1] = {0};
+MK_BANK const char lives11[7] = {0x00, 0x00, 0x50, 0xf8, 0xf8, 0x20, 0x20};
+MK_BANK const char *livesleft[4] = { lives22 + 3, lives11, lives31, lives31 };
+MK_BANK const char *livesright[4] = { lives22 + 3, lives22 + 3, lives22, lives32 };
 
 MS_KERNEL_BANK prepare_background(char scrolling)
 {
@@ -87,11 +95,18 @@ MS_KERNEL_BANK prepare_background(char scrolling)
     }
 }
 
-EXTRA_RAM char player_xpos, player_ypos, player_state, player_state2, player_timer;
+EXTRA_RAM char player_xpos, player_ypos, player_state, player_state2, player_timer, nb_lives;
 EXTRA_RAM char button_pressed; 
 EXTRA_RAM char missile_sprite;
 EXTRA_RAM int score;
 EXTRA_RAM char update_score;
+    
+MK_BANK update_lives_display()
+{
+    X = nb_lives; 
+    mk_s0 = livesleft[X];
+    mk_s1 = livesright[X];
+}
 
 void game_init()
 {
@@ -103,6 +118,8 @@ void game_init()
     missile_sprite = MS_UNALLOCATED;
     button_pressed = 0;
     player_timer = 1;
+    nb_lives = 3;
+    update_lives_display();
 }
 
 void lose_one_life()
@@ -110,6 +127,9 @@ void lose_one_life()
     player_state = 1;
     player_state2 = 0;
     player_timer = 10;
+    nb_lives--;
+    if (nb_lives == -1) nb_lives = 3;
+    update_lives_display();
 }
 
 void game_logic()
@@ -193,9 +213,6 @@ void main()
     multisprite_init(playfield);
     game_init();
     multisprite_new(0, player_xpos, player_ypos, 0);
-
-    mk_s0 = _mk_digits[0];
-    mk_s1 = _mk_digits[0];
 
     do {
         *VBLANK = 2; // Enable VBLANK
