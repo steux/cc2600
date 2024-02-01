@@ -108,8 +108,8 @@ MK_BANK void mini_kernel_6_sprites()
     *GRP1 = 0;
     *REFP0 = 0;
     *REFP1 = 0;
-    *HMP1 = 0xA0; 
-    *HMP0 = 0x90;
+    *HMP1 = 0x90; 
+    *HMP0 = 0x80;
     csleep(7);
     strobe(RESP0);
     strobe(RESP1);
