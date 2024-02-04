@@ -1,6 +1,6 @@
 #include "vcs_colors.h"
 
-//#define EXTRA_RAM superchip
+#define EXTRA_RAM superchip
 #define MS_OFFSCREEN_BANK bank0
 #define MS_KERNEL_BANK bank1
 
@@ -38,7 +38,7 @@ MS_KERNEL_BANK const char garfield_colors[22] = { 0, 0, 0x3c, 0x3c, 0x3c, 0x0e, 
 MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {24};
 MS_KERNEL_BANK aligned(256) const char *ms_coluptr[MS_NB_SPRITES_DEF] = {garfield_colors};
 
-#define MULTISPRITE_SELECT_FAST
+#define MS_SELECT_FAST
 #include "multisprite.h"
 
 void main()

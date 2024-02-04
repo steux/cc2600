@@ -4,7 +4,7 @@
 //#define EXTRA_RAM superchip
 #define MS_OFFSCREEN_BANK bank0
 #define MS_KERNEL_BANK bank1
-#define MS_MAX_NB_SPRITES 8 
+#define MS_MAX_NB_SPRITES 10 
 
 MS_KERNEL_BANK const unsigned char spaceship_gfx[20] = { 0, 0, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3c, 0x18, 0x18, 0x3c, 0xbd, 0xff, 0xdb, 0xdb, 0xdb, 0x66, 0x66, 0, 0};
 MS_KERNEL_BANK const unsigned char meteorite_gfx[16] = { 0, 0, 0x1c, 0x36, 0x7a, 0x7f, 0xfd, 0xfd, 0xfd, 0xff, 0xfe, 0x7e, 0x7c, 0x38, 0, 0};
@@ -19,6 +19,14 @@ MS_KERNEL_BANK const unsigned char explosion3_gfx[16] = { 0, 0, 0x52, 0x76, 0xf7
 MS_KERNEL_BANK const unsigned char explosion4_gfx[16] = { 0, 0, 0x43, 0x64, 0x82, 0xc1, 0x00, 0x00, 0x00, 0x00, 0x81, 0x41, 0xc2, 0x25, 0, 0};
 MS_KERNEL_BANK const unsigned char spaceship_exhaust_gfx[28] = { 0, 0, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3c, 0x18, 0x18, 0x3c, 0xbd, 0xff, 0xdb, 0xdb, 0xdb, 0x66, 0x7e, 0xfe, 0x7f, 0xff, 0x76, 0x6e, 0x76, 0x66, 0x64, 0, 0};
 MS_KERNEL_BANK const unsigned char spaceship_colors[26] = { 0, 0, 0x04, 0x04, 0x84, 0x80, 0x90, 0x06, 0x08, 0x08, 0x0a, 0x0a, 0x0a, 0x0c, 0x0c, 0x0e, 0x0e, 0x30, 0x32, 0x34, 0x36, 0x28, 0x1a, 0x1c, 0x1e, 0x1e};
+
+MS_KERNEL_BANK const unsigned char gameover0_gfx[20] = { 0, 0, 0x3c, 0x3e, 0x76, 0x60, 0xe0, 0xc0, 0xc0, 0xcf, 0xc3, 0xc3, 0xc3, 0xc7, 0x66, 0x7e, 0x3c, 0x3c, 0, 0};
+MS_KERNEL_BANK const unsigned char gameover1_gfx[20] = { 0, 0, 0x18, 0x18, 0x1c, 0x3e, 0x36, 0x36, 0x36, 0x62, 0x63, 0x63, 0xc3, 0xff, 0xc3, 0xc3, 0xc3, 0xc3, 0, 0};
+MS_KERNEL_BANK const unsigned char gameover2_gfx[20] = { 0, 0, 0xfc, 0xde, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0, 0};
+MS_KERNEL_BANK const unsigned char gameover3_gfx[20] = { 0, 0, 0x3f, 0x3f, 0x70, 0x60, 0xe0, 0xc0, 0xc0, 0xfc, 0xc0, 0xc0, 0xc0, 0xc0, 0x60, 0x7f, 0x3f, 0x3f, 0, 0};
+MS_KERNEL_BANK const unsigned char gameover4_gfx[20] = { 0, 0, 0x3c, 0x3e, 0x76, 0x63, 0xe3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc7, 0x66, 0x7e, 0x3c, 0x3c, 0, 0};
+MS_KERNEL_BANK const unsigned char gameover5_gfx[20] = { 0, 0, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc7, 0xe6, 0x66, 0x6c, 0x6c, 0x3c, 0x38, 0x18, 0x18, 0, 0};
+MS_KERNEL_BANK const unsigned char gameover6_gfx[20] = { 0, 0, 0xfc, 0xc6, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xfe, 0xfc, 0xcc, 0xc6, 0xc6, 0xc3, 0xc3, 0, 0};
 #define BLANK 40
 #define OVERSCAN 30
 
@@ -29,11 +37,13 @@ MS_KERNEL_BANK const unsigned char spaceship_colors[26] = { 0, 0, 0x04, 0x04, 0x
 #define REG_PF1     0x0e
 #define REG_PF2     0x0f
 
-#define MS_NB_SPRITES_DEF 9
+#define MS_NB_SPRITES_DEF 16 
 #define MS_KERNEL_DATA \
-MS_KERNEL_BANK const char *ms_grptr[MS_NB_SPRITES_DEF] = {spaceship_gfx, meteorite_gfx, missile_gfx, explosion0_gfx, explosion1_gfx, explosion2_gfx, explosion3_gfx, explosion4_gfx, spaceship_exhaust_gfx}; \
-MS_KERNEL_BANK const char *ms_coluptr[MS_NB_SPRITES_DEF] = {spaceship_colors, meteorite_colors, missile_colors, explosion_colors, explosion_colors, explosion_colors, explosion_colors, explosion_colors, spaceship_colors}; \
-MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {19, 15, 15, 15, 15, 15, 15, 15, 27};
+MS_KERNEL_BANK const char *ms_grptr[MS_NB_SPRITES_DEF] = {spaceship_gfx, meteorite_gfx, missile_gfx, explosion0_gfx, explosion1_gfx, explosion2_gfx, explosion3_gfx, explosion4_gfx, spaceship_exhaust_gfx, \
+    gameover0_gfx, gameover1_gfx, gameover2_gfx, gameover3_gfx, gameover4_gfx, gameover5_gfx, gameover6_gfx }; \
+MS_KERNEL_BANK const char *ms_coluptr[MS_NB_SPRITES_DEF] = {spaceship_colors, meteorite_colors, missile_colors, explosion_colors, explosion_colors, explosion_colors, explosion_colors, explosion_colors, spaceship_colors, \
+    spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors }; \
+MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {19, 15, 15, 15, 15, 15, 15, 15, 27, 19, 19, 19, 19, 19, 19, 19};
 
 MS_KERNEL_BANK const char playfield[] = {
     5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_GREEN, REG_COLUPF,
@@ -124,14 +134,14 @@ void game_init()
 
 void game_over()
 {
-    multisprite_new(0, 80 - 19, 50, 0);
-    multisprite_new(0, 80 - 9, 50, 0);
-    multisprite_new(0, 80 + 1, 50, 0);
-    multisprite_new(0, 80 + 11, 50, 0);
-    multisprite_new(0, 80 - 19, 100, 0);
-    multisprite_new(0, 80 - 9, 100, 0);
-    multisprite_new(0, 80 + 1, 100, 0);
-    multisprite_new(0, 80 + 11, 100, 0);
+    multisprite_new(9, 80 - 19, 50, 0);
+    multisprite_new(10, 80 - 9, 50, 0);
+    multisprite_new(11, 80 + 1, 50, 0);
+    multisprite_new(12, 80 + 11, 50, 0);
+    multisprite_new(13, 80 - 19, 100, 0);
+    multisprite_new(14, 80 - 9, 100, 0);
+    multisprite_new(12, 80 + 1, 100, 0);
+    multisprite_new(15, 80 + 11, 100, 0);
 }
 
 void lose_one_life()
