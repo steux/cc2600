@@ -278,51 +278,58 @@ void _ms_mergesort()
 #ifdef MS_SELECT_FAST
 MS_OFFSCREEN_BANK _ms_select_sprites()
 {
-    Y = 0;
-    ms_sorted_by_y[Y] &= 0x7f; // Display this one (a priori)
-    X = ms_sorted_by_y[Y];
-    ms_nusiz[X] &= 0x3f; // Reset collision
-    for (Y = 1; Y < ms_nb_sprites; Y++) {
-        char candidate = ms_sorted_by_y[Y];
-        if (candidate & 0x80) { // If it was not displayed at previous iteration
-            ms_sorted_by_y[Y] = candidate & 0x7f;
-            // Yes. It overlaps. Skip candidate1 and set it as prioritary for next time
-            ms_sorted_by_y[--Y] |= 0x80;
-            Y++;
-        } else {
-            X = candidate & 0x7f;
-            ms_nusiz[X] &= 0x3f; // Reset collision
+    char end = ms_nb_sprites - 1;
+    char candidate1, candidate2;
+    for (Y = 0; Y < end; Y++) {
+        candidate1 = ms_sorted_by_y[Y];
+        X = candidate1 & 0x7f;
+        ms_nusiz[X] &= 0x3f; // Reset collision
+        if (!(candidate1 & 0x80)) {
+            char candidate2 = ms_sorted_by_y[++Y];
+            Y--;
+            if (candidate2 & 0x80) { // If it was not displayed at previous iteration
+                                     // Let's see if this candidate overlaps with our previous candidate
+                                     // Yes. It overlaps. Skip candidate1 and set it as prioritary for next time
+                X = candidate1 | 0x80;
+            }
         }
+        ms_sorted_by_y[Y] = X;
     }
+    X = ms_sorted_by_y[Y] & 0x7f;
+    ms_nusiz[X] &= 0x3f; // Reset collision
+    ms_sorted_by_y[Y] = X;
 }
 #else
 #ifdef MS_SELECT_ACCURATE
 MS_KERNEL_BANK _ms_select_sprites()
 {
-    Y = 0;
-    ms_sorted_by_y[Y] &= 0x7f; // Display this one (a priori)
-    X = ms_sorted_by_y[Y];
-    ms_nusiz[X] &= 0x3f; // Reset collision
-    char candidate1 = X;
-    for (Y = 1; Y < ms_nb_sprites; Y++) {
-        char candidate2 = ms_sorted_by_y[Y];
-        if (candidate2 & 0x80) { // If it was not displayed at previous iteration
-            // Let's see if this candidate overlaps with our previous candidate
-            char y2 = ms_sprite_y[X = candidate2 & 0x7f];
-            ms_sorted_by_y[Y] = X;
-            char y1 = ms_sprite_y[X = candidate1 & 0x7f] + 13;
-            char height1 = ms_height[X = ms_sprite_model[X]];
-            if (y1 + height1 >= y2) {
-                // Yes. It overlaps. Skip candidate1 and set it as prioritary for next time
-                ms_sorted_by_y[--Y] |= 0x80;
-                Y++;
+    char end = ms_nb_sprites - 1;
+    char candidate1, candidate2;
+    for (Y = 0; Y < end; Y++) {
+        candidate1 = ms_sorted_by_y[Y];
+        X = candidate1 & 0x7f;
+        ms_nusiz[X] &= 0x3f; // Reset collision
+        if (!(candidate1 & 0x80)) {
+            char candidate2 = ms_sorted_by_y[++Y];
+            Y--;
+            if (candidate2 & 0x80) { // If it was not displayed at previous iteration
+                                     // Let's see if this candidate overlaps with our previous candidate
+                char y1 = ms_sprite_y[X] + 13;
+                char height1 = ms_height[X = ms_sprite_model[X]];
+                char y2 = ms_sprite_y[X = candidate2 & 0x7f];
+                if (y1 + height1 >= y2) {
+                    // Yes. It overlaps. Skip candidate1 and set it as prioritary for next time
+                    X = candidate1 | 0x80;
+                } else {
+                    X = candidate1 & 0x7f;
+                }
             } 
-        } else {
-            X = candidate2 & 0x7f;
-            ms_nusiz[X] &= 0x3f; // Reset collision
         }
-        candidate1 = candidate2;
+        ms_sorted_by_y[Y] = X;
     }
+    X = ms_sorted_by_y[Y] & 0x7f;
+    ms_nusiz[X] &= 0x3f; // Reset collision
+    ms_sorted_by_y[Y] = X;
 }
 #else
 #ifndef MS_OVERLAP_MARGIN
@@ -330,29 +337,32 @@ MS_KERNEL_BANK _ms_select_sprites()
 #endif
 MS_OFFSCREEN_BANK _ms_select_sprites()
 {
-    Y = 0;
-    ms_sorted_by_y[Y] &= 0x7f; // Display this one (a priori)
-    X = ms_sorted_by_y[Y];
-    ms_nusiz[X] &= 0x3f; // Reset collision
-    char candidate1 = X;
-    for (Y = 1; Y < ms_nb_sprites; Y++) {
-        char candidate2 = ms_sorted_by_y[Y];
-        if (candidate2 & 0x80) { // If it was not displayed at previous iteration
-            // Let's see if this candidate overlaps with our previous candidate
-            char y2 = ms_sprite_y[X = candidate2 & 0x7f];
-            ms_sorted_by_y[Y] = X;
-            char y1 = ms_sprite_y[X = candidate1 & 0x7f];
-            if (y1 + MS_OVERLAP_MARGIN >= y2) {
-                // Yes. It overlaps. Skip candidate1 and set it as prioritary for next time
-                ms_sorted_by_y[--Y] |= 0x80;
-                Y++;
+    char end = ms_nb_sprites - 1;
+    char candidate1, candidate2;
+    for (Y = 0; Y < end; Y++) {
+        candidate1 = ms_sorted_by_y[Y];
+        X = candidate1 & 0x7f;
+        ms_nusiz[X] &= 0x3f; // Reset collision
+        if (!(candidate1 & 0x80)) {
+            char candidate2 = ms_sorted_by_y[++Y];
+            Y--;
+            if (candidate2 & 0x80) { // If it was not displayed at previous iteration
+                                     // Let's see if this candidate overlaps with our previous candidate
+                char y1 = ms_sprite_y[X];
+                char y2 = ms_sprite_y[X = candidate2 & 0x7f];
+                if (y1 + MS_OVERLAP_MARGIN >= y2) {
+                    // Yes. It overlaps. Skip candidate1 and set it as prioritary for next time
+                    X = candidate1 | 0x80;
+                } else {
+                    X = candidate1 & 0x7f;
+                }
             } 
-        } else {
-            X = candidate2 & 0x7f;
-            ms_nusiz[X] &= 0x3f; // Reset collision
         }
-        candidate1 = candidate2;
+        ms_sorted_by_y[Y] = X;
     }
+    X = ms_sorted_by_y[Y] & 0x7f;
+    ms_nusiz[X] &= 0x3f; // Reset collision
+    ms_sorted_by_y[Y] = X;
 }
 #endif
 #endif

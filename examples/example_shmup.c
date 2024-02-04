@@ -1,10 +1,10 @@
 #include "vcs.h"
 #include "vcs_colors.h"
 
-#define EXTRA_RAM superchip
+//#define EXTRA_RAM superchip
 #define MS_OFFSCREEN_BANK bank0
 #define MS_KERNEL_BANK bank1
-#define MS_MAX_NB_SPRITES 16 
+#define MS_MAX_NB_SPRITES 8 
 
 MS_KERNEL_BANK const unsigned char spaceship_gfx[20] = { 0, 0, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3c, 0x18, 0x18, 0x3c, 0xbd, 0xff, 0xdb, 0xdb, 0xdb, 0x66, 0x66, 0, 0};
 MS_KERNEL_BANK const unsigned char meteorite_gfx[16] = { 0, 0, 0x1c, 0x36, 0x7a, 0x7f, 0xfd, 0xfd, 0xfd, 0xff, 0xfe, 0x7e, 0x7c, 0x38, 0, 0};
@@ -110,7 +110,7 @@ MK_BANK update_lives_display()
 
 void game_init()
 {
-    score = 9000;
+    score = 0;
     update_score = 1;
     player_xpos = 76;
     player_ypos = 170;
@@ -122,12 +122,25 @@ void game_init()
     update_lives_display();
 }
 
+void game_over()
+{
+    multisprite_new(0, 80 - 19, 50, 0);
+    multisprite_new(0, 80 - 9, 50, 0);
+    multisprite_new(0, 80 + 1, 50, 0);
+    multisprite_new(0, 80 + 11, 50, 0);
+    multisprite_new(0, 80 - 19, 100, 0);
+    multisprite_new(0, 80 - 9, 100, 0);
+    multisprite_new(0, 80 + 1, 100, 0);
+    multisprite_new(0, 80 + 11, 100, 0);
+}
+
 void lose_one_life()
 {
     player_state = 1;
     player_state2 = 0;
     player_timer = 10;
     nb_lives--;
+    if (nb_lives == 0) game_over();
     if (nb_lives == -1) nb_lives = 3;
     update_lives_display();
 }
@@ -212,7 +225,8 @@ void main()
     char scrolling = 0;
     multisprite_init(playfield);
     game_init();
-    multisprite_new(0, player_xpos, player_ypos, 0);
+    //multisprite_new(0, player_xpos, player_ypos, 0);
+    game_over();
 
     do {
         *VBLANK = 2; // Enable VBLANK
@@ -225,7 +239,7 @@ void main()
         // Blank
         *TIM64T = ((BLANK - 3) * 76) / 64 - 3;
         // Do some logic here
-        game_logic();
+        //game_logic();
 
         ms_scenery = playfield - MS_OFFSET + 12;
         ms_scenery += scrolling;
