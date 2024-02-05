@@ -1,7 +1,7 @@
 #include "vcs.h"
 #include "vcs_colors.h"
 
-//#define EXTRA_RAM superchip
+#define EXTRA_RAM superchip
 #define MS_OFFSCREEN_BANK bank0
 #define MS_KERNEL_BANK bank1
 #define MS_MAX_NB_SPRITES 10 
@@ -123,7 +123,7 @@ void game_init()
     score = 0;
     update_score = 1;
     player_xpos = 76;
-    player_ypos = 170;
+    player_ypos = 160;
     player_state = 0;
     missile_sprite = MS_UNALLOCATED;
     button_pressed = 0;
@@ -160,7 +160,7 @@ void game_logic()
     X = 0;
     if (!(*SWCHA & 0x80) && player_xpos < 153) { player_xpos++; } // Right
     if (!(*SWCHA & 0x40) && player_xpos > 0) { player_xpos--; } // Left
-    if (!(*SWCHA & 0x20) && player_ypos < 180) { player_ypos++; } // Down
+    if (!(*SWCHA & 0x20) && player_ypos < 170) { player_ypos++; } // Down
     if (!(*SWCHA & 0x10) && player_ypos > 0) { player_ypos--; ms_sprite_model[X] = 8;} // Up
     else { ms_sprite_model[X] = 0; } 
     multisprite_move(0, player_xpos, player_ypos);
@@ -235,8 +235,7 @@ void main()
     char scrolling = 0;
     multisprite_init(playfield);
     game_init();
-    //multisprite_new(0, player_xpos, player_ypos, 0);
-    game_over();
+    multisprite_new(0, player_xpos, player_ypos, 0);
 
     do {
         *VBLANK = 2; // Enable VBLANK
@@ -249,7 +248,7 @@ void main()
         // Blank
         *TIM64T = ((BLANK - 3) * 76) / 64 - 3;
         // Do some logic here
-        //game_logic();
+        game_logic();
 
         ms_scenery = playfield - MS_OFFSET + 12;
         ms_scenery += scrolling;
