@@ -52,7 +52,7 @@ MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {19, 15, 15, 15, 15, 15
 #define MS_OFFSCREEN_DATA \
 const char sprite_width[8] = {8, 24, 40, 40, 72, 16, 72, 32}; \
 const char sprite_is_one_invader[8] = {1, 0, 0, 0, 0, 1, 0, 1}; \
-const char invader_score[2] = {0, 100}; \
+const char invader_score[2] = {0, 10}; \
 const char sprite_new_nusiz_remove_left[7] = {0, 0, 0, 1, 0, 0, 0}; \
 const char sprite_offset_remove_left[7] = {0, 16, 32, 16, 64, 0, 32}; \
 const char sprite_new_nusiz_remove_right[7] = {0, 0, 0, 1, 0, 0, 2};
@@ -315,8 +315,6 @@ void lose_one_life()
     player_state2 = 0;
     player_timer = 10;
     nb_lives--;
-    if (nb_lives == 0) game_over();
-    if (nb_lives == -1) nb_lives = 3;
     update_lives_display();
 }
 
@@ -392,8 +390,11 @@ void game_logic()
                 player_timer = 10;
                 player_state2++;
                 if (player_state2 == 5) {
-                    player_state = 0;
-                    ms_sprite_model[X] = 0;
+                    if (nb_lives == 0) game_over();
+                    else {
+                        player_state = 0;
+                        ms_sprite_model[X] = 0;
+                    }
                 }
             } 
         }
