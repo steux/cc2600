@@ -27,6 +27,10 @@ MS_KERNEL_BANK const unsigned char gameover3_gfx[20] = { 0, 0, 0x3f, 0x3f, 0x70,
 MS_KERNEL_BANK const unsigned char gameover4_gfx[20] = { 0, 0, 0x3c, 0x3e, 0x76, 0x63, 0xe3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc7, 0x66, 0x7e, 0x3c, 0x3c, 0, 0};
 MS_KERNEL_BANK const unsigned char gameover5_gfx[20] = { 0, 0, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc7, 0xe6, 0x66, 0x6c, 0x6c, 0x3c, 0x38, 0x18, 0x18, 0, 0};
 MS_KERNEL_BANK const unsigned char gameover6_gfx[20] = { 0, 0, 0xfc, 0xc6, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xfe, 0xfc, 0xcc, 0xc6, 0xc6, 0xc3, 0xc3, 0, 0};
+
+MS_KERNEL_BANK const unsigned char invader1_gfx[16] = { 0, 0, 0x18, 0x3c, 0x7e, 0x99, 0xff, 0xff, 0xff, 0x7e, 0x66, 0x42, 0x81, 0x42, 0, 0};
+MS_KERNEL_BANK const unsigned char invader1_colors[14] = { 0, 0, 0xd2, 0xd2, 0xd2, 0xd2, 0xc4, 0xc4, 0xd6, 0xd6, 0xdc, 0x1c, 0x1c, 0x1c};
+
 #define BLANK 40
 #define OVERSCAN 30
 
@@ -37,13 +41,13 @@ MS_KERNEL_BANK const unsigned char gameover6_gfx[20] = { 0, 0, 0xfc, 0xc6, 0xc3,
 #define REG_PF1     0x0e
 #define REG_PF2     0x0f
 
-#define MS_NB_SPRITES_DEF 16 
+#define MS_NB_SPRITES_DEF 17 
 #define MS_KERNEL_DATA \
 MS_KERNEL_BANK const char *ms_grptr[MS_NB_SPRITES_DEF] = {spaceship_gfx, meteorite_gfx, missile_gfx, explosion0_gfx, explosion1_gfx, explosion2_gfx, explosion3_gfx, explosion4_gfx, spaceship_exhaust_gfx, \
-    gameover0_gfx, gameover1_gfx, gameover2_gfx, gameover3_gfx, gameover4_gfx, gameover5_gfx, gameover6_gfx }; \
+    gameover0_gfx, gameover1_gfx, gameover2_gfx, gameover3_gfx, gameover4_gfx, gameover5_gfx, gameover6_gfx, invader1_gfx }; \
 MS_KERNEL_BANK const char *ms_coluptr[MS_NB_SPRITES_DEF] = {spaceship_colors, meteorite_colors, missile_colors, explosion_colors, explosion_colors, explosion_colors, explosion_colors, explosion_colors, spaceship_colors, \
-    spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors }; \
-MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {19, 15, 15, 15, 15, 15, 15, 15, 27, 19, 19, 19, 19, 19, 19, 19};
+    spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors, invader1_colors }; \
+MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {19, 15, 15, 15, 15, 15, 15, 15, 27, 19, 19, 19, 19, 19, 19, 19, 15};
 
 MS_KERNEL_BANK const char playfield[] = {
     5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_GREEN, REG_COLUPF,
@@ -110,6 +114,9 @@ EXTRA_RAM char button_pressed;
 EXTRA_RAM char missile_sprite;
 EXTRA_RAM int score;
 EXTRA_RAM char update_score;
+EXTRA_RAM unsigned int game_counter;
+#define MAX_NB_ENEMIES 3
+EXTRA_RAM char enemy_xpos[MAX_NB_ENEMIES], enemy_ypos[MAX_NB_ENEMIES], enemy_sprite[MAX_NB_ENEMIES], enemy_type[MAX_NB_ENEMIES], enemy_nusiz[MAX_NB_ENEMIES], enemy_state[MAX_NB_ENEMIES], enemy_counter[MAX_NB_ENEMIES];
     
 MK_BANK update_lives_display()
 {
@@ -129,7 +136,67 @@ void game_init()
     button_pressed = 0;
     player_timer = 1;
     nb_lives = 3;
+    for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
+        enemy_type[X] = 0;
+    }
     update_lives_display();
+    game_counter = 0;
+}
+
+void spawn_new_enemy(char type, char spec)
+{
+    char i, r;
+    for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
+        if (!enemy_type[X]) break;
+    }
+    if (X < 0) return; // No room for this enemy
+    
+    if (type == 1) {
+        enemy_type[X] = 1;
+        enemy_ypos[X] = -12;
+        enemy_xpos[X] = spec;
+        enemy_state[X] = 0;
+        enemy_counter[X] = 0;
+        enemy_nusiz[X] = 3;
+        i = X;
+        r = multisprite_new(16, spec, 0, 3);
+        X = i;
+        if (r == -1) {
+            enemy_type[X] = 0; // No room left for this enemy
+        } else {
+            enemy_sprite[X] = r;
+        }
+    }
+}
+
+void game_move_enemies()
+{
+    char i;
+    for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
+        if (enemy_type[X] == 1) {
+            enemy_ypos[X] += 1;
+            if (enemy_ypos[X] == 170) {
+                i = X;
+                multisprite_delete(enemy_sprite[X]);
+                X = i;
+                enemy_type[X] = 0;
+            } else {
+                i = X;
+                multisprite_move(enemy_sprite[X], enemy_xpos[X], enemy_ypos[X]); 
+                X = i;
+            }    
+        }
+    }
+}
+
+void game_scenario()
+{
+    game_counter++;
+    if (game_counter < 10) {
+        if (game_counter == 1 || game_counter == 3 || game_counter == 5) {
+            spawn_new_enemy(1, 60);
+        }
+    }
 }
 
 void game_over()
@@ -225,9 +292,6 @@ void game_logic()
             }
         }
     } else button_pressed = 0;
-
-    score += 1;
-    update_score = 1;
 }
 
 void main()
@@ -276,7 +340,11 @@ void main()
         
         prepare_background(scrolling);
         scrolling -= 2;
-        if (scrolling < 0) scrolling = 82;
+        if (scrolling < 0) {
+            scrolling = 82;
+            game_scenario();
+        }
+        game_move_enemies();
 
         if (update_score) {
             mini_kernel_update_score_4_digits(score);
