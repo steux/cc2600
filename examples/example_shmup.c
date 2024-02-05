@@ -123,7 +123,10 @@ EXTRA_RAM char missile_sprite;
 EXTRA_RAM int score;
 EXTRA_RAM char update_score;
 EXTRA_RAM unsigned int game_counter;
-#define MAX_NB_ENEMIES 3
+EXTRA_RAM char game_state;
+#define GAME_STARTED    0
+#define GAME_OVER       1
+#define MAX_NB_ENEMIES  3 
 EXTRA_RAM char enemy_sprite[MAX_NB_ENEMIES], enemy_type[MAX_NB_ENEMIES], enemy_state[MAX_NB_ENEMIES], enemy_counter[MAX_NB_ENEMIES];
   
 #ifdef DEBUG
@@ -154,6 +157,8 @@ void game_init()
     }
     update_lives_display();
     game_counter = 0;
+    game_state = GAME_STARTED;
+    multisprite_new(0, player_xpos, player_ypos, 0);
 }
 
 void spawn_new_enemy(char type, char spec)
@@ -273,6 +278,25 @@ void game_scenario()
 
 void game_over()
 {
+    char i;
+    // Destroy all enemies
+    for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
+        if (enemy_type[X]) {
+            i = X;
+            multisprite_delete(enemy_sprite[X]);
+            X = i;
+            enemy_type[X] = 0;
+        }
+    }
+    // Destroy missile
+    if (missile_sprite != MS_UNALLOCATED) {
+        multisprite_delete(missile_sprite);
+        missile_sprite = MS_UNALLOCATED;
+    }
+    // Destroy ship
+    multisprite_delete(0);
+    player_state = 2;
+
     multisprite_new(9, 80 - 19, 50, 0);
     multisprite_new(10, 80 - 9, 50, 0);
     multisprite_new(11, 80 + 1, 50, 0);
@@ -281,6 +305,8 @@ void game_over()
     multisprite_new(14, 80 - 9, 100, 0);
     multisprite_new(12, 80 + 1, 100, 0);
     multisprite_new(15, 80 + 11, 100, 0);
+
+    game_state = GAME_OVER;
 }
 
 void lose_one_life()
@@ -303,38 +329,6 @@ void game_logic()
     if (!(*SWCHA & 0x10) && player_ypos > 0) { player_ypos--; ms_sprite_model[X] = 8;} // Up
     else { ms_sprite_model[X] = 0; } 
     multisprite_move(0, player_xpos, player_ypos);
-
-    // Player management
-    if (player_state == 0) {
-        // Check collision with playfield
-        if (ms_nusiz[X = 0] & MS_PF_COLLISION) {
-            if (ms_sprite_x[X] < 12 || ms_sprite_x[X] >= 153 - 12) {
-                lose_one_life();
-            }
-        }
-    }
-    if (player_state == 0) {
-        if (player_timer >= 1) {
-            player_timer = 0;
-            ms_nusiz[X] = 0;
-        } else {
-            player_timer = 1;
-            ms_nusiz[X] = MS_REFLECTED;
-        }
-    } else {
-        if (player_state == 1) {
-            ms_sprite_model[X = 0] = 3 + player_state2;
-            player_timer--;
-            if (player_timer == 0) {
-                player_timer = 10;
-                player_state2++;
-                if (player_state2 == 5) {
-                    player_state = 0;
-                    ms_sprite_model[X] = 0;
-                }
-            } 
-        }
-    }
 
     // Missile management
     if (missile_sprite != MS_UNALLOCATED) {
@@ -368,6 +362,42 @@ void game_logic()
             }
         }
     } else button_pressed = 0;
+    
+    // Player management
+    if (player_state == 0) {
+        // Check collision with playfield
+        if (ms_nusiz[X = 0] & MS_PF_COLLISION) {
+            if (ms_sprite_x[X] < 12 || ms_sprite_x[X] >= 153 - 12) {
+                lose_one_life();
+            }
+        }
+        if (ms_nusiz[X = 0] & MS_COLLISION) {
+            lose_one_life();
+        }
+    }
+    if (player_state == 0) {
+        if (player_timer >= 1) {
+            player_timer = 0;
+            ms_nusiz[X] = 0;
+        } else {
+            player_timer = 1;
+            ms_nusiz[X] = MS_REFLECTED;
+        }
+    } else {
+        // Player explosion
+        if (player_state == 1) {
+            ms_sprite_model[X = 0] = 3 + player_state2;
+            player_timer--;
+            if (player_timer == 0) {
+                player_timer = 10;
+                player_state2++;
+                if (player_state2 == 5) {
+                    player_state = 0;
+                    ms_sprite_model[X] = 0;
+                }
+            } 
+        }
+    }
 }
 
 void main()
@@ -380,7 +410,6 @@ void main()
     char scrolling = 0;
     multisprite_init(playfield);
     game_init();
-    multisprite_new(0, player_xpos, player_ypos, 0);
 
     do {
         *VBLANK = 2; // Enable VBLANK
@@ -393,7 +422,8 @@ void main()
         // Blank
         *TIM64T = ((BLANK - 3) * 76) / 64 - 3;
         // Do some logic here
-        game_logic();
+        if (game_state == GAME_STARTED) 
+            game_logic();
 
         ms_scenery = playfield - MS_OFFSET + 12;
         ms_scenery += scrolling;
@@ -427,7 +457,8 @@ void main()
         scrolling -= 2;
         if (scrolling < 0) {
             scrolling = 82;
-            game_scenario();
+            if (game_state == GAME_STARTED) 
+                game_scenario();
         }
         game_move_enemies();
 
