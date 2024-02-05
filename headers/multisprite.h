@@ -101,8 +101,12 @@ MS_KERNEL_BANK aligned(256) const char ms_sprite_hm[160] = {0x40, 0x30, 0x20, 0x
 MS_OFFSCREEN_BANK void multisprite_init(char *scenery)
 {
     ms_nb_sprites = 0;
-    ms_sprite_iter = 0;
     ms_scenery = scenery - MS_OFFSET;
+}
+
+inline void multisprite_clear()
+{
+    ms_nb_sprites = 0;
 }
 
 // Create a new sprite at nx, ny (model and nusiz provided)
@@ -579,8 +583,8 @@ MS_KERNEL_BANK void _ms_p0_p1_kernel(char stop)
             ms_colup0 = ms_colup0ptr[Y];    // 9
             ms_colup1 = ms_colup1ptr[Y];    // 9
             *GRP0 = ms_grp0ptr[Y];          // 9
-            load(ms_grp1ptr[Y++]);          // 6
-            strobe(WSYNC);                  // 3: Total (2) = 61 
+            load(ms_grp1ptr[Y++]);          // 8
+            strobe(WSYNC);                  // 3: Total (2) = 63 
 
             store(*GRP1);                   // 3
             *COLUP0 = ms_colup0;            // 6

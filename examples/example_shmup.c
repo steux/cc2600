@@ -58,28 +58,28 @@ const char sprite_offset_remove_left[7] = {0, 16, 32, 16, 64, 0, 32}; \
 const char sprite_new_nusiz_remove_right[7] = {0, 0, 0, 1, 0, 0, 2};
 
 MS_KERNEL_BANK const char playfield[] = {
-    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_BLUE, REG_COLUPF,
+    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLUE, REG_COLUPF,
     0xfc, REG_PF2, 0xff, REG_PF2, 0x03, REG_PF1, 0x0f, REG_PF1, 0x1f, REG_PF1, 0x3f, REG_PF1, 0x7f, REG_PF1, 0xff, REG_PF1,
     0x80, REG_PF0, 0, REG_PF2, 0xc0, REG_PF0, 0xf0, REG_PF1, 0xe0, REG_PF0, 0xe0, REG_PF1, 0xc0, REG_PF1,
     0xf0, REG_PF0, 0x80, REG_PF1, VCS_WHITE, REG_COLUPF, 0x00, REG_PF1, 1, REG_CTRLPF, 0x70, REG_PF0, VCS_LGREY, REG_COLUPF,
     0xf0, REG_PF0, 0xe0, REG_PF0, 0xc0, REG_PF1, VCS_GREY, REG_COLUPF, 0xf0, REG_PF1, 0xc0, REG_PF0, 0xff, REG_PF1, 0x0, REG_PF0, 0xff, REG_PF2,
     0x0f, REG_PF1, 0x04, REG_COLUPF, 0, REG_PF1, 0, REG_PF2,
 
-    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_BLUE, REG_COLUPF,
+    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLUE, REG_COLUPF,
     0xfc, REG_PF2, 0xff, REG_PF2, 0x03, REG_PF1, 0x0f, REG_PF1, 0x1f, REG_PF1, 0x3f, REG_PF1, 0x7f, REG_PF1, 0xff, REG_PF1,
     0x80, REG_PF0, 0, REG_PF2, 0xc0, REG_PF0, 0xf0, REG_PF1, 0xe0, REG_PF0, 0xe0, REG_PF1, 0xc0, REG_PF1,
     0xf0, REG_PF0, 0x80, REG_PF1, VCS_WHITE, REG_COLUPF, 0x00, REG_PF1, 1, REG_CTRLPF, 0x70, REG_PF0, VCS_LGREY, REG_COLUPF,
     0xf0, REG_PF0, 0xe0, REG_PF0, 0xc0, REG_PF1, VCS_GREY, REG_COLUPF, 0xf0, REG_PF1, 0xc0, REG_PF0, 0xff, REG_PF1, 0x0, REG_PF0, 0xff, REG_PF2,
     0x0f, REG_PF1, 0x04, REG_COLUPF, 0, REG_PF1, 0, REG_PF2,
 
-    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_BLUE, REG_COLUPF,
+    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLUE, REG_COLUPF,
     0xfc, REG_PF2, 0xff, REG_PF2, 0x03, REG_PF1, 0x0f, REG_PF1, 0x1f, REG_PF1, 0x3f, REG_PF1, 0x7f, REG_PF1, 0xff, REG_PF1,
     0x80, REG_PF0, 0, REG_PF2, 0xc0, REG_PF0, 0xf0, REG_PF1, 0xe0, REG_PF0, 0xe0, REG_PF1, 0xc0, REG_PF1,
     0xf0, REG_PF0, 0x80, REG_PF1, VCS_WHITE, REG_COLUPF, 0x00, REG_PF1, 1, REG_CTRLPF, 0x70, REG_PF0, VCS_LGREY, REG_COLUPF,
     0xf0, REG_PF0, 0xe0, REG_PF0, 0xc0, REG_PF1, VCS_GREY, REG_COLUPF, 0xf0, REG_PF1, 0xc0, REG_PF0, 0xff, REG_PF1, 0x0, REG_PF0, 0xff, REG_PF2,
     0x0f, REG_PF1, 0x04, REG_COLUPF, 0, REG_PF1, 0, REG_PF2,
 
-    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_BLUE, REG_COLUPF,
+    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLUE, REG_COLUPF,
     0xfc, REG_PF2, 0xff, REG_PF2, 0x03, REG_PF1, 0x0f, REG_PF1, 0x1f, REG_PF1, 0x3f, REG_PF1, 0x7f, REG_PF1, 0xff, REG_PF1,
     0x80, REG_PF0, 0, REG_PF2, 0xc0, REG_PF0, 0xf0, REG_PF1, 0xe0, REG_PF0, 0xe0, REG_PF1, 0xc0, REG_PF1,
     0xf0, REG_PF0, 0x80, REG_PF1, VCS_WHITE, REG_COLUPF, 0x00, REG_PF1, 1, REG_CTRLPF, 0x70, REG_PF0, VCS_LGREY, REG_COLUPF,
@@ -102,21 +102,6 @@ MK_BANK const char lives11[7] = {0x00, 0x00, 0x50, 0xf8, 0xf8, 0x20, 0x20};
 MK_BANK const char *livesleft[4] = { lives22 + 3, lives11, lives31, lives31 };
 MK_BANK const char *livesright[4] = { lives22 + 3, lives22 + 3, lives22, lives32 };
 
-MS_KERNEL_BANK prepare_background(char scrolling)
-{
-    char j, start = 0;
-    scrolling += 12;
-    if (scrolling >= 30) start = scrolling - 30;
-    *PF2 = 0;
-    *COLUBK = 0;
-    // Replay background to put the correct colors/regs
-    for (Y = start; Y != scrolling;) {
-        j = playfield[Y++];
-        X = playfield[Y++];
-        VSYNC[X] = j;
-    }
-}
-
 EXTRA_RAM char player_xpos, player_ypos, player_state, player_state2, player_timer, nb_lives;
 EXTRA_RAM char button_pressed; 
 EXTRA_RAM char missile_sprite;
@@ -124,6 +109,7 @@ EXTRA_RAM int score;
 EXTRA_RAM char update_score;
 EXTRA_RAM unsigned int game_counter;
 EXTRA_RAM char game_state;
+EXTRA_RAM char background_color;
 #define GAME_STARTED    0
 #define GAME_OVER       1
 #define MAX_NB_ENEMIES  3 
@@ -134,6 +120,21 @@ char min_timer_vblank;
 char min_timer_overscan;
 #endif
 
+MS_KERNEL_BANK prepare_background(char scrolling)
+{
+    char j, start = 0;
+    scrolling += 12;
+    if (scrolling >= 30) start = scrolling - 30;
+    *PF2 = 0;
+    *COLUBK = background_color;
+    // Replay background to put the correct colors/regs
+    for (Y = start; Y != scrolling;) {
+        j = playfield[Y++];
+        X = playfield[Y++];
+        VSYNC[X] = j;
+    }
+}
+
 MK_BANK update_lives_display()
 {
     X = nb_lives; 
@@ -143,6 +144,7 @@ MK_BANK update_lives_display()
 
 void game_init()
 {
+    multisprite_init(playfield);
     score = 0;
     update_score = 1;
     player_xpos = 76;
@@ -159,6 +161,7 @@ void game_init()
     game_counter = 0;
     game_state = GAME_STARTED;
     multisprite_new(0, player_xpos, player_ypos, 0);
+    background_color = VCS_BLACK;
 }
 
 void spawn_new_enemy(char type, char spec)
@@ -174,7 +177,7 @@ void spawn_new_enemy(char type, char spec)
         enemy_state[X] = 0;
         enemy_counter[X] = 0;
         i = X;
-        r = multisprite_new(16, spec, 12, 3);
+        r = multisprite_new(16, spec, -12, 3);
         X = i;
         if (r == -1) {
             enemy_type[X] = 0; // No room left for this enemy
@@ -270,7 +273,6 @@ void game_move_enemies()
 
 void game_scenario()
 {
-    game_counter++;
     if (!(game_counter & 1)) {
         spawn_new_enemy(1, 60);
     }
@@ -281,22 +283,12 @@ void game_over()
     char i;
     // Destroy all enemies
     for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
-        if (enemy_type[X]) {
-            i = X;
-            multisprite_delete(enemy_sprite[X]);
-            X = i;
-            enemy_type[X] = 0;
-        }
+        enemy_type[X] = 0;
     }
     // Destroy missile
-    if (missile_sprite != MS_UNALLOCATED) {
-        multisprite_delete(missile_sprite);
-        missile_sprite = MS_UNALLOCATED;
-    }
-    // Destroy ship
-    multisprite_delete(0);
-    player_state = 2;
+    missile_sprite = MS_UNALLOCATED;
 
+    multisprite_clear();
     multisprite_new(9, 80 - 19, 50, 0);
     multisprite_new(10, 80 - 9, 50, 0);
     multisprite_new(11, 80 + 1, 50, 0);
@@ -307,6 +299,8 @@ void game_over()
     multisprite_new(15, 80 + 11, 100, 0);
 
     game_state = GAME_OVER;
+    game_counter = 0;
+    background_color = VCS_RED;
 }
 
 void lose_one_life()
@@ -401,6 +395,19 @@ void game_logic()
     }
 }
 
+void game_wait_for_restart()
+{
+    if (game_counter >= 3) {
+        game_counter = 3;
+        if (!(*INPT4 & 0x80)) {
+            if (!button_pressed) {
+                button_pressed = 1;
+                game_init();
+            }
+        } else button_pressed = 0;
+    }
+}
+
 void main()
 {
 #ifdef DEBUG
@@ -409,7 +416,6 @@ void main()
 #endif
 
     char scrolling = 0;
-    multisprite_init(playfield);
     game_init();
 
     do {
@@ -425,6 +431,7 @@ void main()
         // Do some logic here
         if (game_state == GAME_STARTED) 
             game_logic();
+        else game_wait_for_restart();
 
         ms_scenery = playfield - MS_OFFSET + 12;
         ms_scenery += scrolling;
@@ -457,7 +464,8 @@ void main()
         prepare_background(scrolling);
         scrolling -= 2;
         if (scrolling < 0) {
-            scrolling = 82;
+            scrolling = 80;
+            game_counter++;
             if (game_state == GAME_STARTED) 
                 game_scenario();
         }
