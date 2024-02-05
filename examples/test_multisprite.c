@@ -12,7 +12,7 @@ const char garfield[24] = { 0, 0, 0x12, 0x36, 0x4a, 0x33, 0x55, 0x33, 0xcb, 0xb6
 const char garfield_colors[22] = { 0, 0, 0x3c, 0x3c, 0x3c, 0x0e, 0x0e, 0x0e, 0x3c, 0x3c, 0x3c, 0x3c, 0x38, 0x2c, 0x3c, 0x3c, 0x38, 0x38, 0x2c, 0x2c, 0x12, 0x12}; \
 const char *ms_grptr[MS_NB_SPRITES_DEF] = {garfield}; \
 const char *ms_coluptr[MS_NB_SPRITES_DEF] = {garfield_colors}; \
-const char ms_height[MS_NB_SPRITES_DEF] = {24};
+const char ms_height[MS_NB_SPRITES_DEF] = {23};
 
 const char playfield[192 + 32] = {
     VCS_RED, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_LGREEN, REG_COLUBK, VCS_YELLOW, REG_COLUBK, 

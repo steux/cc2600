@@ -600,6 +600,8 @@ MS_KERNEL_BANK void _ms_void_kernel(char stop)
 {
     // [45/76] when coming from no sprite 0 & 1 left to display
     strobe(WSYNC);                  // 3
+//    *GRP0 = 0;
+//    *GRP1 = 0;
     ms_v = ms_scenery[Y];           // 9
     Y++;                            // 2
     X = ms_scenery[Y++];            // 10 
@@ -983,7 +985,7 @@ display_sprite1:
             } else {
                 if (ms_tmp1 >= MS_END_OF_SCREEN) {
                     _ms_p0_p1_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
-                    goto check_collisions_and_return;
+                    goto check_collisions_and_return_immediately;
                 }
                 _ms_p0_p1_kernel(ms_tmp1);
                 if (Y < ms_tmp0) {
@@ -999,7 +1001,6 @@ display_sprite1:
             // This is the end of the multisprite kernel.Fill with void.
 finish:
             if (Y < MS_OFFSET + MS_PLAYFIELD_HEIGHT)
-finish2:
                 _ms_void_kernel(MS_OFFSET + MS_PLAYFIELD_HEIGHT);
             goto check_collisions_and_return;
         }
@@ -1015,6 +1016,9 @@ repo_try_again:
     if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 6) goto finish;
     goto repo0_try_again;
 check_collisions_and_return:
+    *GRP0 = 0;
+    *GRP1 = 0;
+check_collisions_and_return_immediately:
     _ms_check_collisions();
 }
 
