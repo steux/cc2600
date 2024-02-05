@@ -49,29 +49,37 @@ MS_KERNEL_BANK const char *ms_coluptr[MS_NB_SPRITES_DEF] = {spaceship_colors, me
     spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors, spaceship_colors, invader1_colors }; \
 MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {19, 15, 15, 15, 15, 15, 15, 15, 27, 19, 19, 19, 19, 19, 19, 19, 15};
 
+#define MS_OFFSCREEN_DATA \
+const char sprite_width[8] = {8, 24, 40, 40, 72, 16, 72, 32}; \
+const char sprite_is_one_invader[8] = {1, 0, 0, 0, 0, 1, 0, 1}; \
+const char invader_score[2] = {0, 100}; \
+const char sprite_new_nusiz_remove_left[7] = {0, 0, 0, 1, 0, 0, 0}; \
+const char sprite_offset_remove_left[7] = {0, 16, 32, 16, 64, 0, 32}; \
+const char sprite_new_nusiz_remove_right[7] = {0, 0, 0, 1, 0, 0, 2};
+
 MS_KERNEL_BANK const char playfield[] = {
-    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_GREEN, REG_COLUPF,
+    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_BLUE, REG_COLUPF,
     0xfc, REG_PF2, 0xff, REG_PF2, 0x03, REG_PF1, 0x0f, REG_PF1, 0x1f, REG_PF1, 0x3f, REG_PF1, 0x7f, REG_PF1, 0xff, REG_PF1,
     0x80, REG_PF0, 0, REG_PF2, 0xc0, REG_PF0, 0xf0, REG_PF1, 0xe0, REG_PF0, 0xe0, REG_PF1, 0xc0, REG_PF1,
     0xf0, REG_PF0, 0x80, REG_PF1, VCS_WHITE, REG_COLUPF, 0x00, REG_PF1, 1, REG_CTRLPF, 0x70, REG_PF0, VCS_LGREY, REG_COLUPF,
     0xf0, REG_PF0, 0xe0, REG_PF0, 0xc0, REG_PF1, VCS_GREY, REG_COLUPF, 0xf0, REG_PF1, 0xc0, REG_PF0, 0xff, REG_PF1, 0x0, REG_PF0, 0xff, REG_PF2,
     0x0f, REG_PF1, 0x04, REG_COLUPF, 0, REG_PF1, 0, REG_PF2,
 
-    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_GREEN, REG_COLUPF,
+    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_BLUE, REG_COLUPF,
     0xfc, REG_PF2, 0xff, REG_PF2, 0x03, REG_PF1, 0x0f, REG_PF1, 0x1f, REG_PF1, 0x3f, REG_PF1, 0x7f, REG_PF1, 0xff, REG_PF1,
     0x80, REG_PF0, 0, REG_PF2, 0xc0, REG_PF0, 0xf0, REG_PF1, 0xe0, REG_PF0, 0xe0, REG_PF1, 0xc0, REG_PF1,
     0xf0, REG_PF0, 0x80, REG_PF1, VCS_WHITE, REG_COLUPF, 0x00, REG_PF1, 1, REG_CTRLPF, 0x70, REG_PF0, VCS_LGREY, REG_COLUPF,
     0xf0, REG_PF0, 0xe0, REG_PF0, 0xc0, REG_PF1, VCS_GREY, REG_COLUPF, 0xf0, REG_PF1, 0xc0, REG_PF0, 0xff, REG_PF1, 0x0, REG_PF0, 0xff, REG_PF2,
     0x0f, REG_PF1, 0x04, REG_COLUPF, 0, REG_PF1, 0, REG_PF2,
 
-    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_GREEN, REG_COLUPF,
+    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_BLUE, REG_COLUPF,
     0xfc, REG_PF2, 0xff, REG_PF2, 0x03, REG_PF1, 0x0f, REG_PF1, 0x1f, REG_PF1, 0x3f, REG_PF1, 0x7f, REG_PF1, 0xff, REG_PF1,
     0x80, REG_PF0, 0, REG_PF2, 0xc0, REG_PF0, 0xf0, REG_PF1, 0xe0, REG_PF0, 0xe0, REG_PF1, 0xc0, REG_PF1,
     0xf0, REG_PF0, 0x80, REG_PF1, VCS_WHITE, REG_COLUPF, 0x00, REG_PF1, 1, REG_CTRLPF, 0x70, REG_PF0, VCS_LGREY, REG_COLUPF,
     0xf0, REG_PF0, 0xe0, REG_PF0, 0xc0, REG_PF1, VCS_GREY, REG_COLUPF, 0xf0, REG_PF1, 0xc0, REG_PF0, 0xff, REG_PF1, 0x0, REG_PF0, 0xff, REG_PF2,
     0x0f, REG_PF1, 0x04, REG_COLUPF, 0, REG_PF1, 0, REG_PF2,
 
-    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_GREEN, REG_COLUPF,
+    5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLACK, REG_COLUBK, VCS_BLUE, REG_COLUPF,
     0xfc, REG_PF2, 0xff, REG_PF2, 0x03, REG_PF1, 0x0f, REG_PF1, 0x1f, REG_PF1, 0x3f, REG_PF1, 0x7f, REG_PF1, 0xff, REG_PF1,
     0x80, REG_PF0, 0, REG_PF2, 0xc0, REG_PF0, 0xf0, REG_PF1, 0xe0, REG_PF0, 0xe0, REG_PF1, 0xc0, REG_PF1,
     0xf0, REG_PF0, 0x80, REG_PF1, VCS_WHITE, REG_COLUPF, 0x00, REG_PF1, 1, REG_CTRLPF, 0x70, REG_PF0, VCS_LGREY, REG_COLUPF,
@@ -116,7 +124,7 @@ EXTRA_RAM int score;
 EXTRA_RAM char update_score;
 EXTRA_RAM unsigned int game_counter;
 #define MAX_NB_ENEMIES 3
-EXTRA_RAM char enemy_xpos[MAX_NB_ENEMIES], enemy_ypos[MAX_NB_ENEMIES], enemy_sprite[MAX_NB_ENEMIES], enemy_type[MAX_NB_ENEMIES], enemy_nusiz[MAX_NB_ENEMIES], enemy_state[MAX_NB_ENEMIES], enemy_counter[MAX_NB_ENEMIES];
+EXTRA_RAM char enemy_sprite[MAX_NB_ENEMIES], enemy_type[MAX_NB_ENEMIES], enemy_state[MAX_NB_ENEMIES], enemy_counter[MAX_NB_ENEMIES];
   
 #ifdef DEBUG
 char min_timer_vblank;
@@ -158,13 +166,10 @@ void spawn_new_enemy(char type, char spec)
     
     if (type == 1) {
         enemy_type[X] = 1;
-        enemy_ypos[X] = -12;
-        enemy_xpos[X] = spec;
         enemy_state[X] = 0;
         enemy_counter[X] = 0;
-        enemy_nusiz[X] = 3;
         i = X;
-        r = multisprite_new(16, spec, 0, 3);
+        r = multisprite_new(16, spec, 12, 3);
         X = i;
         if (r == -1) {
             enemy_type[X] = 0; // No room left for this enemy
@@ -174,20 +179,84 @@ void spawn_new_enemy(char type, char spec)
     }
 }
 
+void check_shot_at_enemy()
+{
+    char i, my = ms_sprite_y[X = missile_sprite];
+    char my2 = my - 12;
+    char mx = ms_sprite_x[X];
+    char mx2 = mx + 7;
+    char hit = 0;
+    for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
+        if (enemy_type[X]) {
+            Y = enemy_sprite[X];
+            if (ms_sprite_y[Y] < my && ms_sprite_y[Y] >= my2) {
+                // We are at the right height
+                i = X;
+                char l = sprite_width[X = ms_nusiz[Y] & 7];
+                if (mx2 >= ms_sprite_x[Y] && mx < ms_sprite_x[Y] + l) {
+                    // Let's see if we hit one of these invaders
+                    if (sprite_is_one_invader[X]) {
+                        hit = 1;
+                        X = i;
+                        X = enemy_type[X];
+                        score += invader_score[X];
+                        X = i;
+                        enemy_type[X] = 0;
+                        multisprite_delete(Y);
+                    } else {
+                        // Let's see if we hit the left side
+                        if (mx < ms_sprite_x[Y] + 8) {
+                            // Yes !
+                            hit = 1;
+                            // Let's reduce the size of this invader
+                            ms_nusiz[Y] = sprite_new_nusiz_remove_left[X];
+                            ms_sprite_x[Y] += sprite_offset_remove_left[X];
+                        } else if (mx2 >= ms_sprite_x[Y] + l - 8) {
+                            // Yes. Wi hit the right side
+                            hit = 1;
+                            // Let's reduce the size of this invader
+                            ms_nusiz[Y] = sprite_new_nusiz_remove_right[X];
+                        } else if (X == 3 && mx2 >= ms_sprite_x[Y] + 16 && mx < ms_sprite_x[Y] + 24) {
+                            // Yes. Wi hit the right side
+                            hit = 1;
+                            // Let's reduce the size of this invader
+                            ms_nusiz[Y] = 2;
+                        } else if (X == 6 && mx2 >= ms_sprite_x[Y] + 32 && mx < ms_sprite_x[Y] + 40) {
+                            // Yes. Wi hit the right side
+                            hit = 1;
+                            // Let's reduce the size of this invader
+                            ms_nusiz[Y] = 4;
+                        }
+                    }
+                    if (hit) { 
+                        multisprite_delete(missile_sprite);
+                        missile_sprite = MS_UNALLOCATED;
+                        score += 1;
+                        update_score = 1;
+                        break;
+                    }
+                }
+                X = i;
+            }
+        }
+    }
+}
+
 void game_move_enemies()
 {
-    char i;
+    char i, ny;
     for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
         if (enemy_type[X] == 1) {
-            enemy_ypos[X] += 1;
-            if (enemy_ypos[X] == 170) {
+            Y = enemy_sprite[X];
+            ny = ms_sprite_y[Y] + (1 - MS_OFFSET);
+            if (ny == 170) {
                 i = X;
-                multisprite_delete(enemy_sprite[X]);
+                multisprite_delete(Y);
                 X = i;
                 enemy_type[X] = 0;
             } else {
                 i = X;
-                multisprite_move(enemy_sprite[X], enemy_xpos[X], enemy_ypos[X]); 
+                multisprite_move(Y, -1, ny); 
                 X = i;
             }    
         }
@@ -197,10 +266,8 @@ void game_move_enemies()
 void game_scenario()
 {
     game_counter++;
-    if (game_counter < 10) {
-        if (game_counter == 1 || game_counter == 3 || game_counter == 5) {
-            spawn_new_enemy(1, 60);
-        }
+    if (!(game_counter & 1)) {
+        spawn_new_enemy(1, 60);
     }
 }
 
@@ -237,6 +304,7 @@ void game_logic()
     else { ms_sprite_model[X] = 0; } 
     multisprite_move(0, player_xpos, player_ypos);
 
+    // Player management
     if (player_state == 0) {
         // Check collision with playfield
         if (ms_nusiz[X = 0] & MS_PF_COLLISION) {
@@ -268,6 +336,7 @@ void game_logic()
         }
     }
 
+    // Missile management
     if (missile_sprite != MS_UNALLOCATED) {
         X = missile_sprite;
         // Check for collision 
@@ -277,6 +346,8 @@ void game_logic()
                 missile_sprite = MS_UNALLOCATED;
             }
         }
+        // Check if an enemy was destroyed
+        check_shot_at_enemy();
     }
     if (missile_sprite != MS_UNALLOCATED) {
         X = missile_sprite;
@@ -285,7 +356,7 @@ void game_logic()
             multisprite_delete(missile_sprite);
             missile_sprite = MS_UNALLOCATED;
         } else {
-            multisprite_move(missile_sprite, -1, y);
+            multisprite_move(missile_sprite, -1 /* Go straight */, y);
         }
     }
 
@@ -339,6 +410,7 @@ void main()
         // Overscan
         strobe(WSYNC);
         *COLUBK = VCS_RED;
+        *GRP0 = 0; *GRP1 = 0;
         *PF0 = 0; *PF1 = 0; *PF2 = 0;
         *COLUP0 = VCS_WHITE; *COLUP1 = VCS_WHITE;
          

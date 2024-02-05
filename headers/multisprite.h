@@ -161,7 +161,8 @@ MS_OFFSCREEN_BANK void multisprite_delete(char i)
 MS_OFFSCREEN_BANK void multisprite_move(char i, char nx, char ny)
 {
     char j;
-    if (nx != -1)  ms_sprite_x[X = i] = nx;
+    X = i;
+    if (nx != -1)  ms_sprite_x[X] = nx;
     ny += MS_OFFSET;
     if (ms_sprite_y[X] == ny) return; // No vertical move, so nothing to check
 
@@ -1010,8 +1011,6 @@ repo_try_again:
     if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 6) goto finish;
     goto repo0_try_again;
 check_collisions_and_return:
-    *GRP0 = 0;
-    *GRP1 = 0;
     _ms_check_collisions();
 }
 
