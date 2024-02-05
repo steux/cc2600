@@ -117,7 +117,12 @@ EXTRA_RAM char update_score;
 EXTRA_RAM unsigned int game_counter;
 #define MAX_NB_ENEMIES 3
 EXTRA_RAM char enemy_xpos[MAX_NB_ENEMIES], enemy_ypos[MAX_NB_ENEMIES], enemy_sprite[MAX_NB_ENEMIES], enemy_type[MAX_NB_ENEMIES], enemy_nusiz[MAX_NB_ENEMIES], enemy_state[MAX_NB_ENEMIES], enemy_counter[MAX_NB_ENEMIES];
-    
+  
+#ifdef DEBUG
+char min_timer_vblank;
+char min_timer_overscan;
+#endif
+
 MK_BANK update_lives_display()
 {
     X = nb_lives; 
@@ -296,6 +301,11 @@ void game_logic()
 
 void main()
 {
+#ifdef DEBUG
+    min_timer_overscan = 255;
+    min_timer_vblank = 255;
+#endif
+
     char scrolling = 0;
     multisprite_init(playfield);
     game_init();
@@ -318,7 +328,10 @@ void main()
         ms_scenery += scrolling;
 
         multisprite_kernel_prep();
-        
+       
+#ifdef DEBUG
+        if (*INTIM < min_timer_vblank) min_timer_vblank = *INTIM;
+#endif 
         while (*INTIM); // Wait for end of blank
  
         multisprite_kernel();
@@ -351,6 +364,9 @@ void main()
             update_score = 0;
         }
 
+#ifdef DEBUG
+        if (*INTIM < min_timer_overscan) min_timer_overscan = *INTIM;
+#endif 
         while (*INTIM); // Wait for end of overscan
     } while(1);
 }
