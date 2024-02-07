@@ -12,29 +12,24 @@
 #define EXTRA_RAM
 #endif
 
-char *_sfx_instrument;
 EXTRA_RAM char *_sfx_ptr[2];
-EXTRA_RAM char _sfx_fram;
+EXTRA_RAM char _sfx_frames[2];
 EXTRA_RAM char _sfx_priority[2];
 EXTRA_RAM char _sfx_tick[2];
 
 void sfx_init()
 {
-    _sfx_ptr[0] = NULL;
-    _sfx_ptr[1] = NULL;
+    _sfx_ptr[0] = 0;
+    _sfx_ptr[1] = 0;
 }
 
-#define sfx_schedule(ptr) \
-    _sfx_instrument = (ptr); \
-    _sfx_schedule();
-
-void _sfx_schedule()
+void sfx_schedule(char *_sfx_instrument)
 {
 #define channel X 
     channel = 0;
     if (_sfx_instrument[Y = 0] == 0x10) { // TIA sound
-        if (_sfx_ptr[0] == NULL) channel = 1;
-        else if (_sfx_ptr[1] == NULL) channel = 2;
+        if (_sfx_ptr[0] == 0) channel = 1;
+        else if (_sfx_ptr[1] == 0) channel = 2;
         else if (_sfx_instrument[++Y]) {
             if (_sfx_priority[1] < _sfx_priority[0]) {
                 channel = 2;
@@ -56,8 +51,8 @@ void _sfx_schedule()
 
 void sfx_mute()
 {
-    _sfx_ptr[0] = NULL;
-    _sfx_ptr[1] = NULL;
+    _sfx_ptr[0] = 0;
+    _sfx_ptr[1] = 0;
      for (X = 3; X >= 0; X--)
          AUDF0[X] = 0;
 }

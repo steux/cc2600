@@ -2,11 +2,11 @@
 // Copyright 2016 Andre "Kylearan" Wichmann
 // Website: https://bitbucket.org/kylearan/tiatracker
 // Email: andre.wichmann@gmx.de
-;
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-;
+//
 //   http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
@@ -376,7 +376,7 @@ tt_Bit6Set:     ; This opcode has bit #6 set, for use with bit instruction
 ==== ASSEMBLER END ====
 #endif // __TIA_TRACKER_H__
 
-inline void tia_tracker_play()
+void tia_tracker_play()
 {
     asm("jsr tt_Player", 3);
 }
