@@ -176,19 +176,20 @@ MK_BANK void mini_kernel_position_sprites_center()
 MK_BANK void mini_kernel_display_text(char *line, char sizey)
 {
     char i, j;
+    strobe(WSYNC);
     i = line;
-    X = line >> 8;
-    mk_s0 = i | (X << 8);
+    j = line >> 8;
+    mk_s0 = i | (j << 8);
     i += sizey;
-    mk_s1 = i | (X << 8);
+    mk_s1 = i | (j << 8);
     i += sizey;
-    mk_s2 = i | (X << 8);
+    mk_s2 = i | (j << 8);
     i += sizey;
-    mk_s3 = i | (X << 8);
+    mk_s3 = i | (j << 8);
     i += sizey;
-    mk_s4 = i | (X << 8);
+    mk_s4 = i | (j << 8);
     i += sizey;
-    mk_s5 = i | (X << 8);
+    mk_s5 = i | (j << 8);
 
     strobe(WSYNC);
     Y = sizey;
