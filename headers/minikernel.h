@@ -52,6 +52,8 @@ MK_BANK const char *_mk_digits[10] = {
     _mk_digits_font + 56,
     _mk_digits_font + 63
 };
+#else
+MK_BANK const char *_mk_digits[1] = { 0 };
 #endif
 
 MK_BANK void mini_kernel_update_score_4_digits(int score)
@@ -146,6 +148,73 @@ MK_BANK void mini_kernel_6_sprites()
     *VDELP1 = 0;
     *GRP0 = 0;
     *GRP1 = 0;
+}
+
+MK_BANK void mini_kernel_position_sprites_center()
+{
+    strobe(WSYNC);
+    
+    *COLUBK = 0;
+    *GRP0 = 0;
+    *GRP1 = 0;
+    *REFP0 = 0;
+    *REFP1 = 0;
+    *HMP1 = 0x90; 
+    *HMP0 = 0x80;
+    csleep(7);
+    strobe(RESP0);
+    strobe(RESP1);
+    strobe(WSYNC);
+    
+    strobe(HMOVE); // 3
+    *VDELP0 = 1;
+    *VDELP1 = 1;
+    *NUSIZ0 = 0x33;
+    *NUSIZ1 = 0x33;
+}
+
+MK_BANK void mini_kernel_display_text(char *line, char sizey)
+{
+    char i, j;
+    i = line;
+    X = line >> 8;
+    mk_s0 = i | (X << 8);
+    i += sizey;
+    mk_s1 = i | (X << 8);
+    i += sizey;
+    mk_s2 = i | (X << 8);
+    i += sizey;
+    mk_s3 = i | (X << 8);
+    i += sizey;
+    mk_s4 = i | (X << 8);
+    i += sizey;
+    mk_s5 = i | (X << 8);
+
+    strobe(WSYNC);
+    Y = sizey;
+    Y--;
+    csleep(7);
+    do {
+        *GRP0 = mk_s0[Y];
+        strobe(WSYNC);
+        *GRP1 = mk_s1[Y];
+        i = Y;          // 3
+        *GRP0 = mk_s2[Y];
+        X = mk_s4[Y];
+        j = mk_s5[Y];
+        load(mk_s3[Y]);
+        Y = j;
+        store(*GRP1);
+        *GRP0 = X;
+        *GRP1 = Y;
+        strobe(GRP0);
+        Y = i;
+        Y--;
+    } while (Y >= 0);
+    
+    *GRP0 = 0;
+    *GRP1 = 0;
+    *GRP0 = 0;
 }
 
 #endif // __MINIKERNEL_H__
