@@ -4,9 +4,8 @@
 
 unsigned char X, Y;
 
-#define BLANK 40
-#define KERNAL 192
-#define OVERSCAN 30
+#define BLANK 39 
+#define OVERSCAN 29
 
 bank3 {
 void sfx_schedule_bank3(char *_sfx_instrument)
@@ -1299,7 +1298,7 @@ const char sfx_quack[42] = {
 };
 }
 
-const char *array_data[117] = {
+const char *sounds[117] = {
 	sfx_salvolasershot, sfx_spaceinvshoot, sfx_berzerkrobotdeath, sfx_echo1, sfx_echo2, sfx_jumpman, sfx_cavalry, sfx_alientrill1,
 	sfx_alientrill2, sfx_pitfalljump, sfx_advpickup, sfx_advdrop, sfx_advbite, sfx_advdragonslain, sfx_bling, sfx_dropmedium,
 	sfx_electrobump, sfx_explosion, sfx_humanoid, sfx_transporter, sfx_twinkle, sfx_electroswitch, sfx_nonobounce, sfx_70stvcomputer,
@@ -2189,9 +2188,16 @@ const char line116[42] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+const char empty[42] = {
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 }
 
-const char *lines[117] = { 
+const char *lines[120] = { 
     line0, line1, line2, line3, line4, line5, line6, line7, line8, line9,
     line10, line11, line12, line13, line14, line15, line16, line17, line18, line19,
     line20, line21, line22, line23, line24, line25, line26, line27, line28, line29,
@@ -2203,11 +2209,12 @@ const char *lines[117] = {
     line80, line21, line22, line23, line24, line25, line26, line27, line28, line29,
     line90, line91, line92, line93, line94, line95, line96, line97, line98, line99,
     line100, line101, line102, line103, line104, line105, line106, line107, line108, line109,
-    line110, line111, line112, line113, line114, line115, line116};
+    line110, line111, line112, line113, line114, line115, line116, empty, empty, empty};
 
 void main()
 {
-    char i, j, sfxtop = 0;
+    char playing = 0, j, sfxtop = 0, selected = 0;
+    char button_pressed = 0, moved = 0;
     mini_kernel_position_sprites_center();
     *COLUP0 = VCS_WHITE;
     *COLUP1 = VCS_WHITE;
@@ -2222,30 +2229,55 @@ void main()
         *VSYNC = 0; // Turn VSYNC Off
         
         // Blank
-        *TIM64T = ((BLANK - 3) * 76) / 64 + 1;
+        *TIM64T = ((BLANK - 3) * 76) / 64;
         // Do some logic here
+    
+        if (!moved) {
+            if (!(*SWCHA & 0x80)) { moved = 1; sfxtop += 15; if (sfxtop >= 117) sfxtop = 0; } // Right
+            if (!(*SWCHA & 0x40)) { moved = 1; sfxtop -= 15; if (sfxtop < 0) sfxtop = 105; } // Left
+            if (!(*SWCHA & 0x20)) { moved = 1; if (selected < 14) selected++; } // Down
+            if (!(*SWCHA & 0x10)) { moved = 1; if (selected >= 1) selected--; } // Up
+        }
+        if ((*SWCHA & 0xf0) == 0xf0) moved = 0;
 
-        Y = KERNAL; // Initialize line counter
+        if (!(*INPT4 & 0x80)) {
+            if (!button_pressed) {
+                button_pressed = 1;
+                X = sfxtop + selected;
+                playing = X;
+                if (X < 30) {
+                    sfx_schedule_bank3(sounds[X]);
+                } else if (X < 60) {
+                    sfx_schedule_bank4(sounds[X]);
+                } else if (X < 90) {
+                    sfx_schedule_bank5(sounds[X]);
+                } else sfx_schedule_bank6(sounds[X]);
+            }
+        } else button_pressed = 0;
 
-        // Do some extra logic
-        
+        j = 0;
+        if (!selected) {
+            *COLUP0 = VCS_RED;
+            *COLUP1 = VCS_RED;
+        }
         while (*INTIM);
         
         // Image drawing
         strobe(WSYNC);
         *VBLANK = 0;
-        j = 0;
         do {
-            i = Y;
             mini_kernel_display_text(lines[X = sfxtop + j] , 7);
-            Y = i - 12;
-            j++;
-        } while (Y >= 13);
-
-        do {
             strobe(WSYNC);
-            Y--;
-        } while (Y);
+            if (j == selected) {
+                *COLUP0 = VCS_WHITE;
+                *COLUP1 = VCS_WHITE;
+            }
+            j++;
+            if (j == selected) {
+                *COLUP0 = VCS_RED;
+                *COLUP1 = VCS_RED;
+            }
+        } while (j != 15);
 
         // Last line is out of loop and is generally simpler
         strobe(WSYNC);
@@ -2255,6 +2287,15 @@ void main()
         *VBLANK = 2; // Enable VBLANK
         *TIM64T = (OVERSCAN * 76) / 64;
         // Do some logic here
+        X = playing;
+        if (X < 30) {
+            sfx_play_bank3();
+        } else if (X < 60) {
+            sfx_play_bank4();
+        } else if (X < 90) {
+            sfx_play_bank5();
+        } else sfx_play_bank6();
+        
         while (*INTIM);
     }
 }
