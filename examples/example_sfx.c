@@ -2191,12 +2191,27 @@ const char line116[42] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 }
 
+const char *lines[117] = { 
+    line0, line1, line2, line3, line4, line5, line6, line7, line8, line9,
+    line10, line11, line12, line13, line14, line15, line16, line17, line18, line19,
+    line20, line21, line22, line23, line24, line25, line26, line27, line28, line29,
+    line30, line31, line32, line33, line34, line35, line36, line37, line38, line39,
+    line40, line41, line42, line43, line44, line45, line46, line47, line48, line49,
+    line50, line51, line52, line53, line54, line55, line56, line57, line58, line59,
+    line60, line61, line62, line63, line64, line65, line66, line67, line68, line69,
+    line70, line71, line72, line73, line74, line75, line76, line77, line78, line79,
+    line80, line21, line22, line23, line24, line25, line26, line27, line28, line29,
+    line90, line91, line92, line93, line94, line95, line96, line97, line98, line99,
+    line100, line101, line102, line103, line104, line105, line106, line107, line108, line109,
+    line110, line111, line112, line113, line114, line115, line116};
+
 void main()
 {
-    char i;
+    char i, j, sfxtop = 0;
     mini_kernel_position_sprites_center();
     *COLUP0 = VCS_WHITE;
     *COLUP1 = VCS_WHITE;
+    *COLUBK = VCS_GREY;
 
     while(1) {
         *VBLANK = 2; // Disable VBLANK
@@ -2219,29 +2234,13 @@ void main()
         // Image drawing
         strobe(WSYNC);
         *VBLANK = 0;
-        Y--;
+        j = 0;
         do {
-            strobe(WSYNC);
-            Y--;
-        } while (Y >= 110);
-
-        i = Y;
-        *COLUP0 = VCS_BLUE;
-        *COLUP1 = VCS_BLUE;
-        mini_kernel_display_text(line0, 7);
-        Y = i - 11;
-
-        i = Y;
-        *COLUP0 = VCS_WHITE;
-        *COLUP1 = VCS_WHITE;
-        mini_kernel_display_text(line0, 7);
-        Y = i - 11;
-
-        i = Y;
-        *COLUP0 = VCS_RED;
-        *COLUP1 = VCS_RED;
-        mini_kernel_display_text(line0, 7);
-        Y = i - 11;
+            i = Y;
+            mini_kernel_display_text(lines[X = sfxtop + j] , 7);
+            Y = i - 12;
+            j++;
+        } while (Y >= 13);
 
         do {
             strobe(WSYNC);
