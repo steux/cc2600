@@ -22,9 +22,7 @@ void main()
 {
     char i;
     mini_kernel_position_sprites_center();
-    *COLUP0 = VCS_WHITE;
-    *COLUP1 = VCS_WHITE;
-
+    
     while(1) {
         *VBLANK = 2; // Disable VBLANK
         *VSYNC = 2; // Set VSYNC

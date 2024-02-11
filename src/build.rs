@@ -707,9 +707,9 @@ Powerup
                                     } else {
                                         gstate.write(&format!(">{}", i.0))?;
                                     }
-                                    if counter % 8 != 0 && counter < 2 * arr.len() {
-                                        gstate.write(", ")?;
-                                    }
+                                }
+                                if counter % 8 != 0 && counter < 2 * arr.len() {
+                                    gstate.write(", ")?;
                                 }
                             } 
                             gstate.write("\n")?;
