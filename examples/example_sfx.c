@@ -2231,12 +2231,31 @@ void main()
         // Blank
         *TIM64T = ((BLANK - 3) * 76) / 64;
         // Do some logic here
-    
+   
+        // Joystick navigation in sounds list 
         if (!moved) {
-            if (!(*SWCHA & 0x80)) { moved = 1; sfxtop += 15; if (sfxtop >= 117) sfxtop = 0; } // Right
-            if (!(*SWCHA & 0x40)) { moved = 1; sfxtop -= 15; if (sfxtop < 0) sfxtop = 105; } // Left
-            if (!(*SWCHA & 0x20)) { moved = 1; if (selected < 14) selected++; } // Down
-            if (!(*SWCHA & 0x10)) { moved = 1; if (selected >= 1) selected--; } // Up
+            if (!(*SWCHA & 0x80)) { // Right 
+                moved = 1; 
+                sfxtop += 15; 
+                if (sfxtop >= 117) sfxtop = 0;
+                else if (sfxtop + selected >= 117) selected = 116 - sfxtop;
+            } // Right
+            if (!(*SWCHA & 0x40)) { // Left
+                moved = 1;
+                sfxtop -= 15; 
+                if (sfxtop < 0) {
+                    sfxtop = 105; 
+                    if (sfxtop + selected >= 117) selected = 116 - sfxtop;
+                } // Left
+            } 
+            if (!(*SWCHA & 0x20)) { // Down
+                moved = 1; 
+                if (selected < 14 && sfxtop + selected < 116) selected++; 
+            } // Down
+            if (!(*SWCHA & 0x10)) { // Top
+                moved = 1; 
+                if (selected >= 1) selected--; 
+            } // Up
         }
         if ((*SWCHA & 0xf0) == 0xf0) moved = 0;
 
@@ -2266,7 +2285,12 @@ void main()
         strobe(WSYNC);
         *VBLANK = 0;
         do {
-            mini_kernel_display_text(lines[X = sfxtop + j] , 7);
+            X = sfxtop + j;
+            if (X < 60) {
+                mini_kernel_display_text(lines[X] , 7);
+            } else {
+                mini_kernel_display_text_bank2(lines[X] , 7);
+            }
             strobe(WSYNC);
             if (j == selected) {
                 *COLUP0 = VCS_WHITE;
