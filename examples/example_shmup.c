@@ -171,14 +171,14 @@ void game_init()
 
 void spawn_new_enemy(char type, char spec)
 {
-    char i, r;
+    char i, r, s;
     for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
         if (!enemy_type[X]) break;
     }
     if (X < 0) return; // No room for this enemy
     
+    enemy_type[X] = type;
     if (type == 1) {
-        enemy_type[X] = 1;
         enemy_state[X] = 0;
         enemy_counter[X] = 0;
         i = X;
@@ -189,23 +189,38 @@ void spawn_new_enemy(char type, char spec)
         } else {
             enemy_sprite[X] = r;
         }
+    } else if (type == 2) {
+        enemy_type[X] = 2;
+        enemy_counter[X] = 0;
+        i = X;
+        r = multisprite_new(SPRITE_BIGBOSS, spec, -30, 5);
+        s = multisprite_new(SPRITE_BIGBOSS, spec + 16, -30, 5 | MS_REFLECTED);
+        X = i;
+        if (r == -1) {
+            enemy_type[X] = 0; // No room left for this enemy
+        } else {
+            enemy_sprite[X] = r;
+            enemy_state[X] = s;
+        }
     }
 }
 
 void check_shot_at_enemy()
 {
-    char i, my = ms_sprite_y[X = missile_sprite];
+    char i, j, my = ms_sprite_y[X = missile_sprite];
     char my2 = my - 12;
     char mx = ms_sprite_x[X];
     char mx2 = mx + 7;
     char hit = 0;
     for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
         if (enemy_type[X]) {
+            j = (enemy_type[X] == 2);
             Y = enemy_sprite[X];
             if (ms_sprite_y[Y] < my && ms_sprite_y[Y] >= my2) {
                 // We are at the right height
                 i = X;
                 char l = sprite_width[X = ms_nusiz[Y] & 7];
+                if (j) l <<= 1;
                 if (mx2 >= ms_sprite_x[Y] && mx < ms_sprite_x[Y] + l) {
                     // Let's see if we hit one of these invaders
                     if (sprite_is_one_invader[X]) {
@@ -216,6 +231,11 @@ void check_shot_at_enemy()
                         X = i;
                         enemy_type[X] = 0;
                         multisprite_delete(Y);
+                        if (j) { // Double sprite enemy
+                            X = i;
+                            Y = enemy_state[X];
+                            multisprite_delete(Y);
+                        }
                     } else {
                         // Let's see if we hit the left side
                         if (mx < ms_sprite_x[Y] + 8) {
@@ -262,6 +282,12 @@ void game_move_enemies()
     for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
         if (enemy_type[X] == 1) {
             Y = enemy_sprite[X];
+            enemy_counter[X] += 1;
+            if (enemy_counter[X] & 1) {
+                ms_nusiz[Y] |= MS_REFLECTED;
+            } else {
+                ms_nusiz[Y] &= ~MS_REFLECTED;
+            }
             ny = ms_sprite_y[Y] + (1 - MS_OFFSET);
             if (ny == 170) {
                 i = X;
@@ -273,6 +299,25 @@ void game_move_enemies()
                 multisprite_move(Y, -1, ny); 
                 X = i;
             }    
+        } else if (enemy_type[X] == 2) {
+            Y = enemy_sprite[X];
+            ny = ms_sprite_y[Y] + (1 - MS_OFFSET);
+            if (ny == 170) {
+                i = X;
+                multisprite_delete(Y);
+                X = i;
+                Y = enemy_state[X];
+                multisprite_delete(Y);
+                X = i;
+                enemy_type[X] = 0;
+            } else {
+                i = X;
+                multisprite_move(Y, -1, ny); 
+                X = i;
+                Y = enemy_state[X];
+                multisprite_move(Y, -1, ny); 
+                X = i;
+            }    
         }
     }
 }
@@ -280,7 +325,11 @@ void game_move_enemies()
 void game_scenario()
 {
     if (!(game_counter & 1)) {
-        spawn_new_enemy(1, 60);
+        if ((game_counter & 7) == 0) {
+            spawn_new_enemy(2, 60);
+        } else {
+            spawn_new_enemy(1, 60);
+        }
     }
 }
 
