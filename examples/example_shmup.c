@@ -47,12 +47,14 @@ const char sfx_bigboom[261] = {
 #define BLANK 40
 #define OVERSCAN 30
 
-#define REG_COLUPF  0x08
-#define REG_COLUBK  0x09
-#define REG_CTRLPF  0x0a // LSB: Playfield priority / Score mode / Reflective playfield
-#define REG_PF0     0x0d
-#define REG_PF1     0x0e
-#define REG_PF2     0x0f
+#define BULLET_L    0
+#define BULLET_BL   1
+#define BULLET_B    2
+#define BULLET_BR   3
+#define BULLET_R    4
+#define BULLET_TR   5
+#define BULLET_T    6
+#define BULLET_TL   7
 
 #define MS_OFFSCREEN_DATA \
 const char sprite_width[8] = {8, 24, 40, 40, 72, 16, 72, 32}; \
@@ -60,7 +62,17 @@ const char sprite_is_one_invader[8] = {1, 0, 0, 0, 0, 1, 0, 1}; \
 const char invader_score[2] = {100, 10}; \
 const char sprite_new_nusiz_remove_left[7] = {0, 0, 0, 1, 0, 0, 0}; \
 const char sprite_offset_remove_left[7] = {0, 16, 32, 16, 64, 0, 32}; \
-const char sprite_new_nusiz_remove_right[7] = {0, 0, 0, 1, 0, 0, 2};
+const char sprite_new_nusiz_remove_right[7] = {0, 0, 0, 1, 0, 0, 2}; \
+const signed char bullet_dx[8] = {-2, -1, 0, 1, 2, 1, 0, -1}; \
+const signed char bullet_dy[8] = {0, 2, 3, 2, 0, -2, -3, -2}; \
+const char bullet_start_direction[8] = {BULLET_BL, BULLET_B, BULLET_BR, BULLET_B, BULLET_L, BULLET_R, BULLET_TL, BULLET_TR};
+
+#define REG_COLUPF  0x08
+#define REG_COLUBK  0x09
+#define REG_CTRLPF  0x0a // LSB: Playfield priority / Score mode / Reflective playfield
+#define REG_PF0     0x0d
+#define REG_PF1     0x0e
+#define REG_PF2     0x0f
 
 MS_KERNEL_BANK const char playfield[] = {
     5, REG_CTRLPF, 0, REG_PF0, 0, REG_PF1, 0, REG_PF2, VCS_BLUE, REG_COLUPF,
@@ -120,18 +132,7 @@ EXTRA_RAM char background_color;
 #define MAX_NB_ENEMIES  3 
 EXTRA_RAM char enemy_sprite[MAX_NB_ENEMIES], enemy_type[MAX_NB_ENEMIES], enemy_state[MAX_NB_ENEMIES], enemy_counter[MAX_NB_ENEMIES];
 
-const signed char bullet_dx[8] = {-2, -1, 0, 1, 2, 1, 0, -1};
-const signed char bullet_dy[8] = {0, 2, 3, 2, 0, -2, -3, -2};
-#define BULLET_L    0
-#define BULLET_BL   1
-#define BULLET_B    2
-#define BULLET_BR   3
-#define BULLET_R    4
-#define BULLET_TR   5
-#define BULLET_T    6
-#define BULLET_TL   7
 #define MAX_NB_BULLETS  3 
-const char bullet_start_direction[8] = {BULLET_BL, BULLET_B, BULLET_BR, BULLET_B, BULLET_L, BULLET_R, BULLET_TL, BULLET_TR};
 EXTRA_RAM char bullet_sprite[MAX_NB_BULLETS], bullet_direction[MAX_NB_BULLETS];
   
 #ifdef DEBUG
