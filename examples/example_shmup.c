@@ -112,13 +112,27 @@ EXTRA_RAM char button_pressed;
 EXTRA_RAM char missile_sprite;
 EXTRA_RAM int score;
 EXTRA_RAM char update_score;
-EXTRA_RAM unsigned int game_counter;
+EXTRA_RAM char game_counter;
 EXTRA_RAM char game_state;
 EXTRA_RAM char background_color;
 #define GAME_STARTED    0
 #define GAME_OVER       1
 #define MAX_NB_ENEMIES  3 
 EXTRA_RAM char enemy_sprite[MAX_NB_ENEMIES], enemy_type[MAX_NB_ENEMIES], enemy_state[MAX_NB_ENEMIES], enemy_counter[MAX_NB_ENEMIES];
+
+const signed char bullet_dx[8] = {-2, -1, 0, 1, 2, 1, 0, -1};
+const signed char bullet_dy[8] = {0, 2, 3, 2, 0, -2, -3, -2};
+#define BULLET_L    0
+#define BULLET_BL   1
+#define BULLET_B    2
+#define BULLET_BR   3
+#define BULLET_R    4
+#define BULLET_TR   5
+#define BULLET_T    6
+#define BULLET_TL   7
+#define MAX_NB_BULLETS  3 
+const char bullet_start_direction[8] = {BULLET_BL, BULLET_B, BULLET_BR, BULLET_B, BULLET_L, BULLET_R, BULLET_TL, BULLET_TR};
+EXTRA_RAM char bullet_sprite[MAX_NB_BULLETS], bullet_direction[MAX_NB_BULLETS];
   
 #ifdef DEBUG
 char min_timer_vblank;
@@ -162,6 +176,9 @@ void game_init()
     for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
         enemy_type[X] = 0;
     }
+    for (X = MAX_NB_BULLETS - 1; X >= 0; X--) {
+        bullet_sprite[X] = 0;
+    }
     update_lives_display();
     game_counter = 0;
     game_state = GAME_STARTED;
@@ -178,20 +195,19 @@ void spawn_new_enemy(char type, char spec)
     if (X < 0) return; // No room for this enemy
     
     enemy_type[X] = type;
+    enemy_counter[X] = 0;
+    i = X;
     if (type == 1) {
         enemy_state[X] = 0;
-        enemy_counter[X] = 0;
-        i = X;
-        r = multisprite_new(SPRITE_ENEMY1, spec, -10, 3);
+        r = multisprite_new(SPRITE_ENEMY1, 60, -10, 3);
         X = i;
         if (r == -1) {
             enemy_type[X] = 0; // No room left for this enemy
         } else {
             enemy_sprite[X] = r;
+            enemy_state[X] = spec;
         }
     } else if (type == 128) {
-        enemy_counter[X] = 0;
-        i = X;
         r = multisprite_new(SPRITE_BIGBOSS, spec, -30, 5);
         s = multisprite_new(SPRITE_BIGBOSS, spec + 16, -30, 5 | MS_REFLECTED);
         X = i;
@@ -201,6 +217,23 @@ void spawn_new_enemy(char type, char spec)
             enemy_sprite[X] = r;
             enemy_state[X] = s;
         }
+    }
+}
+
+void fire_new_bullet(char x, char y, char direction, char nusiz)
+{
+    char i, r;
+    for (X = MAX_NB_BULLETS - 1; X >= 0; X--) {
+        if (!bullet_sprite[X]) break;
+    }
+    if (X < 0) return; // No room for this bullet 
+    
+    i = X;
+    r = multisprite_new(SPRITE_BULLET, x, y, nusiz);
+    X = i;
+    if (r != -1) {
+        bullet_sprite[X] = r;
+        bullet_direction[X] = direction;
     }
 }
 
@@ -277,7 +310,7 @@ void check_shot_at_enemy()
 
 void game_move_enemies()
 {
-    char i, nx, ny;
+    char i, j, nx, ny;
     for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
         if (enemy_type[X] == 1) {
             Y = enemy_sprite[X];
@@ -288,27 +321,38 @@ void game_move_enemies()
             }
             enemy_counter[X] += 1;
             nx = ms_sprite_x[Y];
+            i = X;
             if (enemy_counter[X] < 100) {
-                if (enemy_counter[X] > 60) nx++;
                 ny = ms_sprite_y[Y] + (1 - MS_OFFSET);
+                if (enemy_counter[X] >= 60) {
+                    if (enemy_counter[X] == 60) {
+                        j = Y;
+                        fire_new_bullet(nx, ny + 12, bullet_start_direction[X = enemy_state[X]], ms_nusiz[Y]);
+                        Y = j;
+                    }
+                    nx++;
+                }
             } else {
                 ny = ms_sprite_y[Y] + (-1 - MS_OFFSET);
             }
             if (ny == -11) {
-                i = X;
                 multisprite_delete(Y);
                 X = i;
                 enemy_type[X] = 0;
             } else {
-                i = X;
                 multisprite_move(Y, nx, ny); 
                 X = i;
             }    
         } else if (enemy_type[X] == 128) {
             Y = enemy_sprite[X];
+            i = X;
             ny = ms_sprite_y[Y] + (1 - MS_OFFSET);
+            if (ny == 40) {
+                j = Y;
+                fire_new_bullet(ms_sprite_x[Y] + 6, ny + 24, BULLET_B, 1);
+                Y = j;
+            }
             if (ny == 170) {
-                i = X;
                 multisprite_delete(Y);
                 X = i;
                 Y = enemy_state[X];
@@ -316,11 +360,37 @@ void game_move_enemies()
                 X = i;
                 enemy_type[X] = 0;
             } else {
-                i = X;
                 multisprite_move(Y, -1, ny); 
                 X = i;
                 Y = enemy_state[X];
                 multisprite_move(Y, -1, ny); 
+                X = i;
+            }
+        }
+    }
+}
+
+void game_move_bullets()
+{
+    char i, nx, ny, destroy ;
+    for (X = MAX_NB_BULLETS - 1; X >= 0; X--) {
+        Y = bullet_sprite[X];
+        if (Y) {
+            destroy = 0;
+            i = X;
+            X = bullet_direction[X];
+            nx = ms_sprite_x[Y] + bullet_dx[X];
+            if (nx < 3) destroy = 1;
+            if (nx >= 150) destroy = 1;
+            ny = ms_sprite_y[Y] + bullet_dy[X] - MS_OFFSET;
+            if (ny < MS_OFFSET) destroy = 1;
+            if (ny >= MS_PLAYFIELD_HEIGHT) destroy = 1;
+            if (destroy) {
+                multisprite_delete(Y);
+                X = i;
+                bullet_sprite[X] = 0;
+            } else {
+                multisprite_move(Y, nx, ny); 
                 X = i;
             }    
         }
@@ -333,7 +403,7 @@ void game_scenario()
         if ((game_counter & 7) == 0) {
             spawn_new_enemy(128, 60);
         } else {
-            spawn_new_enemy(1, 60);
+            spawn_new_enemy(1, (game_counter >> 2) & 3);
         }
     }
 }
@@ -341,9 +411,12 @@ void game_scenario()
 void game_over()
 {
     char i;
-    // Destroy all enemies
+    // Destroy all enemies & bullets
     for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
         enemy_type[X] = 0;
+    }
+    for (X = MAX_NB_BULLETS - 1; X >= 0; X--) {
+        bullet_sprite[X] = 0;
     }
     // Destroy missile
     missile_sprite = MS_UNALLOCATED;
@@ -497,6 +570,7 @@ void main()
             game_logic();
         else game_wait_for_restart();
         game_move_enemies();
+        game_move_bullets();
 
         ms_scenery = playfield - MS_OFFSET + 12;
         ms_scenery += scrolling;
