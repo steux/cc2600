@@ -57,7 +57,7 @@ const char sfx_bigboom[261] = {
 #define MS_OFFSCREEN_DATA \
 const char sprite_width[8] = {8, 24, 40, 40, 72, 16, 72, 32}; \
 const char sprite_is_one_invader[8] = {1, 0, 0, 0, 0, 1, 0, 1}; \
-const char invader_score[2] = {0, 10}; \
+const char invader_score[2] = {100, 10}; \
 const char sprite_new_nusiz_remove_left[7] = {0, 0, 0, 1, 0, 0, 0}; \
 const char sprite_offset_remove_left[7] = {0, 16, 32, 16, 64, 0, 32}; \
 const char sprite_new_nusiz_remove_right[7] = {0, 0, 0, 1, 0, 0, 2};
@@ -195,10 +195,10 @@ void spawn_new_enemy(char type, char spec)
     if (X < 0) return; // No room for this enemy
     
     enemy_type[X] = type;
-    enemy_counter[X] = 0;
     i = X;
     if (type == 1) {
         enemy_state[X] = 0;
+        enemy_counter[X] = 0;
         r = multisprite_new(SPRITE_ENEMY1, 60, -10, 3);
         X = i;
         if (r == -1) {
@@ -208,6 +208,7 @@ void spawn_new_enemy(char type, char spec)
             enemy_state[X] = spec;
         }
     } else if (type == 128) {
+        enemy_counter[X] = 3;
         r = multisprite_new(SPRITE_BIGBOSS, spec, -30, 5);
         s = multisprite_new(SPRITE_BIGBOSS, spec + 16, -30, 5 | MS_REFLECTED);
         X = i;
@@ -258,14 +259,21 @@ void check_shot_at_enemy()
                     if (sprite_is_one_invader[X]) {
                         hit = 1;
                         X = i;
-                        X = enemy_type[X];
-                        score += invader_score[X];
-                        X = i;
-                        enemy_type[X] = 0;
-                        multisprite_delete(Y);
-                        if (j) { // Double sprite enemy
+                        if (j) {
+                            enemy_counter[X]--;
+                            if (enemy_counter[X] == 0) { 
+                                j = Y;
+                                multisprite_delete(enemy_state[X]);
+                                Y = j;
+                                j = 0;
+                                X = i;
+                            }
+                        }
+                        if (!j) { 
+                            X = enemy_type[X] & 0x7f; // Remove the boss byte
+                            score += invader_score[X];
                             X = i;
-                            Y = enemy_state[X];
+                            enemy_type[X] = 0;
                             multisprite_delete(Y);
                         }
                     } else {
