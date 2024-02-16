@@ -182,15 +182,14 @@ void spawn_new_enemy(char type, char spec)
         enemy_state[X] = 0;
         enemy_counter[X] = 0;
         i = X;
-        r = multisprite_new(SPRITE_ENEMY1, spec, -12, 3);
+        r = multisprite_new(SPRITE_ENEMY1, spec, -10, 3);
         X = i;
         if (r == -1) {
             enemy_type[X] = 0; // No room left for this enemy
         } else {
             enemy_sprite[X] = r;
         }
-    } else if (type == 2) {
-        enemy_type[X] = 2;
+    } else if (type == 128) {
         enemy_counter[X] = 0;
         i = X;
         r = multisprite_new(SPRITE_BIGBOSS, spec, -30, 5);
@@ -214,7 +213,7 @@ void check_shot_at_enemy()
     char hit = 0;
     for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
         if (enemy_type[X]) {
-            j = (enemy_type[X] == 2);
+            j = enemy_type[X] & 128;
             Y = enemy_sprite[X];
             if (ms_sprite_y[Y] < my && ms_sprite_y[Y] >= my2) {
                 // We are at the right height
@@ -278,28 +277,34 @@ void check_shot_at_enemy()
 
 void game_move_enemies()
 {
-    char i, ny;
+    char i, nx, ny;
     for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
         if (enemy_type[X] == 1) {
             Y = enemy_sprite[X];
-            enemy_counter[X] += 1;
             if (enemy_counter[X] & 1) {
                 ms_nusiz[Y] |= MS_REFLECTED;
             } else {
                 ms_nusiz[Y] &= ~MS_REFLECTED;
             }
-            ny = ms_sprite_y[Y] + (1 - MS_OFFSET);
-            if (ny == 170) {
+            enemy_counter[X] += 1;
+            nx = ms_sprite_x[Y];
+            if (enemy_counter[X] < 100) {
+                if (enemy_counter[X] > 60) nx++;
+                ny = ms_sprite_y[Y] + (1 - MS_OFFSET);
+            } else {
+                ny = ms_sprite_y[Y] + (-1 - MS_OFFSET);
+            }
+            if (ny == -11) {
                 i = X;
                 multisprite_delete(Y);
                 X = i;
                 enemy_type[X] = 0;
             } else {
                 i = X;
-                multisprite_move(Y, -1, ny); 
+                multisprite_move(Y, nx, ny); 
                 X = i;
             }    
-        } else if (enemy_type[X] == 2) {
+        } else if (enemy_type[X] == 128) {
             Y = enemy_sprite[X];
             ny = ms_sprite_y[Y] + (1 - MS_OFFSET);
             if (ny == 170) {
@@ -326,7 +331,7 @@ void game_scenario()
 {
     if (!(game_counter & 1)) {
         if ((game_counter & 7) == 0) {
-            spawn_new_enemy(2, 60);
+            spawn_new_enemy(128, 60);
         } else {
             spawn_new_enemy(1, 60);
         }
@@ -491,6 +496,7 @@ void main()
         if (game_state == GAME_STARTED) 
             game_logic();
         else game_wait_for_restart();
+        game_move_enemies();
 
         ms_scenery = playfield - MS_OFFSET + 12;
         ms_scenery += scrolling;
@@ -528,7 +534,6 @@ void main()
             if (game_state == GAME_STARTED) 
                 game_scenario();
         }
-        game_move_enemies();
 
         if (update_score) {
             mini_kernel_update_score_4_digits(score);
