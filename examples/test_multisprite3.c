@@ -52,7 +52,7 @@ const signed char dy[8] = {0, 2, 3, 2, 0, -2, -3, -2};
 void init_sprites()
 {
     char i;
-    char x = 20, y = 0;
+    char x = 20, y = MS_OFFSET;
     for (i = 0; i != 8; i++) {
         multisprite_new(1, x, y, 3);
         x += 10;
@@ -68,14 +68,14 @@ void move_sprite(char i) {
     char x, y;
     x = ms_sprite_x[X = i] + dx[Y = i & 7];
     if (x < 2) x = 150; else if (x >= 151) x = 2;
-    y = ms_sprite_y[X] - MS_OFFSET + dy[Y];
-    if (y < 3) y = 179; else if (y >= 180) y = 3;
+    y = ms_sprite_y[X] + dy[Y];
+    if (y < 3 + MS_OFFSET) y = 179 + MS_OFFSET; else if (y >= 180 + MS_OFFSET) y = 3 + MS_OFFSET;
     multisprite_move(i, x, y);
 }
 
 void main()
 {
-    char i = 1, xpos = 76, ypos = 170, scrolling = 0;
+    char i = 1, xpos = 76, ypos = 170 + MS_OFFSET, scrolling = 0;
     multisprite_init(playfield);
     multisprite_new(0, xpos, ypos, 0);
 
@@ -94,7 +94,7 @@ void main()
         if (!(*SWCHA & 0x80) && xpos < 158) { xpos++; ms_nusiz[0] = 0; } // Right
         if (!(*SWCHA & 0x40) && xpos > 0) { xpos--; ms_nusiz[0] = 8; } // Left
         if (!(*SWCHA & 0x20)) { ypos++; } // Down
-        if (!(*SWCHA & 0x10)) { ypos--; }// Up
+        if (!(*SWCHA & 0x10)) { ypos--; } // Up
 
         multisprite_move(0, xpos, ypos);
         

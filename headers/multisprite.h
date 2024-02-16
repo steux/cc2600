@@ -113,7 +113,6 @@ inline void multisprite_clear()
 MS_OFFSCREEN_BANK char multisprite_new(char model, char nx, char ny, char nusiz)
 {
     char i;
-    ny += MS_OFFSET;
     // Look for right ny position
     for (X = ms_nb_sprites; X != 0; X--) {
         X--;
@@ -167,7 +166,6 @@ MS_OFFSCREEN_BANK void multisprite_move(char i, char nx, char ny)
     char j;
     X = i;
     if (nx != -1)  ms_sprite_x[X] = nx;
-    ny += MS_OFFSET;
     if (ms_sprite_y[X] == ny) return; // No vertical move, so nothing to check
 
     if (ms_sprite_y[X] >= MS_OFFSET + MS_PLAYFIELD_HEIGHT / 2) {

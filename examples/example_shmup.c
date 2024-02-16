@@ -167,7 +167,7 @@ void game_init()
     score = 0;
     update_score = 1;
     player_xpos = 76;
-    player_ypos = 160;
+    player_ypos = 192;
     player_state = 0;
     missile_sprite = MS_UNALLOCATED;
     button_pressed = 0;
@@ -199,7 +199,7 @@ void spawn_new_enemy(char type, char spec)
     if (type == 1) {
         enemy_state[X] = 0;
         enemy_counter[X] = 0;
-        r = multisprite_new(SPRITE_ENEMY1, 60, -10, 3);
+        r = multisprite_new(SPRITE_ENEMY1, 60, 22, 3);
         X = i;
         if (r == -1) {
             enemy_type[X] = 0; // No room left for this enemy
@@ -209,8 +209,8 @@ void spawn_new_enemy(char type, char spec)
         }
     } else if (type == 128) {
         enemy_counter[X] = 3;
-        r = multisprite_new(SPRITE_BIGBOSS, spec, -30, 5);
-        s = multisprite_new(SPRITE_BIGBOSS, spec + 16, -30, 5 | MS_REFLECTED);
+        r = multisprite_new(SPRITE_BIGBOSS, spec, 2, 5);
+        s = multisprite_new(SPRITE_BIGBOSS, spec + 16, 2, 5 | MS_REFLECTED);
         X = i;
         if (r == -1) {
             enemy_type[X] = 0; // No room left for this enemy
@@ -331,7 +331,7 @@ void game_move_enemies()
             nx = ms_sprite_x[Y];
             i = X;
             if (enemy_counter[X] < 100) {
-                ny = ms_sprite_y[Y] + (1 - MS_OFFSET);
+                ny = ms_sprite_y[Y] + 1;
                 if (enemy_counter[X] >= 60) {
                     if (enemy_counter[X] == 60) {
                         j = Y;
@@ -341,9 +341,9 @@ void game_move_enemies()
                     nx++;
                 }
             } else {
-                ny = ms_sprite_y[Y] + (-1 - MS_OFFSET);
+                ny = ms_sprite_y[Y] - 1;
             }
-            if (ny == -11) {
+            if (ny == 21) {
                 multisprite_delete(Y);
                 X = i;
                 enemy_type[X] = 0;
@@ -354,13 +354,13 @@ void game_move_enemies()
         } else if (enemy_type[X] == 128) {
             Y = enemy_sprite[X];
             i = X;
-            ny = ms_sprite_y[Y] + (1 - MS_OFFSET);
-            if (ny == 40) {
+            ny = ms_sprite_y[Y] + 1;
+            if (ny == 70) {
                 j = Y;
                 fire_new_bullet(ms_sprite_x[Y] + 6, ny + 24, BULLET_B, 1);
                 Y = j;
             }
-            if (ny == 170) {
+            if (ny == 200) {
                 multisprite_delete(Y);
                 X = i;
                 Y = enemy_state[X];
@@ -390,9 +390,9 @@ void game_move_bullets()
             nx = ms_sprite_x[Y] + bullet_dx[X];
             if (nx < 3) destroy = 1;
             if (nx >= 150) destroy = 1;
-            ny = ms_sprite_y[Y] + bullet_dy[X] - MS_OFFSET;
+            ny = ms_sprite_y[Y] + bullet_dy[X];
             if (ny < MS_OFFSET) destroy = 1;
-            if (ny >= MS_PLAYFIELD_HEIGHT) destroy = 1;
+            if (ny >= MS_PLAYFIELD_HEIGHT + MS_OFFSET - 2) destroy = 1;
             if (destroy) {
                 multisprite_delete(Y);
                 X = i;
@@ -430,14 +430,14 @@ void game_over()
     missile_sprite = MS_UNALLOCATED;
 
     multisprite_clear();
-    multisprite_new(SPRITE_LETTER_G, 80 - 19, 50, 0);
-    multisprite_new(SPRITE_LETTER_A, 80 - 9, 50, 0);
-    multisprite_new(SPRITE_LETTER_M, 80 + 1, 50, 0);
-    multisprite_new(SPRITE_LETTER_E, 80 + 11, 50, 0);
-    multisprite_new(SPRITE_LETTER_O, 80 - 19, 100, 0);
-    multisprite_new(SPRITE_LETTER_V, 80 - 9, 100, 0);
-    multisprite_new(SPRITE_LETTER_E, 80 + 1, 100, 0);
-    multisprite_new(SPRITE_LETTER_R, 80 + 11, 100, 0);
+    multisprite_new(SPRITE_LETTER_G, 80 - 19, 80, 0);
+    multisprite_new(SPRITE_LETTER_A, 80 - 9, 80, 0);
+    multisprite_new(SPRITE_LETTER_M, 80 + 1, 80, 0);
+    multisprite_new(SPRITE_LETTER_E, 80 + 11, 80, 0);
+    multisprite_new(SPRITE_LETTER_O, 80 - 19, 130, 0);
+    multisprite_new(SPRITE_LETTER_V, 80 - 9, 130, 0);
+    multisprite_new(SPRITE_LETTER_E, 80 + 1, 130, 0);
+    multisprite_new(SPRITE_LETTER_R, 80 + 11, 130, 0);
 
     game_state = GAME_OVER;
     game_counter = 0;
@@ -458,9 +458,9 @@ void game_logic()
 {
     X = 0;
     if (!(*SWCHA & 0x80) && player_xpos < 153) { player_xpos++; } // Right
-    if (!(*SWCHA & 0x40) && player_xpos > 0) { player_xpos--; } // Left
-    if (!(*SWCHA & 0x20) && player_ypos < 170) { player_ypos++; } // Down
-    if (!(*SWCHA & 0x10) && player_ypos > 0) { player_ypos--; ms_sprite_model[X] = SPRITE_SPACESHIP_EXHAUST;} // Up
+    if (!(*SWCHA & 0x40) && player_xpos >= 1) { player_xpos--; } // Left
+    if (!(*SWCHA & 0x20) && player_ypos < 200) { player_ypos++; } // Down
+    if (!(*SWCHA & 0x10) && player_ypos >= 32) { player_ypos--; ms_sprite_model[X] = SPRITE_SPACESHIP_EXHAUST;} // Up
     else { ms_sprite_model[X] = SPRITE_SPACESHIP; } 
     multisprite_move(0, player_xpos, player_ypos);
 
@@ -479,8 +479,8 @@ void game_logic()
     }
     if (missile_sprite != MS_UNALLOCATED) {
         X = missile_sprite;
-        char y = ms_sprite_y[X] - (MS_OFFSET + 6);
-        if (y < 0) {
+        char y = ms_sprite_y[X] - 6;
+        if (y < 32) {
             multisprite_delete(missile_sprite);
             missile_sprite = MS_UNALLOCATED;
         } else {

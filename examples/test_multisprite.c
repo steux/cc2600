@@ -36,15 +36,15 @@ const char playfield[192 + 32] = {
 
 void main()
 {
-    char xpos = 50, ypos = 50, scrolling = 0;
+    char xpos = 50, ypos = 50 + MS_OFFSET, scrolling = 0;
     multisprite_init(playfield);
     multisprite_new(0, xpos, ypos, 0);
-    multisprite_new(0, 50, 50, 3);
-    multisprite_new(0, 50, 70, 3);
-    multisprite_new(0, 100, 50, 3);
-    multisprite_new(0, 30, -10, 3);
-    multisprite_new(0, 30, 170, 3);
-    multisprite_new(0, 50, 180, 3);
+    multisprite_new(0, 50, 50 + MS_OFFSET, 3);
+    multisprite_new(0, 50, 70 + MS_OFFSET, 3);
+    multisprite_new(0, 100, 50 + MS_OFFSET, 3);
+    multisprite_new(0, 30, -10 + MS_OFFSET, 3);
+    multisprite_new(0, 30, 170 + MS_OFFSET, 3);
+    multisprite_new(0, 50, 180 + MS_OFFSET, 3);
     
     do {
         *VBLANK = 2; // Enable VBLANK
