@@ -217,6 +217,9 @@ MS_OFFSCREEN_BANK void spawn_new_enemy(char type, char spec)
     } else if (type == 128) {
         enemy_counter[X] = 3;
         r = multisprite_new(SPRITE_BIGBOSS, spec, 2, 5);
+        Y = X;
+        X = i;
+        enemy_rank[X] = Y;
         s = multisprite_new(SPRITE_BIGBOSS, spec + 16, 2, 5 | MS_REFLECTED);
         X = i;
         if (r == -1) {
@@ -272,7 +275,7 @@ MS_OFFSCREEN_BANK void check_shot_at_enemy()
                             enemy_counter[X]--;
                             if (enemy_counter[X] == 0) { 
                                 j = Y;
-                                multisprite_delete(enemy_state[X]);
+                                multisprite_delete_with_rank(enemy_state[X], enemy_rank[X] + 1);
                                 Y = j;
                                 j = 0;
                                 X = i;
@@ -283,7 +286,7 @@ MS_OFFSCREEN_BANK void check_shot_at_enemy()
                             score += invader_score[X];
                             X = i;
                             enemy_type[X] = 0;
-                            multisprite_delete(Y);
+                            multisprite_delete_with_rank(Y, enemy_rank[X]);
                         }
                     } else {
                         // Let's see if we hit the left side
@@ -373,18 +376,20 @@ MS_OFFSCREEN_BANK void game_move_enemies()
                 Y = j;
             }
             if (ny == 200) {
-                multisprite_delete(Y);
                 X = i;
-                Y = enemy_state[X];
-                multisprite_delete(Y);
+                multisprite_delete_with_rank(Y, enemy_rank[X]);
+                X = i;
+                multisprite_delete_with_rank(enemy_state[X], enemy_rank[X]);
                 X = i;
                 enemy_type[X] = 0;
             } else {
-                multisprite_move(Y, -1, ny); 
+                // Move the right one before to save the order
                 X = i;
-                Y = enemy_state[X];
-                multisprite_move(Y, -1, ny); 
+                multisprite_move_with_rank(enemy_state[X], -1, ny, enemy_rank[X] + 1); 
                 X = i;
+                multisprite_move_with_rank(enemy_sprite[X], -1, ny, enemy_rank[X]); 
+                X = i;
+                enemy_rank[X] = Y;
             }
         }
     }

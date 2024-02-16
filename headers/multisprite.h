@@ -277,7 +277,7 @@ MS_OFFSCREEN_BANK void multisprite_move(char i, char nx, char ny)
         for (; Y != i; Y++) {
             Y++;
             X = ms_sorted_by_y[Y] & 0x7f;
-            if (ny > ms_sprite_y[X]) {
+            if (ms_sprite_y[X] < ny) {
                 X = ms_sorted_by_y[Y];
                 Y--;
                 ms_sorted_by_y[Y] = X;

@@ -87,16 +87,14 @@ pub fn build_cartridge(compiler_state: &CompilerState, writer: &mut dyn Write, a
         bankswitching_scheme = "DPC";
         if maxbank > 1 {
             return Err(Error::Configuration { error: "DPC chip only works with 8KB ROM".to_string() });
-        } else {
-            maxbank = 1;
         }
+        maxbank = 1;
     } else if compiler_state.context.get_macro("__DPCPLUS__").is_some() {
         bankswitching_scheme = "DPC+";
         if maxbank > 5 {
             return Err(Error::Configuration { error: "DPC+ framework only works with 32KB ROM".to_string() });
-        } else {
-            maxbank = 5;
         }
+        maxbank = 5;
     } else if compiler_state.context.get_macro("__3E__").is_some() {
         bankswitching_scheme = "3E";
         maxbank = ((maxbank / 8) + 1) * 8 - 1;
