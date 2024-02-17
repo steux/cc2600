@@ -174,7 +174,7 @@ void game_init()
     player_ypos = 192;
     player_state = 0;
     missile_sprite = MS_UNALLOCATED;
-    button_pressed = 0;
+    button_pressed = 1;
     player_timer = 1;
     nb_lives = 3;
     for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
@@ -197,7 +197,7 @@ MS_OFFSCREEN_BANK void spawn_new_enemy(char type, char spec)
     for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
         if (!enemy_type[X]) break;
     }
-    if (X < 0) return; // No room for this enemy
+    if (X == -1) return; // No room for this enemy
     
     enemy_type[X] = type;
     i = X;
@@ -237,7 +237,7 @@ MS_OFFSCREEN_BANK void fire_new_bullet(char x, char y, char direction, char nusi
     for (X = MAX_NB_BULLETS - 1; X >= 0; X--) {
         if (!bullet_sprite[X]) break;
     }
-    if (X < 0) return; // No room for this bullet 
+    if (X == -1) return; // No room for this bullet 
     
     i = X;
     r = multisprite_new(SPRITE_BULLET, x, y, nusiz);
@@ -565,7 +565,6 @@ void game_wait_for_restart()
         game_counter = 3;
         if (!(*INPT4 & 0x80)) {
             if (!button_pressed) {
-                button_pressed = 1;
                 game_init();
             }
         } else button_pressed = 0;
@@ -599,7 +598,7 @@ void main()
             game_logic();
         else game_wait_for_restart();
         game_move_enemies();
-        game_move_bullets();
+        //game_move_bullets();
 
         ms_scenery = playfield - MS_OFFSET + 12;
         ms_scenery += scrolling;

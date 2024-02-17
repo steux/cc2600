@@ -779,13 +779,14 @@ MS_KERNEL_BANK _ms_check_collisions()
 {
     ms_y0 = MS_UNALLOCATED;
     ms_y1 = MS_UNALLOCATED;
-    if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= MS_PF_COLLISION; // 8/20
-    if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= MS_PF_COLLISION;
-    //strobe(WSYNC);                  // 3
-    else if (*CXPPMM & 0x80) {
+    if (*CXPPMM & 0x80) {
         ms_nusiz[X = ms_id_p[0]] |= MS_COLLISION;
         ms_nusiz[X = ms_id_p[1]] |= MS_COLLISION;
+    } else {
+        if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= MS_PF_COLLISION; // 8/20
+        if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= MS_PF_COLLISION;
     }
+    //strobe(WSYNC);                  // 3
     strobe(CXCLR);
 }
 
