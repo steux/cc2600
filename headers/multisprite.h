@@ -725,6 +725,7 @@ MS_OFFSCREEN_BANK void _ms_kernel_prep()
     *VDELP0 = 0;
     ms_y0 = MS_UNALLOCATED;
     ms_y1 = MS_UNALLOCATED;
+    strobe(CXCLR);
     X = _ms_allocate_sprite_ex();
     // Position sprite 0
     if (X != -1) {
