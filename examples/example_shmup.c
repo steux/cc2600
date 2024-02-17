@@ -133,7 +133,7 @@ EXTRA_RAM char do_schedule_sfx;
 #define GAME_STARTED    0
 #define GAME_OVER       1
 #define MAX_NB_ENEMIES  3 
-EXTRA_RAM char enemy_sprite[MAX_NB_ENEMIES], enemy_type[MAX_NB_ENEMIES], enemy_state[MAX_NB_ENEMIES], enemy_counter[MAX_NB_ENEMIES], enemy_rank[MAX_NB_ENEMIES];
+EXTRA_RAM char enemy_sprite[MAX_NB_ENEMIES], enemy_type[MAX_NB_ENEMIES], enemy_state[MAX_NB_ENEMIES], enemy_counter[MAX_NB_ENEMIES], enemy_rank[MAX_NB_ENEMIES], enemy_x[MAX_NB_ENEMIES], enemy_y[MAX_NB_ENEMIES];
 
 #define MAX_NB_BULLETS  3 
 EXTRA_RAM char bullet_sprite[MAX_NB_BULLETS], bullet_direction[MAX_NB_BULLETS], bullet_rank[MAX_NB_BULLETS];
@@ -216,6 +216,8 @@ MS_OFFSCREEN_BANK void spawn_new_enemy(char type, char spec)
             enemy_sprite[X] = r;
             enemy_state[X] = spec;
             enemy_rank[X] = s;
+            enemy_x[X] = 60;
+            enemy_y[X] = 22;
         }
     } else if (type == 128) {
         enemy_counter[X] = 3;
@@ -230,6 +232,8 @@ MS_OFFSCREEN_BANK void spawn_new_enemy(char type, char spec)
         } else {
             enemy_sprite[X] = r;
             enemy_state[X] = s;
+            enemy_x[X] = spec;
+            enemy_y[X] = 2;
         }
     }
 }
@@ -333,6 +337,77 @@ MS_OFFSCREEN_BANK void check_shot_at_enemy()
 
 MS_OFFSCREEN_BANK void game_move_enemies()
 {
+    char i, j;
+    // "cheap" part of movement first
+    for (X = MAX_NB_ENEMIES - 1; X >= 0; X--) {
+        if (enemy_type[X] == 1) {
+            Y = enemy_sprite[X];
+            if (enemy_counter[X] & 1) {
+                ms_nusiz[Y] |= MS_REFLECTED;
+            } else {
+                ms_nusiz[Y] &= ~MS_REFLECTED;
+            }
+            enemy_counter[X]++;
+            if (enemy_counter[X] < 100) {
+                enemy_y[X]++;
+                if (enemy_counter[X] >= 60) {
+                    enemy_x[X]++;
+                    if (enemy_counter[X] == 60) {
+                        j = ms_nusiz[Y];
+                        fire_new_bullet(enemy_x[X], enemy_y[X] + 12, bullet_start_direction[Y = enemy_state[X]], j);
+                    }
+                }
+            } else {
+                enemy_y[X]--;
+                if (enemy_y[X] == 21) {
+                    i = X;
+                    multisprite_delete_with_rank(Y, enemy_rank[X]);
+                    X = i;
+                    enemy_type[X] = 0;
+                }    
+            }
+        } else if (enemy_type[X] == 128) {
+            enemy_y[X]++;
+            if (enemy_y[X] == 70) {
+                fire_new_bullet(enemy_x[X] + 6, enemy_y[X] + 24, BULLET_B, 1);
+            } else if (enemy_y[X] == 200) {
+                i = X;
+                multisprite_delete_with_rank(enemy_sprite[X], enemy_rank[X]);
+                X = i;
+                multisprite_delete_with_rank(enemy_state[X], enemy_rank[X]);
+                X = i;
+                enemy_type[X] = 0;
+            }
+        }
+    }
+    
+    // And actually move the sprites if there is still some resources available
+    while (*INTIM >= 23) {
+        X = moving_enemy_counter;
+        if (X == 0) {
+            X = MAX_NB_ENEMIES;
+        }
+        X--;
+        moving_enemy_counter = X;
+
+        if (enemy_type[X] == 1) {
+            multisprite_move_with_rank(enemy_sprite[X], enemy_x[X], enemy_y[X], enemy_rank[X]); 
+            X = moving_enemy_counter;
+            enemy_rank[X] = Y;
+        } else if (enemy_type[X] == 128) {
+            // Move the right one before to save the order
+            multisprite_move_with_rank(enemy_state[X], -1, enemy_y[X], enemy_rank[X] + 1); 
+            X = moving_enemy_counter;
+            multisprite_move_with_rank(enemy_sprite[X], -1, enemy_y[X], enemy_rank[X]); 
+            X = moving_enemy_counter;
+            enemy_rank[X] = Y;
+        }
+    }
+}
+
+/* 
+MS_OFFSCREEN_BANK void game_move_enemies()
+{
     char i, j, nx, ny;
     if (moving_enemy_counter == 0) return;
     moving_enemy_counter--;
@@ -399,6 +474,7 @@ MS_OFFSCREEN_BANK void game_move_enemies()
         }
     }
 }
+*/
 
 MS_OFFSCREEN_BANK void game_move_bullets()
 {
@@ -602,8 +678,7 @@ void main()
         if (game_state == GAME_STARTED) 
             game_logic();
         else game_wait_for_restart();
-        if (moving_enemy_counter == 0) moving_enemy_counter = MAX_NB_ENEMIES;
-        while (*INTIM >= 28) game_move_enemies();
+        game_move_enemies();
 
         ms_scenery = playfield - MS_OFFSET + 12;
         ms_scenery += scrolling;
@@ -613,6 +688,7 @@ void main()
 #ifdef DEBUG
         if (*INTIM < min_timer_vblank) min_timer_vblank = *INTIM;
 #endif 
+
         while (*INTIM); // Wait for end of blank
  
         multisprite_kernel();
