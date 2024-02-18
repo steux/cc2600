@@ -3,6 +3,7 @@
 
 #define EXTRA_RAM superchip
 #define MS_OFFSCREEN_BANK bank2
+#define MS_OFFSCREEN2_BANK bank3
 #define MS_KERNEL_BANK bank1
 #define MS_MAX_NB_SPRITES 10 
 
@@ -56,16 +57,17 @@ const char sfx_bigboom[261] = {
 #define BULLET_T    6
 #define BULLET_TL   7
 
-#define MS_OFFSCREEN_DATA \
-const char sprite_width[8] = {8, 24, 40, 40, 72, 16, 72, 32}; \
-const char sprite_is_one_invader[8] = {1, 0, 0, 0, 0, 1, 0, 1}; \
-const char invader_score[2] = {100, 10}; \
-const char sprite_new_nusiz_remove_left[7] = {0, 0, 0, 1, 0, 0, 0}; \
-const char sprite_offset_remove_left[7] = {0, 16, 32, 16, 64, 0, 32}; \
-const char sprite_new_nusiz_remove_right[7] = {0, 0, 0, 1, 0, 0, 2}; \
-const signed char bullet_dx[8] = {-2, -1, 0, 1, 2, 1, 0, -1}; \
-const signed char bullet_dy[8] = {0, 2, 3, 2, 0, -2, -3, -2}; \
-const char bullet_start_direction[8] = {BULLET_BL, BULLET_B, BULLET_BR, BULLET_B, BULLET_L, BULLET_R, BULLET_TL, BULLET_TR};
+MS_OFFSCREEN_BANK {
+    const char sprite_width[8] = {8, 24, 40, 40, 72, 16, 72, 32}; 
+    const char sprite_is_one_invader[8] = {1, 0, 0, 0, 0, 1, 0, 1}; 
+    const char invader_score[2] = {100, 10}; 
+    const char sprite_new_nusiz_remove_left[7] = {0, 0, 0, 1, 0, 0, 0}; 
+    const char sprite_offset_remove_left[7] = {0, 16, 32, 16, 64, 0, 32}; 
+    const char sprite_new_nusiz_remove_right[7] = {0, 0, 0, 1, 0, 0, 2}; 
+    const signed char bullet_dx[8] = {-2, -1, 0, 1, 2, 1, 0, -1}; 
+    const signed char bullet_dy[8] = {0, 2, 3, 2, 0, -2, -3, -2};
+    const char bullet_start_direction[8] = {BULLET_BL, BULLET_B, BULLET_BR, BULLET_B, BULLET_L, BULLET_R, BULLET_TL, BULLET_TR};
+}
 
 #define REG_COLUPF  0x08
 #define REG_COLUBK  0x09
