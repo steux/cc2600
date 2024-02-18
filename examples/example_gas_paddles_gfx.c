@@ -12,7 +12,7 @@ MS_KERNEL_BANK const char car10_gfx[16] = {0, 0, 0x30, 0x78, 0x48, 0x98, 0xfc, 0
 MS_KERNEL_BANK const char car11_gfx[16] = {0, 0, 0x38, 0x68, 0x4c, 0x7c, 0x7c, 0x7c, 0x3a, 0x62, 0x26, 0x3e, 0x1c, 0x1c, 0, 0};
 MS_KERNEL_BANK const char car12_gfx[16] = {0, 0, 0x18, 0x3c, 0x24, 0x3c, 0x3c, 0x3c, 0x3c, 0x42, 0x24, 0x3c, 0x3c, 0x18, 0, 0};
 #define MS_NB_SPRITES_DEF 13
-MS_KERNEL_BANK const char *ms_grptr[MS_NB_SPRITES_DEF] = {car0_gfx, car1_gfx, car2_gfx, car3_gfx, car4_gfx, car5_gfx, car6_gfx, car7_gfx, car8_gfx, car9_gfx, car10_gfx, car11_gfx, car12_gfx};
+MS_KERNEL_BANK aligned(256) const char *ms_grptr[MS_NB_SPRITES_DEF] = {car0_gfx, car1_gfx, car2_gfx, car3_gfx, car4_gfx, car5_gfx, car6_gfx, car7_gfx, car8_gfx, car9_gfx, car10_gfx, car11_gfx, car12_gfx};
 MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {15, 15, 15, 14, 13, 11, 11, 11, 13, 14, 15, 15, 15};
 #define SPRITE_CAR0 0
 #define SPRITE_CAR1 1

@@ -21,7 +21,7 @@
 // v0.1: Initial version
 // DONE: Add support for SARA chip
 // DONE: Test with bankswitching
-// TODO: Add support for single color (3 bits of model_id)
+// TODO: Add support for single color sprites (MS_ONE_COLOR_SPRITES) 
 // DONE: Implement bidir search in multisprite_move
 
 #ifndef __MULTISPRITE_H__
@@ -74,13 +74,19 @@
 #define MS_COLLISION 0x80
 
 char ms_y0, ms_y1, ms_h0, ms_h1, ms_v;
-char *ms_colup0ptr, *ms_colup1ptr, *ms_grp0ptr, *ms_grp1ptr, *ms_scenery;
+#ifndef MS_ONE_COLOR_SPRITES
+char *ms_colup0ptr, *ms_colup1ptr;
+#endif
+char *ms_grp0ptr, *ms_grp1ptr, *ms_scenery;
 char ms_sprite_iter;
 EXTRA_RAM char ms_sprite_x[MS_MAX_NB_SPRITES];
 EXTRA_RAM char ms_sprite_y[MS_MAX_NB_SPRITES];
 EXTRA_RAM char ms_sprite_model[MS_MAX_NB_SPRITES];
 EXTRA_RAM char ms_nusiz[MS_MAX_NB_SPRITES];
 EXTRA_RAM char ms_sorted_by_y[MS_MAX_NB_SPRITES];
+#ifdef MS_ONE_COLOR_SPRITES
+EXTRA_RAM char ms_color[MS_MAX_NB_SPRITES];
+#endif
 char ms_id_p[2];
 char ms_nb_sprites;
 
@@ -113,6 +119,39 @@ inline void multisprite_clear()
     ms_nb_sprites = 0;
 }
 
+#ifdef MS_ONE_COLOR_SPRITES
+// Create a new sprite at nx, ny (model and nusiz provided)
+// In output, X is the rank of this sprite
+MS_OFFSCREEN_BANK char multisprite_new(char model, char nx, char ny, char nusiz, char color)
+{
+    char i;
+    // Look for right ny position
+    for (X = ms_nb_sprites; X != 0; X--) {
+        X--;
+        i = ms_sorted_by_y[X];
+        X++;
+        if (ny >= ms_sprite_y[Y = i & 0x7f]) break;
+        ms_sorted_by_y[X] = i;
+    }
+
+    // Put new sprite data
+    // Look for a free place
+    for (Y = 0; Y != ms_nb_sprites; Y++) {
+        if (ms_sprite_y[Y] == MS_UNALLOCATED) break;
+    }
+
+    ms_sorted_by_y[X] = Y;
+    ms_sprite_x[Y] = nx;
+    ms_sprite_y[Y] = ny;
+    ms_sprite_model[Y] = model;
+    ms_nusiz[Y] = nusiz;
+    ms_color[Y] = color;
+
+    // Update number of sprites
+    ms_nb_sprites++;
+    return Y;
+}
+#else
 // Create a new sprite at nx, ny (model and nusiz provided)
 // In output, X is the rank of this sprite
 MS_OFFSCREEN_BANK char multisprite_new(char model, char nx, char ny, char nusiz)
@@ -143,6 +182,7 @@ MS_OFFSCREEN_BANK char multisprite_new(char model, char nx, char ny, char nusiz)
     ms_nb_sprites++;
     return Y;
 }
+#endif
 
 MS_OFFSCREEN_BANK void multisprite_delete_with_rank(char i, char rank)
 {
@@ -538,10 +578,18 @@ MS_KERNEL_BANK char _ms_kernel_repo0()
     X = ms_tmp;                         // 3
     VSYNC[X] = ms_v;                    // 7 [10]
     X = ms_id_p[0];                     // 3 
-    ms_y0 = ms_sprite_y[X];                // 7 [20]
-    X = ms_sprite_model[X];                // 6 [26]
-    ms_grp0ptr = ms_grptr[X] - ms_y0;      // 21 [47]
+    ms_y0 = ms_sprite_y[X];             // 7 [20]
+#ifdef MS_ONE_COLOR_SPRITES
+    *COLUP0 = ms_color[X];              // 7
+    csleep(7);                          // 7
+    csleep(5);                          // 5
+    csleep(2);                          // 2
+#endif
+    X = ms_sprite_model[X];             // 6 [26]
+    ms_grp0ptr = ms_grptr[X] - ms_y0;   // 21 [47]
+#ifndef MS_ONE_COLOR_SPRITES
     ms_colup0ptr = ms_coluptr[X] - ms_y0;  // 21 [68]
+#endif
     Y++;                                // 2 [70]
     strobe(HMOVE);                      // Early hmove [73]
     //strobe(WSYNC);                    // 3
@@ -574,9 +622,17 @@ MS_KERNEL_BANK char _ms_kernel_repo1()
     VSYNC[X] = ms_v;                    // 7 [10]
     X = ms_id_p[1];                     // 3 
     ms_y1 = ms_sprite_y[X];                // 7 [20]
+#ifdef MS_ONE_COLOR_SPRITES
+    *COLUP1 = ms_color[X];              // 7
+    csleep(7);                          // 7
+    csleep(5);                          // 5
+    csleep(2);                          // 2
+#endif
     X = ms_sprite_model[X];                // 6 [26]
     ms_grp1ptr = ms_grptr[X] - ms_y1;      // 21 [47]
+#ifndef MS_ONE_COLOR_SPRITES
     ms_colup1ptr = ms_coluptr[X] - ms_y1;  // 21 [68]
+#endif
     Y++;                                // 2 [70]
     strobe(HMOVE);                      // Early hmove [73]
     //strobe(WSYNC);                    // 3
@@ -593,7 +649,9 @@ MS_KERNEL_BANK void _ms_p0_kernel(char stop)
         strobe(WSYNC);              // 3
 
         *GRP0 = ms_grp0ptr[Y];      // 9
+#ifndef MS_ONE_COLOR_SPRITES
         *COLUP0 = ms_colup0ptr[Y];  // 9 
+#endif
         kernel_medium_macro; // Max 39 cycles
         Y++;                        // 2
         X = ms_scenery[Y];          // 8
@@ -601,7 +659,9 @@ MS_KERNEL_BANK void _ms_p0_kernel(char stop)
         strobe(WSYNC);              // 3 // [37/76]
 
         store(*GRP0);               // 3
+#ifndef MS_ONE_COLOR_SPRITES
         *COLUP0 = ms_colup0ptr[Y];  // 9 
+#endif
         VSYNC[X] = ms_v;            // 7
         Y++;                        // 2
     } while (Y < stop);   // 5/6
@@ -615,15 +675,19 @@ MS_KERNEL_BANK void _ms_p1_kernel(char stop)
         strobe(WSYNC);              // 3
 
         *GRP1 = ms_grp1ptr[Y];      // 9
+#ifndef MS_ONE_COLOR_SPRITES
         *COLUP1 = ms_colup1ptr[Y];  // 9 
-        kernel_medium_macro; // Max 39 cycles
+#endif
+        kernel_medium_macro;        // Max 39 cycles
         Y++;                        // 2
         X = ms_scenery[Y];          // 8
         load(ms_grp1ptr[Y]);        // 6
         strobe(WSYNC);              // 3 // [37/76]
 
         store(*GRP1);               // 3
+#ifndef MS_ONE_COLOR_SPRITES
         *COLUP1 = ms_colup1ptr[Y];  // 9 
+#endif
         VSYNC[X] = ms_v;            // 7
         Y++;                        // 2
     } while (Y < stop);   // 5/6
@@ -632,26 +696,34 @@ MS_KERNEL_BANK void _ms_p1_kernel(char stop)
 
 MS_KERNEL_BANK void _ms_p0_p1_kernel(char stop)
 {
+#ifndef MS_ONE_COLOR_SPRITES
     char ms_colup0, ms_colup1;
+#endif
 
     *VDELP0 = 1;                    // 5
     // [46/76] when coming from p0/p1 multisprite_kernel
     ms_v = ms_scenery[Y];           // 9
     *GRP0 = ms_grp0ptr[Y];          // 9
+#ifndef MS_ONE_COLOR_SPRITES
     *COLUP1 = ms_colup1ptr[Y];      // 9
     *COLUP0 = ms_colup0ptr[Y];      // 9 [82/76]. No WSYNC necessary 
+#endif
     *GRP1 = ms_grp1ptr[Y];          // 6 
     Y++;                            // 2
     X = ms_scenery[Y];              // 8
+#ifndef MS_ONE_COLOR_SPRITES
     ms_colup0 = ms_colup0ptr[Y];    // 9
     ms_colup1 = ms_colup1ptr[Y];    // 9
+#endif
     *GRP0 = ms_grp0ptr[Y];          // 9
     load(ms_grp1ptr[Y]);            // 6
     strobe(WSYNC);                  // 3: Total (2) = 134 = 58 into the second line
 
     store(*GRP1);                   // 3
+#ifndef MS_ONE_COLOR_SPRITES
     *COLUP0 = ms_colup0;            // 6
     *COLUP1 = ms_colup1;            // 6
+#endif
     VSYNC[X] = ms_v;                // 7
     Y++;                            // 2
     
@@ -659,27 +731,35 @@ MS_KERNEL_BANK void _ms_p0_p1_kernel(char stop)
 
         do { // [30/76] while looping
             ms_v = ms_scenery[Y];           // 9
+#ifndef MS_ONE_COLOR_SPRITES
             ms_colup0 = ms_colup0ptr[Y];    // 9
             ms_colup1 = ms_colup1ptr[Y];    // 9
+#endif
             *GRP0 = ms_grp0ptr[Y];          // 9
             load(ms_grp1ptr[Y]);            // 6
             strobe(WSYNC);                  // 3 ; Total (1) = 30 + 36 + 9 = 76
 
             store(*GRP1);                   // 3
+#ifndef MS_ONE_COLOR_SPRITES
             *COLUP0 = ms_colup0;            // 6 
             *COLUP1 = ms_colup1;            // 6
+#endif
             kernel_short_macro;             // Max 13 cycles
             Y++;                            // 2
             X = ms_scenery[Y];              // 8
+#ifndef MS_ONE_COLOR_SPRITES
             ms_colup0 = ms_colup0ptr[Y];    // 9
             ms_colup1 = ms_colup1ptr[Y];    // 9
+#endif
             *GRP0 = ms_grp0ptr[Y];          // 9
             load(ms_grp1ptr[Y++]);          // 8
             strobe(WSYNC);                  // 3: Total (2) = 63 
 
             store(*GRP1);                   // 3
+#ifndef MS_ONE_COLOR_SPRITES
             *COLUP0 = ms_colup0;            // 6
             *COLUP1 = ms_colup1;            // 6
+#endif
             VSYNC[X] = ms_v;                // 7
         } while (Y < stop);                 // 5/6
     }
@@ -735,7 +815,10 @@ MS_OFFSCREEN2_BANK void _ms_kernel_prep()
     if (X != -1) {
         ms_id_p[0] = X;
         *NUSIZ0 = ms_nusiz[X];
-        *REFP0 = *NUSIZ0; 
+        *REFP0 = *NUSIZ0;
+#ifdef MS_ONE_COLOR_SPRITES
+        *COLUP0 = ms_color[X];
+#endif
         ms_y0 = ms_sprite_y[X];
         X = ms_sprite_x[X];             // 6
         strobe(WSYNC);                  // 3
@@ -755,6 +838,9 @@ MS_OFFSCREEN2_BANK void _ms_kernel_prep()
         ms_id_p[1] = X;
         *NUSIZ1 = ms_nusiz[X];
         *REFP1 = *NUSIZ1; 
+#ifdef MS_ONE_COLOR_SPRITES
+        *COLUP1 = ms_color[X];
+#endif
         ms_y1 = ms_sprite_y[X];
         X = ms_sprite_x[X];             // 6
         *HMP0 = 0;                      // 3
@@ -812,7 +898,9 @@ MS_KERNEL_BANK void multisprite_kernel()
         ms_v = 0;
         X = ms_sprite_model[X];
         ms_grp0ptr = ms_grptr[X] - ms_y0;   // 21
+#ifndef MS_ONE_COLOR_SPRITES
         ms_colup0ptr = ms_coluptr[X] - ms_y0; // 21
+#endif
         ms_h0 = ms_height[X];
         ms_tmp0 = ms_y0 + ms_h0;
 
@@ -820,7 +908,9 @@ MS_KERNEL_BANK void multisprite_kernel()
         if (X != -1) {
             X = ms_sprite_model[X];
             ms_grp1ptr = ms_grptr[X] - ms_y1;   // 21
+#ifndef MS_ONE_COLOR_SPRITES
             ms_colup1ptr = ms_coluptr[X] - ms_y1; // 21
+#endif
             ms_h1 = ms_height[X];
             ms_tmp1 = ms_y1 + ms_h1;
             

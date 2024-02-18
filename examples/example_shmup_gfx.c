@@ -42,7 +42,7 @@ MS_KERNEL_BANK const char letter_o_gfx[20] = {0, 0, 0x3c, 0x3e, 0x76, 0x63, 0xe3
 MS_KERNEL_BANK const char letter_v_gfx[20] = {0, 0, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc7, 0xe6, 0x66, 0x6c, 0x6c, 0x3c, 0x38, 0x18, 0x18, 0, 0};
 MS_KERNEL_BANK const char letter_r_gfx[20] = {0, 0, 0xfe, 0xc7, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xff, 0xfc, 0xcc, 0xc6, 0xc6, 0xc3, 0xc3, 0, 0};
 #define MS_NB_SPRITES_DEF 18
-MS_KERNEL_BANK const char *ms_grptr[MS_NB_SPRITES_DEF] = {spaceship_gfx, spaceship_exhaust_gfx, fire_gfx, bullet_gfx, explosion1_gfx, explosion2_gfx, explosion3_gfx, explosion4_gfx, explosion5_gfx, enemy1_gfx, bigboss_gfx, letter_g_gfx, letter_a_gfx, letter_m_gfx, letter_e_gfx, letter_o_gfx, letter_v_gfx, letter_r_gfx};
+MS_KERNEL_BANK aligned(256) const char *ms_grptr[MS_NB_SPRITES_DEF] = {spaceship_gfx, spaceship_exhaust_gfx, fire_gfx, bullet_gfx, explosion1_gfx, explosion2_gfx, explosion3_gfx, explosion4_gfx, explosion5_gfx, enemy1_gfx, bigboss_gfx, letter_g_gfx, letter_a_gfx, letter_m_gfx, letter_e_gfx, letter_o_gfx, letter_v_gfx, letter_r_gfx};
 MS_KERNEL_BANK const char *ms_coluptr[MS_NB_SPRITES_DEF] = {spaceship_exhaust_colors, spaceship_exhaust_colors, spaceship_exhaust_colors + 15, bullet_colors, explosion3_colors, explosion3_colors, explosion3_colors, explosion3_colors, explosion3_colors, enemy1_colors, bigboss_colors, spaceship_exhaust_colors, spaceship_exhaust_colors, spaceship_exhaust_colors, spaceship_exhaust_colors, spaceship_exhaust_colors, spaceship_exhaust_colors, spaceship_exhaust_colors};
 MS_KERNEL_BANK const char ms_height[MS_NB_SPRITES_DEF] = {19, 27, 12, 12, 12, 14, 15, 15, 15, 19, 35, 19, 19, 19, 19, 19, 19, 19};
 #define SPRITE_SPACESHIP 0
