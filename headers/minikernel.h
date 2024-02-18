@@ -100,6 +100,16 @@ MK_BANK void mini_kernel_update_score_4_digits(int score)
     mk_s5 = _mk_digits[X = c];
 }
 
+MK_BANK void mini_kernel_6_sprites_init()
+{
+    mk_s0 = _mk_digits[0];
+    mk_s1 = _mk_digits[0];
+    mk_s2 = _mk_digits[0];
+    mk_s3 = _mk_digits[0];
+    mk_s4 = _mk_digits[0];
+    mk_s5 = _mk_digits[0];
+}
+
 MK_BANK void mini_kernel_6_sprites()
 {
     char i, j;

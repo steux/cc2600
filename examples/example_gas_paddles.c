@@ -6,7 +6,7 @@
 #include "example_gas_paddles_gfx.c"
 
 #define BLANK 40
-#define OVERSCAN 30
+#define OVERSCAN 18 
 
 #define REG_COLUPF  0x08
 #define REG_COLUBK  0x09
@@ -34,11 +34,14 @@ MS_KERNEL_BANK const char playfield[192] = {
 #define MS_SELECT_FAST
 #include "multisprite.h"
 
+#define MK_ARMY_FONT
+#include "minikernel.h"
+
 const signed char dx[24] = {40, 38, 34, 28, 19, 10, 0, -10, -20, -28, -34, -38, -40, -38, -34, -28, -19, -10, 0, 10, 19, 28, 34, 38};
 const signed char dy[24] = {0, 16, 32, 45, 55, 61, 64, 61, 55, 45, 32, 16, 0, -16, -31, -45, -55, -61, -64, -61, -55, -45, -32, -16};
 
 int xpos[4], ypos[4];
-char direction[4];
+char direction[4], speed[4];
 const char car_model[24] = {6, 7, 8, 9, 10, 11, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5}; 
 const char car_reflect[24] = {0, 0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 0, 0, 0, 0, 0, 0};
 const char player_color[4] = {VCS_RED, VCS_YELLOW, VCS_BLUE, VCS_LGREEN};
@@ -51,10 +54,21 @@ void game_init()
         ypos[X] = i << 8;
         i += 12;
         direction[X] = 0;
+        speed[X] = 0;
         j = X;
         multisprite_new(6, xpos[X] >> 8, ypos[X] >> 8, 0, player_color[X]);
         X = j;
     } 
+    mini_kernel_6_sprites_init();
+}
+
+void game_logic()
+{
+    char i;
+    for (i = 0; i < 4; i++) {
+        X = i;
+        multisprite_move(X, xpos[X] >> 8, ypos[X] >> 8);
+    }
 }
 
 void main()
@@ -74,15 +88,7 @@ void main()
         // Blank
         *TIM64T = ((BLANK - 3) * 76) / 64 - 3;
         // Do some logic here
-        if (!(*SWCHA & 0x80)) {  } // Right
-        if (!(*SWCHA & 0x40)) {  } // Left
-        if (!(*SWCHA & 0x20)) {  } // Down
-        if (!(*SWCHA & 0x10)) {  } // Up
-    
-        for (i = 0; i < 4; i++) {
-            X = i;
-            multisprite_move(X, xpos[X] >> 8, ypos[X] >> 8);
-        }
+        game_logic();
 
         multisprite_kernel_prep();
         while (*INTIM); // Wait for end of blank
@@ -91,10 +97,24 @@ void main()
         
         // Overscan
         strobe(WSYNC);
+        *COLUBK = VCS_RED;
+        *GRP0 = 0; *GRP1 = 0;
+        *PF0 = 0; *PF1 = 0; *PF2 = 0;
+        *COLUP0 = VCS_WHITE; *COLUP1 = VCS_WHITE;
+        mini_kernel_6_sprites();
+        strobe(WSYNC);
+        *COLUBK = VCS_RED;
+        strobe(WSYNC);
         *VBLANK = 2; // Enable VBLANK
         *TIM64T = ((OVERSCAN) * 76) / 64 + 2;
         // Do some logic here
         multisprite_kernel_post();
+         
+        strobe(WSYNC);
+        *COLUBK = VCS_RED;
+        strobe(WSYNC);
+        *VBLANK = 2; // Enable VBLANK
+
         while (*INTIM); // Wait for end of overscan
     } while(1);
 }
