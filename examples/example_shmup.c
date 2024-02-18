@@ -273,7 +273,7 @@ MS_OFFSCREEN_BANK void check_shot_at_enemy()
             if (ms_sprite_y[Y] < my && ms_sprite_y[Y] >= my2) {
                 // We are at the right height
                 i = X;
-                char l = sprite_width[X = ms_nusiz[Y] & 7];
+                char l = sprite_width[X = ms_sprite_nusiz[Y] & 7];
                 if (j) l <<= 1;
                 if (mx2 >= ms_sprite_x[Y] && mx < ms_sprite_x[Y] + l) {
                     // Let's see if we hit one of these invaders
@@ -303,23 +303,23 @@ MS_OFFSCREEN_BANK void check_shot_at_enemy()
                             // Yes !
                             hit = 1;
                             // Let's reduce the size of this invader
-                            ms_nusiz[Y] = sprite_new_nusiz_remove_left[X];
+                            ms_sprite_nusiz[Y] = sprite_new_nusiz_remove_left[X];
                             ms_sprite_x[Y] += sprite_offset_remove_left[X];
                         } else if (mx2 >= ms_sprite_x[Y] + l - 8) {
                             // Yes. Wi hit the right side
                             hit = 1;
                             // Let's reduce the size of this invader
-                            ms_nusiz[Y] = sprite_new_nusiz_remove_right[X];
+                            ms_sprite_nusiz[Y] = sprite_new_nusiz_remove_right[X];
                         } else if (X == 3 && mx2 >= ms_sprite_x[Y] + 16 && mx < ms_sprite_x[Y] + 24) {
                             // Yes. Wi hit the right side
                             hit = 1;
                             // Let's reduce the size of this invader
-                            ms_nusiz[Y] = 2;
+                            ms_sprite_nusiz[Y] = 2;
                         } else if (X == 6 && mx2 >= ms_sprite_x[Y] + 32 && mx < ms_sprite_x[Y] + 40) {
                             // Yes. Wi hit the right side
                             hit = 1;
                             // Let's reduce the size of this invader
-                            ms_nusiz[Y] = 4;
+                            ms_sprite_nusiz[Y] = 4;
                         }
                     }
                     if (hit) {
@@ -345,9 +345,9 @@ MS_OFFSCREEN_BANK void game_move_enemies()
         if (enemy_type[X] == 1) {
             Y = enemy_sprite[X];
             if (enemy_counter[X] & 1) {
-                ms_nusiz[Y] |= MS_REFLECTED;
+                ms_sprite_nusiz[Y] |= MS_REFLECTED;
             } else {
-                ms_nusiz[Y] &= ~MS_REFLECTED;
+                ms_sprite_nusiz[Y] &= ~MS_REFLECTED;
             }
             enemy_counter[X]++;
             if (enemy_counter[X] < 100) {
@@ -355,7 +355,7 @@ MS_OFFSCREEN_BANK void game_move_enemies()
                 if (enemy_counter[X] >= 60) {
                     enemy_x[X]++;
                     if (enemy_counter[X] == 60) {
-                        j = ms_nusiz[Y];
+                        j = ms_sprite_nusiz[Y];
                         fire_new_bullet(enemy_x[X], enemy_y[X] + 12, bullet_start_direction[Y = enemy_state[X]], j);
                     }
                 }
@@ -418,9 +418,9 @@ MS_OFFSCREEN_BANK void game_move_enemies()
     if (enemy_type[X] == 1) {
         Y = enemy_sprite[X];
         if (enemy_counter[X] & 1) {
-            ms_nusiz[Y] |= MS_REFLECTED;
+            ms_sprite_nusiz[Y] |= MS_REFLECTED;
         } else {
-            ms_nusiz[Y] &= ~MS_REFLECTED;
+            ms_sprite_nusiz[Y] &= ~MS_REFLECTED;
         }
         enemy_counter[X] += 1;
         nx = ms_sprite_x[Y];
@@ -430,7 +430,7 @@ MS_OFFSCREEN_BANK void game_move_enemies()
             if (enemy_counter[X] >= 60) {
                 if (enemy_counter[X] == 60) {
                     j = Y;
-                    fire_new_bullet(nx, ny + 12, bullet_start_direction[X = enemy_state[X]], ms_nusiz[Y]);
+                    fire_new_bullet(nx, ny + 12, bullet_start_direction[X = enemy_state[X]], ms_sprite_nusiz[Y]);
                     Y = j;
                 }
                 nx++;
@@ -571,7 +571,7 @@ MS_OFFSCREEN_BANK game_logic()
     if (missile_sprite != MS_UNALLOCATED) {
         X = missile_sprite;
         // Check for collision 
-        if (ms_nusiz[X] & MS_PF_COLLISION) {
+        if (ms_sprite_nusiz[X] & MS_PF_COLLISION) {
             if (ms_sprite_x[X] < 12 || ms_sprite_x[X] >= 153 - 12) {
                 multisprite_delete_with_rank(missile_sprite, missile_rank);
                 missile_sprite = MS_UNALLOCATED;
@@ -605,22 +605,22 @@ MS_OFFSCREEN_BANK game_logic()
     // Player management
     if (player_state == 0) {
         // Check collision with playfield
-        if (ms_nusiz[X = 0] & MS_PF_COLLISION) {
+        if (ms_sprite_nusiz[X = 0] & MS_PF_COLLISION) {
             if (ms_sprite_x[X] < 12 || ms_sprite_x[X] >= 153 - 12) {
                 lose_one_life();
             }
         }
-        if (ms_nusiz[X = 0] & MS_COLLISION) {
+        if (ms_sprite_nusiz[X = 0] & MS_COLLISION) {
             lose_one_life();
         }
     }
     if (player_state == 0) {
         if (player_timer >= 1) {
             player_timer = 0;
-            ms_nusiz[X] = 0;
+            ms_sprite_nusiz[X] = 0;
         } else {
             player_timer = 1;
-            ms_nusiz[X] = MS_REFLECTED;
+            ms_sprite_nusiz[X] = MS_REFLECTED;
         }
     } else {
         // Player explosion

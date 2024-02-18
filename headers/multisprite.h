@@ -82,7 +82,7 @@ char ms_sprite_iter;
 EXTRA_RAM char ms_sprite_x[MS_MAX_NB_SPRITES];
 EXTRA_RAM char ms_sprite_y[MS_MAX_NB_SPRITES];
 EXTRA_RAM char ms_sprite_model[MS_MAX_NB_SPRITES];
-EXTRA_RAM char ms_nusiz[MS_MAX_NB_SPRITES];
+EXTRA_RAM char ms_sprite_nusiz[MS_MAX_NB_SPRITES];
 EXTRA_RAM char ms_sorted_by_y[MS_MAX_NB_SPRITES];
 #ifdef MS_ONE_COLOR_SPRITES
 EXTRA_RAM char ms_color[MS_MAX_NB_SPRITES];
@@ -144,7 +144,7 @@ MS_OFFSCREEN_BANK char multisprite_new(char model, char nx, char ny, char nusiz,
     ms_sprite_x[Y] = nx;
     ms_sprite_y[Y] = ny;
     ms_sprite_model[Y] = model;
-    ms_nusiz[Y] = nusiz;
+    ms_sprite_nusiz[Y] = nusiz;
     ms_color[Y] = color;
 
     // Update number of sprites
@@ -176,7 +176,7 @@ MS_OFFSCREEN_BANK char multisprite_new(char model, char nx, char ny, char nusiz)
     ms_sprite_x[Y] = nx;
     ms_sprite_y[Y] = ny;
     ms_sprite_model[Y] = model;
-    ms_nusiz[Y] = nusiz;
+    ms_sprite_nusiz[Y] = nusiz;
 
     // Update number of sprites
     ms_nb_sprites++;
@@ -419,7 +419,7 @@ MS_OFFSCREEN_BANK _ms_select_sprites()
     for (Y = 0; Y < end; Y++) {
         candidate1 = ms_sorted_by_y[Y];
         X = candidate1 & 0x7f;
-        ms_nusiz[X] &= 0x3f; // Reset collision
+        ms_sprite_nusiz[X] &= 0x3f; // Reset collision
         if (!(candidate1 & 0x80)) {
             char candidate2 = ms_sorted_by_y[++Y];
             Y--;
@@ -432,7 +432,7 @@ MS_OFFSCREEN_BANK _ms_select_sprites()
         ms_sorted_by_y[Y] = X;
     }
     X = ms_sorted_by_y[Y] & 0x7f;
-    ms_nusiz[X] &= 0x3f; // Reset collision
+    ms_sprite_nusiz[X] &= 0x3f; // Reset collision
     ms_sorted_by_y[Y] = X;
 }
 #else
@@ -444,7 +444,7 @@ MS_KERNEL_BANK _ms_select_sprites()
     for (Y = 0; Y < end; Y++) {
         candidate1 = ms_sorted_by_y[Y];
         X = candidate1 & 0x7f;
-        ms_nusiz[X] &= 0x3f; // Reset collision
+        ms_sprite_nusiz[X] &= 0x3f; // Reset collision
         if (!(candidate1 & 0x80)) {
             char candidate2 = ms_sorted_by_y[++Y];
             Y--;
@@ -464,7 +464,7 @@ MS_KERNEL_BANK _ms_select_sprites()
         ms_sorted_by_y[Y] = X;
     }
     X = ms_sorted_by_y[Y] & 0x7f;
-    ms_nusiz[X] &= 0x3f; // Reset collision
+    ms_sprite_nusiz[X] &= 0x3f; // Reset collision
     ms_sorted_by_y[Y] = X;
 }
 #else
@@ -478,7 +478,7 @@ MS_OFFSCREEN_BANK _ms_select_sprites()
     for (Y = 0; Y < end; Y++) {
         candidate1 = ms_sorted_by_y[Y];
         X = candidate1 & 0x7f;
-        ms_nusiz[X] &= 0x3f; // Reset collision
+        ms_sprite_nusiz[X] &= 0x3f; // Reset collision
         if (!(candidate1 & 0x80)) {
             char candidate2 = ms_sorted_by_y[++Y];
             Y--;
@@ -497,7 +497,7 @@ MS_OFFSCREEN_BANK _ms_select_sprites()
         ms_sorted_by_y[Y] = X;
     }
     X = ms_sorted_by_y[Y] & 0x7f;
-    ms_nusiz[X] &= 0x3f; // Reset collision
+    ms_sprite_nusiz[X] &= 0x3f; // Reset collision
     ms_sorted_by_y[Y] = X;
 }
 #endif
@@ -563,7 +563,7 @@ MS_KERNEL_BANK char _ms_kernel_repo0()
     // Entering at [46/76]
     ms_tmp = ms_scenery[Y];             // 9 [55/76] (variable)
     X = ms_id_p[0];                     // 3
-    *NUSIZ0 = ms_nusiz[X];              // 7 [65/76]
+    *NUSIZ0 = ms_sprite_nusiz[X];              // 7 [65/76]
     *REFP0 = *NUSIZ0;                   // 3 [68/76]
     strobe(WSYNC);                      // 3
 
@@ -606,7 +606,7 @@ MS_KERNEL_BANK char _ms_kernel_repo1()
     // Entering at [46/76]
     ms_tmp = ms_scenery[Y];             // 9 [55/76] (variable)
     X = ms_id_p[1];                     // 3
-    *NUSIZ1 = ms_nusiz[X];              // 7 [65/76]
+    *NUSIZ1 = ms_sprite_nusiz[X];              // 7 [65/76]
     *REFP1 = *NUSIZ1;                   // 3 [68/76]
     strobe(WSYNC);                      // 3
 
@@ -814,7 +814,7 @@ MS_OFFSCREEN2_BANK void _ms_kernel_prep()
     // Position sprite 0
     if (X != -1) {
         ms_id_p[0] = X;
-        *NUSIZ0 = ms_nusiz[X];
+        *NUSIZ0 = ms_sprite_nusiz[X];
         *REFP0 = *NUSIZ0;
 #ifdef MS_ONE_COLOR_SPRITES
         *COLUP0 = ms_color[X];
@@ -836,7 +836,7 @@ MS_OFFSCREEN2_BANK void _ms_kernel_prep()
     // Position sprite 1
     if (X != -1) {
         ms_id_p[1] = X;
-        *NUSIZ1 = ms_nusiz[X];
+        *NUSIZ1 = ms_sprite_nusiz[X];
         *REFP1 = *NUSIZ1; 
 #ifdef MS_ONE_COLOR_SPRITES
         *COLUP1 = ms_color[X];
@@ -871,11 +871,11 @@ MS_KERNEL_BANK _ms_check_collisions()
     ms_y0 = MS_UNALLOCATED;
     ms_y1 = MS_UNALLOCATED;
     if (*CXPPMM & 0x80) {
-        ms_nusiz[X = ms_id_p[0]] |= MS_COLLISION;
-        ms_nusiz[X = ms_id_p[1]] |= MS_COLLISION;
+        ms_sprite_nusiz[X = ms_id_p[0]] |= MS_COLLISION;
+        ms_sprite_nusiz[X = ms_id_p[1]] |= MS_COLLISION;
     } else {
-        if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= MS_PF_COLLISION; // 8/20
-        if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= MS_PF_COLLISION;
+        if (*CXP0FB & 0x80) ms_sprite_nusiz[X = ms_id_p[0]] |= MS_PF_COLLISION; // 8/20
+        if (*CXP1FB & 0x80) ms_sprite_nusiz[X = ms_id_p[1]] |= MS_PF_COLLISION;
     }
     //strobe(WSYNC);                  // 3
     strobe(CXCLR);
@@ -1053,7 +1053,7 @@ display_sprite0:
             _ms_p0_kernel(ms_tmp0);
             if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 6) goto finish;
             strobe(WSYNC);                  // 3
-            if (*CXP0FB & 0x80) ms_nusiz[X = ms_id_p[0]] |= 0x40;
+            if (*CXP0FB & 0x80) ms_sprite_nusiz[X = ms_id_p[0]] |= 0x40;
             strobe(CXCLR); // Clear collisions
             ms_tmp0 = ms_y1 - 4;
             ms_y0 = MS_UNALLOCATED;
@@ -1134,7 +1134,7 @@ display_sprite1:
             _ms_p1_kernel(ms_tmp1);
             if (Y >= MS_OFFSET + MS_PLAYFIELD_HEIGHT - 6) goto finish;
             strobe(WSYNC);                  // 3
-            if (*CXP1FB & 0x80) ms_nusiz[X = ms_id_p[1]] |= 0x40;
+            if (*CXP1FB & 0x80) ms_sprite_nusiz[X = ms_id_p[1]] |= 0x40;
             strobe(CXCLR); // Clear collisions
             ms_tmp1 = ms_y0 - 4;
             ms_y1 = MS_UNALLOCATED;

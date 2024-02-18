@@ -62,8 +62,8 @@ void main()
         // Blank
         *TIM64T = ((BLANK - 3) * 76) / 64 - 3;
         // Do some logic here
-        if (!(*SWCHA & 0x80) && xpos < 158) { xpos++; ms_nusiz[0] = 0; } // Right
-        if (!(*SWCHA & 0x40) && xpos > 0) { xpos--; ms_nusiz[0] = 8; } // Left
+        if (!(*SWCHA & 0x80) && xpos < 158) { xpos++; ms_sprite_nusiz[0] = 0; } // Right
+        if (!(*SWCHA & 0x40) && xpos > 0) { xpos--; ms_sprite_nusiz[0] = 8; } // Left
         if (!(*SWCHA & 0x20)) { ypos++; } // Down
         if (!(*SWCHA & 0x10)) { ypos--; }// Up
 
