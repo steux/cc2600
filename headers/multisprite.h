@@ -21,7 +21,7 @@
 // v0.1: Initial version
 // DONE: Add support for SARA chip
 // DONE: Test with bankswitching
-// TODO: Add support for single color sprites (MS_ONE_COLOR_SPRITES) 
+// DONE: Add support for single color sprites (MS_ONE_COLOR_SPRITES) 
 // DONE: Implement bidir search in multisprite_move
 
 #ifndef __MULTISPRITE_H__

@@ -2,7 +2,6 @@
 
 #define MS_OFFSCREEN_BANK bank0
 #define MS_KERNEL_BANK bank1
-
 #include "example_gas_paddles_gfx.c"
 
 #define BLANK 40
@@ -32,6 +31,23 @@ MS_KERNEL_BANK const char playfield[192] = {
 
 #define MS_ONE_COLOR_SPRITES
 #define MS_SELECT_FAST
+#define MS_MAX_NB_SPRITES 4
+char paddle[4];
+#define kernel_short_macro \
+   X = *INTIM; \
+   if (!(*INPT0 & 0x80)) paddle[0] = X; \
+   if (!(*INPT1 & 0x80)) paddle[1] = X; \
+   if (!(*INPT2 & 0x80)) paddle[2] = X; \
+   if (!(*INPT3 & 0x80)) paddle[3] = X;
+#define kernel_medium_macro kernel_short_macro
+#define kernel_long_macro \
+   X = *INTIM; \
+   if (!(*INPT0 & 0x80)) paddle[0] = X; \
+   if (!(*INPT1 & 0x80)) paddle[1] = X; \
+   strobe(WSYNC); \
+   if (!(*INPT2 & 0x80)) paddle[2] = X; \
+   if (!(*INPT3 & 0x80)) paddle[3] = X;
+
 #include "multisprite.h"
 
 #define MK_ARMY_FONT
@@ -55,6 +71,7 @@ void game_init()
         i += 12;
         direction[X] = 0;
         speed[X] = 0;
+        paddle[X] = 100;
         j = X;
         multisprite_new(6, xpos[X] >> 8, ypos[X] >> 8, 0, player_color[X]);
         X = j;
@@ -78,7 +95,7 @@ void main()
     game_init();
 
     do {
-        *VBLANK = 2; // Enable VBLANK
+        *VBLANK = 0x02; // Turn off video for vblank period
         *VSYNC = 2; // Set VSYNC
         strobe(WSYNC); // Hold it for 3 scanlines
         strobe(WSYNC);
@@ -89,15 +106,18 @@ void main()
         *TIM64T = ((BLANK - 3) * 76) / 64 - 3;
         // Do some logic here
         game_logic();
+        mini_kernel_update_3_digits(paddle[0]);
 
         multisprite_kernel_prep();
         while (*INTIM); // Wait for end of blank
- 
+        *TIM64T = 255;
+
         multisprite_kernel();
         
         // Overscan
         strobe(WSYNC);
         *COLUBK = VCS_RED;
+        *VBLANK = 0x80; // Keep video on. Dump to ground 
         *GRP0 = 0; *GRP1 = 0;
         *PF0 = 0; *PF1 = 0; *PF2 = 0;
         *COLUP0 = VCS_WHITE; *COLUP1 = VCS_WHITE;
@@ -105,15 +125,10 @@ void main()
         strobe(WSYNC);
         *COLUBK = VCS_RED;
         strobe(WSYNC);
-        *VBLANK = 2; // Enable VBLANK
+        *VBLANK = 0x02; // Turn off video. Don't dump to ground 
         *TIM64T = ((OVERSCAN) * 76) / 64 + 2;
         // Do some logic here
         multisprite_kernel_post();
-         
-        strobe(WSYNC);
-        *COLUBK = VCS_RED;
-        strobe(WSYNC);
-        *VBLANK = 2; // Enable VBLANK
 
         while (*INTIM); // Wait for end of overscan
     } while(1);

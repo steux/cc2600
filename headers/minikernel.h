@@ -100,6 +100,46 @@ MK_BANK void mini_kernel_update_score_4_digits(int score)
     mk_s5 = _mk_digits[X = c];
 }
 
+MK_BANK void mini_kernel_update_3_digits(char value)
+{
+    X = 0;
+    if (value >= 100) {
+        do {
+            X++;
+            value -= 100;
+        } while (value >= 0);
+        X--;
+        value += 100;
+    }
+    mk_s3 = _mk_digits[X];
+    X = 0;
+    if (value >= 10) {
+        do {
+            X++;
+            value -= 10;
+        } while (value >= 0);
+        X--;
+        value += 10;
+    }
+    mk_s4 = _mk_digits[X];
+    mk_s5 = _mk_digits[X = value];
+}
+
+MK_BANK void mini_kernel_update_2_digits(char value)
+{
+    X = 0;
+    if (value >= 10) {
+        do {
+            X++;
+            value -= 10;
+        } while (value >= 0);
+        X--;
+        value += 10;
+    }
+    mk_s4 = _mk_digits[X];
+    mk_s5 = _mk_digits[X = value];
+}
+
 MK_BANK void mini_kernel_6_sprites_init()
 {
     mk_s0 = _mk_digits[0];
