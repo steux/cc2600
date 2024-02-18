@@ -56,11 +56,12 @@ char paddle[4];
 const signed char dx[24] = {40, 38, 34, 28, 19, 10, 0, -10, -20, -28, -34, -38, -40, -38, -34, -28, -19, -10, 0, 10, 19, 28, 34, 38};
 const signed char dy[24] = {0, 16, 32, 45, 55, 61, 64, 61, 55, 45, 32, 16, 0, -16, -31, -45, -55, -61, -64, -61, -55, -45, -32, -16};
 
-int xpos[4], ypos[4];
-char direction[4], speed[4];
+unsigned int xpos[4], ypos[4], direction[4];
+char speed[4];
 const char car_model[24] = {6, 7, 8, 9, 10, 11, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5}; 
 const char car_reflect[24] = {0, 0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 0, 0, 0, 0, 0, 0};
 const char player_color[4] = {VCS_RED, VCS_YELLOW, VCS_BLUE, VCS_LGREEN};
+const char paddle_trigger_flag[4] = {0x80, 0x40, 0x08, 0x04};
 
 void game_init() 
 {
@@ -79,11 +80,46 @@ void game_init()
     mini_kernel_6_sprites_init();
 }
 
+void car_forward()
+{
+    xpos[X] += dx[Y];
+    ypos[X] += dy[Y];
+}
+
 void game_logic()
 {
     char i;
     for (i = 0; i < 4; i++) {
         X = i;
+        if ((*SWCHA) & paddle_trigger_flag[X]) {
+            if (speed[X] >= 3) speed[X] -= 2;
+            else speed[X] = 0;
+        } else {
+            if (paddle[X] == 26) {
+                Y = direction[X];
+                xpos[X] -= dx[Y];
+                ypos[X] -= dy[Y];
+                speed[X] = 0;
+            } else if (speed[X] != 255) speed[X]++;
+        }
+        if (speed[X] != 0) {
+            Y = direction[X];
+            car_forward();
+            if (speed[X] >= 64) {
+                car_forward();
+                if (speed[X] >= 128) {
+                    car_forward();
+                    if (speed[X] >= 192) {
+                        car_forward();
+                    }
+                }
+            }
+        }  
+        if ((xpos[X] >> 8) < 1) xpos[X] = 1 * 256;
+        else if ((xpos[X] >> 8) >= 152) xpos[X] = 151 * 256;
+        if ((ypos[X] >> 8) < 32) ypos[X] = 32 * 256;
+        else if ((ypos[X] >> 8) >= 180) ypos[X] = 179 * 256;
+
         multisprite_move(X, xpos[X] >> 8, ypos[X] >> 8);
     }
 }
