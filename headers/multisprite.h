@@ -700,7 +700,6 @@ MS_KERNEL_BANK void _ms_p0_p1_kernel(char stop)
     char ms_colup0, ms_colup1;
 #endif
 
-    *VDELP0 = 1;                    // 5
     // [46/76] when coming from p0/p1 multisprite_kernel
     ms_v = ms_scenery[Y];           // 9
     *GRP0 = ms_grp0ptr[Y];          // 9
@@ -708,7 +707,8 @@ MS_KERNEL_BANK void _ms_p0_p1_kernel(char stop)
     *COLUP1 = ms_colup1ptr[Y];      // 9
     *COLUP0 = ms_colup0ptr[Y];      // 9 [82/76]. No WSYNC necessary 
 #endif
-    *GRP1 = ms_grp1ptr[Y];          // 6 
+    *GRP1 = ms_grp1ptr[Y];          // 9 
+    *VDELP0 = 1;                    // 5
     Y++;                            // 2
     X = ms_scenery[Y];              // 8
 #ifndef MS_ONE_COLOR_SPRITES

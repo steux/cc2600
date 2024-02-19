@@ -109,10 +109,10 @@ void game_logic(char player)
     }
 
     if ((*SWCHA) & paddle_trigger_flag[X]) {
-        if (speed[X] >= 3) speed[X] -= 2;
+        if (speed[X] >= 5) speed[X] -= 4;
         else speed[X] = 0;
     } else {
-        if (paddle[X] == 26) {
+        if (paddle[X] > 240) {
             xpos[X] -= dx[Y];
             ypos[X] -= dy[Y];
             speed[X] = 0;
