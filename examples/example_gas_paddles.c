@@ -64,7 +64,7 @@ char speed[4];
 const char car_model[24] = {6, 7, 8, 9, 10, 11, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5}; 
 const char car_offset[24] = {2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2}; 
 const char car_reflect[24] = {0, 0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 0, 0, 0, 0, 0, 0};
-const char player_color[4] = {VCS_RED, VCS_YELLOW, VCS_BLUE, VCS_LGREEN};
+const char player_color[4] = {VCS_RED, VCS_BLUE, VCS_LGREEN, VCS_YELLOW };
 const char paddle_trigger_flag[4] = {0x80, 0x40, 0x08, 0x04};
 
 #ifdef DEBUG
@@ -215,16 +215,37 @@ void main()
         
         // Overscan
         strobe(WSYNC);
-        *COLUBK = VCS_RED;
-        *VBLANK = 0x80; // Keep video on. Dump to ground 
+        *COLUBK = VCS_BLACK;
+        *COLUPF = VCS_BROWN;
         *GRP0 = 0; *GRP1 = 0;
-        *PF0 = 0; *PF1 = 0; *PF2 = 0;
         *ENABL = 0;
+        *CTRLPF = 0;
+        *VBLANK = 0x80; // Keep video on. Dump to ground 
+        strobe(WSYNC); // Line 1
+        *PF0 = 0x90; *PF1 = 0x8e; *PF2 = 0xc6;
+        strobe(WSYNC); // Line 2
+        *PF1 = 0x06; *PF2 = 0x82;
+        strobe(WSYNC); // Line 3
+        strobe(WSYNC); // Line 4
+        strobe(WSYNC); // Line 5
+        *PF0 = 0x10; *PF1 = 0x22; *PF2 = 0x10;
+        strobe(WSYNC); // Line 6
+        *PF1 = 0x72, *PF2 = 0x38;
+        strobe(WSYNC); // Line 7
+        strobe(WSYNC); // Line 8
+        *PF0 = 0x10; *PF1 = 0xfa; *PF2 = 0x7c;
+        strobe(WSYNC); // Line 10 
+        strobe(WSYNC); // Line 9
+        strobe(WSYNC); // Line 11
+        *PF0 = 0xf0; *PF1 = 0xFF; *PF2 = 0xFF; 
+        strobe(WSYNC); // Line 12
+        /*
         *COLUP0 = VCS_WHITE; *COLUP1 = VCS_WHITE;
         mini_kernel_6_sprites();
         strobe(WSYNC);
         *COLUBK = VCS_RED;
         strobe(WSYNC);
+        */
         *VBLANK = 0x02; // Turn off video. Don't dump to ground 
         *TIM64T = ((OVERSCAN) * 76) / 64 + 2;
         // Do some logic here

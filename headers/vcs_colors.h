@@ -18,7 +18,7 @@
 #define VCS_ORANGE    0x4A
 #define VCS_DGREEN    0x52
 #define VCS_GREEN     0x54
-#define VCS_BROWN     0x24
+#define VCS_BROWN     0x20
 #define VCS_DGRAY     0x04
 #else // NTSC colors
 #define VCS_BLUE      0x72
@@ -30,7 +30,7 @@
 #define VCS_ORANGE    0x3A
 #define VCS_DGREEN    0xc2
 #define VCS_GREEN     0xC4
-#define VCS_BROWN     0x14
+#define VCS_BROWN     0x22
 #define VCS_DGRAY     0x02
 #endif
 
