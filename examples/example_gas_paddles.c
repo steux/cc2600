@@ -48,7 +48,8 @@ char paddle[4];
    if (!(*INPT1 & 0x80)) paddle[1] = X; \
    strobe(WSYNC); \
    if (!(*INPT2 & 0x80)) paddle[2] = X; \
-   if (!(*INPT3 & 0x80)) paddle[3] = X;
+   if (!(*INPT3 & 0x80)) paddle[3] = X; \
+   if (Y >= 163) *ENABL = 2;
 
 #include "multisprite.h"
 
@@ -75,6 +76,20 @@ void game_init()
 #define YSTART 180
     const char xinit[4] = {80, 80, 68, 68};
     const char yinit[4] = {YSTART, YSTART + 12, YSTART, YSTART + 12};
+    
+    // Initialize ball (starting line)
+    X = 90;
+    strobe(WSYNC);                  
+
+    *HMBL = ms_sprite_hm_offscreen[X];
+    X = ms_sprite_wait_offscreen[X];
+    csleep(4);                      
+    // Critical loop. Must not cross page boundary. 
+    if (X) do { X--; } while (X);   // 3 for X = 0. 1 + X * 5 cycles. 
+    strobe(RESBL);                  // 3. Minimum = 23 cycles
+    strobe(WSYNC);                  // 3
+    strobe(HMOVE);
+
     char i;
     for (X = 0; X < 4; X++) {
         xpos[X] = xinit[X] << 8;
@@ -87,6 +102,8 @@ void game_init()
         X = i;
     } 
     mini_kernel_6_sprites_init();
+
+    strobe(HMCLR);
 }
 
 inline void car_forward()
@@ -187,7 +204,7 @@ void main()
 #endif
         mini_kernel_update_3_digits(paddle[0]);
         *PF0 = 255; *PF1 = 255; *PF2 = 255;
-        *CTRLPF = 1; // Reflective playfield
+        *CTRLPF = 1; // Reflective playfield. Ball size is 1
         *COLUPF = VCS_GREEN; // Grass
 
         multisprite_kernel_prep();
@@ -202,6 +219,7 @@ void main()
         *VBLANK = 0x80; // Keep video on. Dump to ground 
         *GRP0 = 0; *GRP1 = 0;
         *PF0 = 0; *PF1 = 0; *PF2 = 0;
+        *ENABL = 0;
         *COLUP0 = VCS_WHITE; *COLUP1 = VCS_WHITE;
         mini_kernel_6_sprites();
         strobe(WSYNC);
