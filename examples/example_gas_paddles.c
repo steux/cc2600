@@ -61,12 +61,13 @@ const int dy[24] = {0, 16, 32, 45, 55, 61, 64, 61, 55, 45, 32, 16, 0, -16, -31, 
 
 unsigned int xpos[4], ypos[4], direction[4];
 char speed[4];
+char steering[4];
 const char car_model[24] = {6, 7, 8, 9, 10, 11, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5}; 
 const char car_offset[24] = {2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2}; 
 const char car_reflect[24] = {0, 0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 0, 0, 0, 0, 0, 0};
 const char player_color[4] = {VCS_RED, VCS_BLUE, VCS_LGREEN, VCS_YELLOW };
 const char paddle_trigger_flag[4] = {0x80, 0x40, 0x08, 0x04};
-
+const char steering_offset[4] = {6, 1, 2, 0};
 #ifdef DEBUG
 char min_timer_vblank, min_timer_overscan;
 #endif
@@ -96,6 +97,7 @@ void game_init()
         ypos[X] = yinit[X] << 8;
         direction[X] = 256 + 128;
         speed[X] = 0;
+        steering[X] = 0;
         paddle[X] = 100;
         i = X;
         multisprite_new(6, xpos[X] >> 8, ypos[X] >> 8, 0, player_color[X]);
@@ -179,6 +181,8 @@ void game_logic(char player)
 
 void main()
 {
+    char counter;
+
 #ifdef DEBUG
     min_timer_vblank = 255;
     min_timer_overscan = 255;
@@ -215,30 +219,72 @@ void main()
         
         // Overscan
         strobe(WSYNC);
-        *COLUBK = VCS_BLACK;
         *COLUPF = VCS_BROWN;
-        *GRP0 = 0; *GRP1 = 0;
+        *CTRLPF = 4; // Playfield priority over players
         *ENABL = 0;
-        *CTRLPF = 0;
+        *COLUBK = VCS_BLACK;
         *VBLANK = 0x80; // Keep video on. Dump to ground 
+        if (counter & 1) {
+            X = steering[2];
+            *HMM0 = ms_sprite_hm_offscreen[X];            // 7
+            Y = ms_sprite_wait_offscreen[X];              // 6 [19/76]
+            strobe(RESP0);
+            if (Y) do { Y--; } while (Y);       // 3 for X = 0. 1 + X * 5 cycles. 
+            strobe(RESM0);                      // 3. Minimum = 26 cycles
+            *HMP0 = 0xe0;
+            strobe(WSYNC);
+            *HMP1 = 0xf0;
+            *COLUP0 = VCS_LGREEN;
+            *COLUP1 = VCS_BLUE;
+            X = steering[1];
+            *HMM1 = ms_sprite_hm_offscreen[X];            // 7
+            X = ms_sprite_wait_offscreen[X];              // 6 [19/76]
+            strobe(RESP1);
+            if (X) do { X--; } while (X);       // 3 for X = 0. 1 + X * 5 cycles. 
+            strobe(RESM1);                      // 3. Minimum = 26 cycles
+        } else {
+            *COLUP0 = VCS_YELLOW;
+            *COLUP1 = VCS_RED;
+            X = steering[3];
+            *HMM0 = ms_sprite_hm_offscreen[X];            // 7
+            Y = ms_sprite_wait_offscreen[X];              // 6 [19/76]
+            csleep(2);
+            strobe(RESP0);
+            if (Y) do { Y--; } while (Y);       // 3 for X = 0. 1 + X * 5 cycles. 
+            strobe(RESM0);                      // 3. Minimum = 26 cycles
+            strobe(WSYNC);
+            X = steering[0];
+            *HMM1 = ms_sprite_hm_offscreen[X];            // 7
+            X = ms_sprite_wait_offscreen[X];              // 6 [19/76]
+            strobe(RESP1);
+            if (X) do { X--; } while (X);       // 3 for X = 0. 1 + X * 5 cycles. 
+            strobe(RESM1);                      // 3. Minimum = 26 cycles
+            *HMP1 = 0x30;
+            *HMP0 = 0x00;
+        }
+        *GRP0 = 0xff; 
+        *GRP1 = 0xff;
+        *ENAM1 = 0x02;
+        *ENAM0 = 0x02;
         strobe(WSYNC); // Line 1
-        *PF0 = 0x90; *PF1 = 0x8e; *PF2 = 0xc6;
+        strobe(HMOVE);
+        *PF0 = 0xc0; *PF1 = 0x1c; *PF2 = 0xe3; *NUSIZ0 = 0x20; *NUSIZ1 = 0x20;
         strobe(WSYNC); // Line 2
-        *PF1 = 0x06; *PF2 = 0x82;
+        *PF0 = 0x40; *PF1 = 0x0c; *PF2 = 0xc1; strobe(HMCLR);
         strobe(WSYNC); // Line 3
+        multisprite_kernel_post();
         strobe(WSYNC); // Line 4
         strobe(WSYNC); // Line 5
-        *PF0 = 0x10; *PF1 = 0x22; *PF2 = 0x10;
+        *PF0 = 0x00; *PF1 = 0x44; *PF2 = 0x88;
         strobe(WSYNC); // Line 6
-        *PF1 = 0x72, *PF2 = 0x38;
+        *PF1 = 0xe4, *PF2 = 0x9c;
         strobe(WSYNC); // Line 7
         strobe(WSYNC); // Line 8
-        *PF0 = 0x10; *PF1 = 0xfa; *PF2 = 0x7c;
+        *PF0 = 0x80; *PF1 = 0xf4; *PF2 = 0xbe;
         strobe(WSYNC); // Line 10 
         strobe(WSYNC); // Line 9
         strobe(WSYNC); // Line 11
-        *PF0 = 0xf0; *PF1 = 0xFF; *PF2 = 0xFF; 
-        strobe(WSYNC); // Line 12
+        *ENAM0 = 0; *ENAM1 = 0;
         /*
         *COLUP0 = VCS_WHITE; *COLUP1 = VCS_WHITE;
         mini_kernel_6_sprites();
@@ -249,12 +295,15 @@ void main()
         *VBLANK = 0x02; // Turn off video. Don't dump to ground 
         *TIM64T = ((OVERSCAN) * 76) / 64 + 2;
         // Do some logic here
-        multisprite_kernel_post();
 #ifdef DEBUG
         if (*INTIM < min_timer_overscan) min_timer_overscan = *INTIM;
 #endif
         game_logic(2);
         game_logic(3);
+        counter++;
+        X = counter & 3;
+        steering[X]++;
+        if (steering[X] == steering_offset[X] + 19 ) steering[X] = steering_offset[X];
     
         while (*INTIM); // Wait for end of overscan
     } while(1);
