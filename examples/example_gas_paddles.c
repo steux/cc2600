@@ -60,14 +60,33 @@ const int dx[24] = {40, 38, 34, 28, 19, 10, 0, -10, -20, -28, -34, -38, -40, -38
 const int dy[24] = {0, 16, 32, 45, 55, 61, 64, 61, 55, 45, 32, 16, 0, -16, -31, -45, -55, -61, -64, -61, -55, -45, -32, -16};
 
 unsigned int xpos[4], ypos[4], direction[4];
-char speed[4];
-char steering[4];
+char speed[4], race_step[4], race_laps[4];
+char steering[4], pstate[4];
+#define STATE_GO          0
+#define STATE_FIRST       1
+#define STATE_SECOND      2
+#define STATE_THIRD       3
+#define STATE_FOURTH      4
+#define STATE_OUT_OF_GAME 5 
+
 const char car_model[24] = {6, 7, 8, 9, 10, 11, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5}; 
 const char car_offset[24] = {2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2}; 
 const char car_reflect[24] = {0, 0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 0, 0, 0, 0, 0, 0};
 const char player_color[4] = {VCS_RED, VCS_BLUE, VCS_LGREEN, VCS_YELLOW };
 const char paddle_trigger_flag[4] = {0x80, 0x40, 0x08, 0x04};
 const char steering_offset[4] = {6, 1, 2, 0};
+
+const char *state_sprite[5] = {0, 0, 0, 0, 0};
+
+#define NB_WAYPOINTS 5
+const char waypoint_x[NB_WAYPOINTS] = {20, 160, 120, 80, 40};
+const char waypoint_y[NB_WAYPOINTS] = {170, 170, 50, 100, 50};
+#define WPT_UP      0
+#define WPT_LEFT    1
+#define WPT_DOWN    2
+#define WPT_RIGHT   3
+const char waypoint_dir[NB_WAYPOINTS] = {WPT_RIGHT, WPT_UP, WPT_DOWN, WPT_UP, WPT_DOWN};
+
 #ifdef DEBUG
 char min_timer_vblank, min_timer_overscan;
 #endif
@@ -78,7 +97,7 @@ void game_init()
     const char xinit[4] = {80, 80, 68, 68};
     const char yinit[4] = {YSTART, YSTART + 12, YSTART, YSTART + 12};
     
-    // Initialize ball (starting line)
+    // Initialize ball (start line)
     X = 90;
     strobe(WSYNC);                  
 
@@ -98,6 +117,9 @@ void game_init()
         direction[X] = 256 + 128;
         speed[X] = 0;
         steering[X] = 0;
+        race_step[X] = 0;
+        race_laps[X] = -1;
+        pstate[X] = STATE_OUT_OF_GAME;
         paddle[X] = 100;
         i = X;
         multisprite_new(6, xpos[X] >> 8, ypos[X] >> 8, 0, player_color[X]);
@@ -175,6 +197,9 @@ void game_logic(char player)
     else if ((ypos[X] >> 8) >= 200) { ypos[X] = 199 * 256; speed[X] = 0; }
 
     ms_sprite_model[X] = car_model[Y];
+    if (ms_sprite_nusiz[X] & 0xc0) {
+        speed[X] = 0; // Collision with playfield and/or another player
+    }
     ms_sprite_nusiz[X] = car_reflect[Y];
     multisprite_move(X, xpos[X] >> 8, (ypos[X] >> 8) + car_offset[Y]);
 }
@@ -225,6 +250,7 @@ void main()
         *COLUBK = VCS_BLACK;
         *VBLANK = 0x80; // Keep video on. Dump to ground 
         if (counter & 1) {
+            // Player 2 & 1
             X = steering[2];
             *HMM0 = ms_sprite_hm_offscreen[X];            // 7
             Y = ms_sprite_wait_offscreen[X];              // 6 [19/76]
@@ -242,7 +268,9 @@ void main()
             strobe(RESP1);
             if (X) do { X--; } while (X);       // 3 for X = 0. 1 + X * 5 cycles. 
             strobe(RESM1);                      // 3. Minimum = 26 cycles
+            X = pstate[2]; Y = pstate[1];
         } else {
+            // Player 4 & 0
             *COLUP0 = VCS_YELLOW;
             *COLUP1 = VCS_RED;
             X = steering[3];
@@ -261,6 +289,7 @@ void main()
             strobe(RESM1);                      // 3. Minimum = 26 cycles
             *HMP1 = 0x30;
             *HMP0 = 0x00;
+            X = pstate[3]; Y = pstate[0];
         }
         *GRP0 = 0xff; 
         *GRP1 = 0xff;
@@ -269,20 +298,25 @@ void main()
         strobe(WSYNC); // Line 1
         strobe(HMOVE);
         *PF0 = 0xc0; *PF1 = 0x1c; *PF2 = 0xe3; *NUSIZ0 = 0x20; *NUSIZ1 = 0x20;
+        ms_grp0ptr = state_sprite[X]; ms_grp1ptr = state_sprite[Y]; Y = 0; 
         strobe(WSYNC); // Line 2
-        *PF0 = 0x40; *PF1 = 0x0c; *PF2 = 0xc1; strobe(HMCLR);
+        *PF0 = 0x40; *GRP1 = ms_grp1ptr[Y]; *GRP0 = ms_grp0ptr[Y++];  *PF1 = 0x0c; *PF2 = 0xc1;
         strobe(WSYNC); // Line 3
-        multisprite_kernel_post();
+        *GRP1 = ms_grp1ptr[Y]; *GRP0 = ms_grp0ptr[Y++]; multisprite_kernel_post();
         strobe(WSYNC); // Line 4
+        *GRP1 = ms_grp1ptr[Y]; *GRP0 = ms_grp0ptr[Y++]; strobe(HMCLR);
         strobe(WSYNC); // Line 5
-        *PF0 = 0x00; *PF1 = 0x44; *PF2 = 0x88;
+        *PF0 = 0x00; *GRP1 = ms_grp1ptr[Y]; *GRP0 = ms_grp0ptr[Y++]; *PF1 = 0x44; *PF2 = 0x88;
         strobe(WSYNC); // Line 6
-        *PF1 = 0xe4, *PF2 = 0x9c;
+        *GRP1 = ms_grp1ptr[Y]; *GRP0 = ms_grp0ptr[Y++]; *PF1 = 0xe4, *PF2 = 0x9c;
         strobe(WSYNC); // Line 7
+        *GRP1 = ms_grp1ptr[Y]; *GRP0 = ms_grp0ptr[Y++];
         strobe(WSYNC); // Line 8
-        *PF0 = 0x80; *PF1 = 0xf4; *PF2 = 0xbe;
+        *PF0 = 0x80; *GRP1 = ms_grp1ptr[Y]; *GRP0 = ms_grp0ptr[Y++]; *PF1 = 0xf4; *PF2 = 0xbe;
         strobe(WSYNC); // Line 10 
+        *GRP1 = ms_grp1ptr[Y]; *GRP0 = ms_grp0ptr[Y++];
         strobe(WSYNC); // Line 9
+        *GRP1 = ms_grp1ptr[Y]; *GRP0 = ms_grp0ptr[Y++];
         strobe(WSYNC); // Line 11
         *ENAM0 = 0; *ENAM1 = 0;
         /*
