@@ -64,7 +64,8 @@ const int dy[24] = {0, 16, 32, 45, 55, 61, 64, 61, 55, 45, 32, 16, 0, -16, -31, 
 
 unsigned int xpos[4], ypos[4], direction[4];
 char speed[4], race_step[4], race_laps[4];
-char steering[4], pstate[4];
+char steering[4], pstate[4], pstate_counter[4];
+char counter;
 #define STATE_READY_SET_GO  0
 #define STATE_FIRST         1
 #define STATE_SECOND        2
@@ -123,13 +124,14 @@ void game_init()
         steering[X] = 0;
         race_step[X] = 0;
         race_laps[X] = -1;
-        pstate[X] = STATE_OUT_OF_GAME;
+        pstate[X] = STATE_READY_SET_GO; //STATE_OUT_OF_GAME; //
+        pstate_counter[X] = 0;
         paddle[X] = 100;
         i = X;
         multisprite_new(6, xpos[X] >> 8, ypos[X] >> 8, 0, player_color[X]);
         X = i;
     } 
-    mini_kernel_6_sprites_init();
+    counter = 0;
 
     strobe(HMCLR);
 }
@@ -140,7 +142,7 @@ inline void car_forward()
     ypos[X] += dy[Y];
 }
 
-#define DEADZONE 16
+#define DEADZONE 32 
 void game_logic(char player)
 {
     signed char psteering;
@@ -155,7 +157,8 @@ void game_logic(char player)
         if (psteering < -DEADZONE) psteering += DEADZONE;
         else psteering = 0;
     }
-    steering[X] = (psteering >> 3) + steering_offset[X] + 9;
+    psteering >>= 1;
+    steering[X] = (psteering >> 2) + steering_offset[X] + 9;
 
     if ((*SWCHA) & paddle_trigger_flag[X]) {
         if (speed[X] >= 5) speed[X] -= 4;
@@ -166,6 +169,9 @@ void game_logic(char player)
             ypos[X] -= dy[Y];
             speed[X] = 0;
         } else if (speed[X] != 255) speed[X]++;
+    }
+    if (ms_sprite_nusiz[X] & MS_COLLISION) {
+        speed[X] = 0; // Collision with playfield
     }
     if (speed[X] != 0) {
         car_forward();
@@ -202,16 +208,20 @@ void game_logic(char player)
     else if ((ypos[X] >> 8) >= 200) { ypos[X] = 199 * 256; speed[X] = 0; }
 
     ms_sprite_model[X] = car_model[Y];
-    if (ms_sprite_nusiz[X] & 0xc0) {
-        speed[X] = 0; // Collision with playfield and/or another player
+    if (ms_sprite_nusiz[X] & MS_PF_COLLISION) {
+        speed[X] = 0; // Collision with playfield
     }
     ms_sprite_nusiz[X] = car_reflect[Y];
     multisprite_move(X, xpos[X] >> 8, (ypos[X] >> 8) + car_offset[Y]);
+
+    if (pstate[X] == STATE_READY_SET_GO) {
+        if ((counter & 1) == 0 && pstate_counter[X] < 126 - 9) pstate_counter[X]++;
+    }
 }
 
 void main()
 {
-    char counter;
+    char o0, o1;
 
 #ifdef DEBUG
     min_timer_vblank = 255;
@@ -236,10 +246,16 @@ void main()
 #ifdef DEBUG
         if (*INTIM < min_timer_vblank) min_timer_vblank = *INTIM;
 #endif
-        mini_kernel_update_3_digits(paddle[0]);
         *PF0 = 255; *PF1 = 255; *PF2 = 255;
         *CTRLPF = 1; // Reflective playfield. Ball size is 1
         *COLUPF = VCS_GREEN; // Grass
+        if (counter & 1) {
+            o0 = pstate_counter[2];
+            o1 = pstate_counter[1];
+        } else {
+            o0 = pstate_counter[3];
+            o1 = pstate_counter[0];
+        }
         multisprite_kernel_prep();
         *HMBL = 0x80; // Set due to early HMOVE
         
@@ -282,7 +298,7 @@ void main()
             X = steering[3];
             *HMM0 = ms_sprite_hm_offscreen[X];            // 7
             Y = ms_sprite_wait_offscreen[X];              // 6 [19/76]
-            csleep(2);
+            csleep(3);
             strobe(RESP0);
             if (Y) do { Y--; } while (Y);       // 3 for X = 0. 1 + X * 5 cycles. 
             strobe(RESM0);                      // 3. Minimum = 26 cycles
@@ -305,7 +321,7 @@ void main()
         strobe(WSYNC); // Line 1
         strobe(HMOVE);
         *PF0 = 0xc0; *PF1 = 0x1c; *PF2 = 0xe3; *NUSIZ0 = 0x20; *NUSIZ1 = 0x20;
-        ms_grp0ptr = state_sprite[X]; ms_grp1ptr = state_sprite[Y]; Y = 0; 
+        ms_grp0ptr = state_sprite[X] | o0; ms_grp1ptr = state_sprite[Y] | o1; Y = 0; 
         strobe(WSYNC); // Line 2
         *PF0 = 0x40; *GRP1 = ms_grp1ptr[Y]; *GRP0 = ms_grp0ptr[Y++];  *PF1 = 0x0c; *PF2 = 0xc1;
         strobe(WSYNC); // Line 3
