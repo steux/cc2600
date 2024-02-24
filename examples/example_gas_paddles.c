@@ -323,7 +323,7 @@ void main()
         *PF0 = 0xc0; *PF1 = 0x1c; *PF2 = 0xe3; *NUSIZ0 = 0x20; *NUSIZ1 = 0x20;
         ms_grp0ptr = state_sprite[X] | o0; ms_grp1ptr = state_sprite[Y] | o1; Y = 0; 
         strobe(WSYNC); // Line 2
-        *PF0 = 0x40; *GRP1 = ms_grp1ptr[Y]; *GRP0 = ms_grp0ptr[Y++];  *PF1 = 0x0c; *PF2 = 0xc1;
+        *PF0 = 0x40; *GRP1 = ms_grp1ptr[Y]; *GRP0 = ms_grp0ptr[Y]; *REFP0 = 0; *REFP1 = 0; *PF1 = 0x0c; *PF2 = 0xc1; Y++;
         strobe(WSYNC); // Line 3
         *GRP1 = ms_grp1ptr[Y]; *GRP0 = ms_grp0ptr[Y++]; multisprite_kernel_post();
         strobe(WSYNC); // Line 4
