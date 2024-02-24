@@ -239,8 +239,9 @@ void main()
         *PF0 = 255; *PF1 = 255; *PF2 = 255;
         *CTRLPF = 1; // Reflective playfield. Ball size is 1
         *COLUPF = VCS_GREEN; // Grass
-
         multisprite_kernel_prep();
+        *HMBL = 0x80; // Set due to early HMOVE
+        
         while (*INTIM); // Wait for end of blank
         *TIM64T = 255;
 
@@ -297,6 +298,7 @@ void main()
         }
         *GRP0 = 0x00; 
         *GRP1 = 0x00;
+        *HMBL = 0x00;
         *ENAM1 = 0x02;
         *ENAM0 = 0x02;
         strobe(WSYNC); // Line 1
