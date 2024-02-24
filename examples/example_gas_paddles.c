@@ -2,7 +2,10 @@
 
 #define MS_OFFSCREEN_BANK bank0
 #define MS_KERNEL_BANK bank1
+// Generated with sprites2600 cars.yaml
 #include "example_gas_paddles_gfx.c"
+// Generated with sprites2600 --raw car2.yaml
+#include "example_gas_paddles_gfx2.c"
 
 #define BLANK 40
 #define OVERSCAN 30 
@@ -62,12 +65,14 @@ const int dy[24] = {0, 16, 32, 45, 55, 61, 64, 61, 55, 45, 32, 16, 0, -16, -31, 
 unsigned int xpos[4], ypos[4], direction[4];
 char speed[4], race_step[4], race_laps[4];
 char steering[4], pstate[4];
-#define STATE_GO          0
-#define STATE_FIRST       1
-#define STATE_SECOND      2
-#define STATE_THIRD       3
-#define STATE_FOURTH      4
-#define STATE_OUT_OF_GAME 5 
+#define STATE_READY_SET_GO  0
+#define STATE_FIRST         1
+#define STATE_SECOND        2
+#define STATE_THIRD         3
+#define STATE_FOURTH        4
+#define STATE_OUT_OF_GAME   5  
+#define STATE_OK            6  
+#define STATE_LAST_LAP      7  
 
 const char car_model[24] = {6, 7, 8, 9, 10, 11, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5}; 
 const char car_offset[24] = {2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2}; 
@@ -76,8 +81,7 @@ const char player_color[4] = {VCS_RED, VCS_BLUE, VCS_LGREEN, VCS_YELLOW };
 const char paddle_trigger_flag[4] = {0x80, 0x40, 0x08, 0x04};
 const char steering_offset[4] = {6, 1, 2, 0};
 
-const char *state_sprite[5] = {0, 0, 0, 0, 0};
-
+const char *state_sprite[8] = {ready_set_go_gfx, first_gfx, second_gfx, third_gfx, fourth_gfx, nok_gfx, ok_gfx, last_lap_gfx};
 #define NB_WAYPOINTS 5
 const char waypoint_x[NB_WAYPOINTS] = {20, 160, 120, 80, 40};
 const char waypoint_y[NB_WAYPOINTS] = {170, 170, 50, 100, 50};
@@ -291,8 +295,8 @@ void main()
             *HMP0 = 0x00;
             X = pstate[3]; Y = pstate[0];
         }
-        *GRP0 = 0xff; 
-        *GRP1 = 0xff;
+        *GRP0 = 0x00; 
+        *GRP1 = 0x00;
         *ENAM1 = 0x02;
         *ENAM0 = 0x02;
         strobe(WSYNC); // Line 1
@@ -319,13 +323,6 @@ void main()
         *GRP1 = ms_grp1ptr[Y]; *GRP0 = ms_grp0ptr[Y++];
         strobe(WSYNC); // Line 11
         *ENAM0 = 0; *ENAM1 = 0;
-        /*
-        *COLUP0 = VCS_WHITE; *COLUP1 = VCS_WHITE;
-        mini_kernel_6_sprites();
-        strobe(WSYNC);
-        *COLUBK = VCS_RED;
-        strobe(WSYNC);
-        */
         *VBLANK = 0x02; // Turn off video. Don't dump to ground 
         *TIM64T = ((OVERSCAN) * 76) / 64 + 2;
         // Do some logic here
