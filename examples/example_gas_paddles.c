@@ -143,18 +143,19 @@ inline void car_forward()
 #define DEADZONE 16
 void game_logic(char player)
 {
-    signed char steering;
+    signed char psteering;
     X = player;
     Y = direction[X] >> 8;
     Y--;
-    steering = paddle[X] - 128;
-    if (steering >= 0) {
-        if (steering >= DEADZONE) steering -= DEADZONE;
-        else steering = 0;
+    psteering = paddle[X] - 128;
+    if (psteering >= 0) {
+        if (psteering >= DEADZONE) psteering -= DEADZONE;
+        else psteering = 0;
     } else {
-        if (steering < -DEADZONE) steering += DEADZONE;
-        else steering = 0;
+        if (psteering < -DEADZONE) psteering += DEADZONE;
+        else psteering = 0;
     }
+    steering[X] = (psteering >> 3) + steering_offset[X] + 9;
 
     if ((*SWCHA) & paddle_trigger_flag[X]) {
         if (speed[X] >= 5) speed[X] -= 4;
@@ -175,17 +176,17 @@ void game_logic(char player)
                 if (speed[X] >= 192) {
                     car_forward();
                 } else {
-                    steering -= (steering >> 2);
+                    psteering -= (psteering >> 2);
                 }
             } else {
-                steering -= (steering >> 1);
+                psteering -= (psteering >> 1);
             }
         } else {
-            signed char s = steering >> 1;
-            steering -= s - (s >> 1);
+            signed char s = psteering >> 1;
+            psteering -= s - (s >> 1);
         }
-    } else steering = 0; 
-    direction[X] += steering;
+    } else psteering = 0; 
+    direction[X] += psteering;
     Y = (direction[X] >> 8);
     if (Y == 0) {
         direction[X] += 24 * 256;
@@ -334,9 +335,6 @@ void main()
         game_logic(2);
         game_logic(3);
         counter++;
-        X = counter & 3;
-        steering[X]++;
-        if (steering[X] == steering_offset[X] + 19 ) steering[X] = steering_offset[X];
     
         while (*INTIM); // Wait for end of overscan
     } while(1);
