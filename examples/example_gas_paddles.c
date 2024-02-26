@@ -81,16 +81,19 @@ const char car_reflect[24] = {0, 0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
 const char player_color[4] = {VCS_RED, VCS_BLUE, VCS_LGREEN, VCS_YELLOW };
 const char paddle_trigger_flag[4] = {0x80, 0x40, 0x08, 0x04};
 const char steering_offset[4] = {6, 1, 2, 0};
+const char ranked[4];
+const char game_state;
+#define GAME_STATE_STARTING 0
+#define GAME_STATE_RUNNING  1
 
 const char *state_sprite[8] = {ready_set_go_gfx, first_gfx, second_gfx, third_gfx, fourth_gfx, nok_gfx, ok_gfx, last_lap_gfx};
-#define NB_WAYPOINTS 5
-const char waypoint_x[NB_WAYPOINTS] = {20, 160, 120, 80, 40};
-const char waypoint_y[NB_WAYPOINTS] = {170, 170, 50, 100, 50};
+#define NB_WAYPOINTS 9
+const char waypoint_xy[NB_WAYPOINTS] = {90, 128, 40 + MS_OFFSET, 108, 90 + MS_OFFSET, 60, 40 + MS_OFFSET, 32, 160 + MS_OFFSET};
 #define WPT_UP      0
 #define WPT_LEFT    1
 #define WPT_DOWN    2
 #define WPT_RIGHT   3
-const char waypoint_dir[NB_WAYPOINTS] = {WPT_RIGHT, WPT_UP, WPT_DOWN, WPT_UP, WPT_DOWN};
+const char waypoint_dir[NB_WAYPOINTS] = {WPT_RIGHT, WPT_RIGHT, WPT_UP, WPT_LEFT, WPT_DOWN, WPT_LEFT, WPT_UP, WPT_LEFT, WPT_DOWN};
 
 #ifdef DEBUG
 char min_timer_vblank, min_timer_overscan;
@@ -124,7 +127,8 @@ void game_init()
         steering[X] = 0;
         race_step[X] = 0;
         race_laps[X] = -1;
-        pstate[X] = STATE_READY_SET_GO; //STATE_OUT_OF_GAME; //
+        ranked[X] = -1;
+        pstate[X] = STATE_OUT_OF_GAME; 
         pstate_counter[X] = 0;
         paddle[X] = 100;
         i = X;
@@ -132,6 +136,7 @@ void game_init()
         X = i;
     } 
     counter = 0;
+    game_state = GAME_STATE_STARTING;
 
     strobe(HMCLR);
 }
