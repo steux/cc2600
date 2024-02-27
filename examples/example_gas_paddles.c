@@ -63,7 +63,7 @@ const int dx[24] = {40, 38, 34, 28, 19, 10, 0, -10, -20, -28, -34, -38, -40, -38
 const int dy[24] = {0, 16, 32, 45, 55, 61, 64, 61, 55, 45, 32, 16, 0, -16, -31, -45, -55, -61, -64, -61, -55, -45, -32, -16};
 
 unsigned int xpos[4], ypos[4], direction[4];
-char speed[4], race_step[4], race_laps[4];
+char speed[4], race_laps[4];
 char steering[4], pstate[4], pstate_counter[4];
 char counter;
 #define STATE_READY_SET_GO  0
@@ -74,6 +74,10 @@ char counter;
 #define STATE_OUT_OF_GAME   5  
 #define STATE_OK            6  
 #define STATE_LAST_LAP      7  
+char ranked[4];
+char game_state;
+#define GAME_STATE_STARTING 0
+#define GAME_STATE_RUNNING  1
 
 const char car_model[24] = {6, 7, 8, 9, 10, 11, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5}; 
 const char car_offset[24] = {2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2}; 
@@ -81,10 +85,6 @@ const char car_reflect[24] = {0, 0, 0, 0, 0, 0, 0, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
 const char player_color[4] = {VCS_RED, VCS_BLUE, VCS_LGREEN, VCS_YELLOW };
 const char paddle_trigger_flag[4] = {0x80, 0x40, 0x08, 0x04};
 const char steering_offset[4] = {6, 1, 2, 0};
-const char ranked[4];
-const char game_state;
-#define GAME_STATE_STARTING 0
-#define GAME_STATE_RUNNING  1
 
 const char *state_sprite[8] = {ready_set_go_gfx, first_gfx, second_gfx, third_gfx, fourth_gfx, nok_gfx, ok_gfx, last_lap_gfx};
 #define NB_WAYPOINTS 9
@@ -125,8 +125,7 @@ void game_init()
         direction[X] = 256 + 128;
         speed[X] = 0;
         steering[X] = 0;
-        race_step[X] = 0;
-        race_laps[X] = -1;
+        race_laps[X] = 0xf0;
         ranked[X] = -1;
         pstate[X] = STATE_OUT_OF_GAME; 
         pstate_counter[X] = 0;
