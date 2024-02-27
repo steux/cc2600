@@ -63,7 +63,7 @@ const int dx[24] = {40, 38, 34, 28, 19, 10, 0, -10, -20, -28, -34, -38, -40, -38
 const int dy[24] = {0, 16, 32, 45, 55, 61, 64, 61, 55, 45, 32, 16, 0, -16, -31, -45, -55, -61, -64, -61, -55, -45, -32, -16};
 
 unsigned int xpos[4], ypos[4], direction[4];
-char speed[4], race_laps[4];
+char speed[4], race_laps[4], race_step[4];
 char steering[4], pstate[4], pstate_counter[4];
 char counter;
 #define STATE_READY_SET_GO  0
@@ -126,6 +126,7 @@ void game_init()
         speed[X] = 0;
         steering[X] = 0;
         race_laps[X] = 0xf0;
+        race_step[X] = 0x00;
         ranked[X] = -1;
         pstate[X] = STATE_OUT_OF_GAME; 
         pstate_counter[X] = 0;
@@ -221,6 +222,47 @@ void game_logic(char player)
     if (pstate[X] == STATE_READY_SET_GO) {
         if ((counter & 1) == 0 && pstate_counter[X] < 126 - 9) pstate_counter[X]++;
     }
+
+/*
+#define NB_WAYPOINTS 9
+const char waypoint_xy[NB_WAYPOINTS] = {90, 128, 40 + MS_OFFSET, 108, 90 + MS_OFFSET, 60, 40 + MS_OFFSET, 32, 160 + MS_OFFSET};
+#define WPT_UP      0
+#define WPT_LEFT    1
+#define WPT_DOWN    2
+#define WPT_RIGHT   3
+const char waypoint_dir[NB_WAYPOINTS] = {WPT_RIGHT, WPT_RIGHT, WPT_UP, WPT_LEFT, WPT_DOWN, WPT_LEFT, WPT_UP, WPT_LEFT, WPT_DOWN};
+*/
+#define tmp psteering
+    // Compute the advance on the track
+    tmp = waypoint_dir[Y = race_laps[X] & 0x0f];
+    if (tmp == WPT_RIGHT) {
+        race_step[X] = (xpos[X] >> 8) - waypoint_xy[Y];
+    } else if (tmp == WPT_UP) {
+        race_step[X] = (ypos[X] >> 8) - waypoint_xy[Y];
+    } else if (tmp == WPT_DOWN) {
+        race_step[X] = waypoint_xy[Y] - (ypos[X] >> 8);
+    } else {
+        race_step[X] = waypoint_xy[Y] - (ypos[X] >> 8);
+    }
+    if (race_step[X] < 0) {
+        race_laps[X]++;
+        if ((race_laps[X] & 0x0f) == NB_WAYPOINTS) {
+            race_laps[X] = race_laps[X] & 0x0f;
+        } else if ((race_laps[X] & 0x0f) == 1) {
+            race_laps[X] = (race_laps[X] & 0xf0) + 0x11;
+        }
+        tmp = waypoint_dir[Y = race_laps[X] & 0x0f];
+        if (tmp == WPT_RIGHT) {
+            race_step[X] = (xpos[X] >> 8) - waypoint_xy[Y];
+        } else if (tmp == WPT_UP) {
+            race_step[X] = (ypos[X] >> 8) - waypoint_xy[Y];
+        } else if (tmp == WPT_DOWN) {
+            race_step[X] = waypoint_xy[Y] - (ypos[X] >> 8);
+        } else {
+            race_step[X] = waypoint_xy[Y] - (ypos[X] >> 8);
+        }
+    }
+    // TODO: Compute rank
 }
 
 void main()
