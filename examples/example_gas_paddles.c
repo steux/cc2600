@@ -223,17 +223,8 @@ void game_logic(char player)
         if ((counter & 1) == 0 && pstate_counter[X] < 126 - 9) pstate_counter[X]++;
     }
 
-/*
-#define NB_WAYPOINTS 9
-const char waypoint_xy[NB_WAYPOINTS] = {90, 128, 40 + MS_OFFSET, 108, 90 + MS_OFFSET, 60, 40 + MS_OFFSET, 32, 160 + MS_OFFSET};
-#define WPT_UP      0
-#define WPT_LEFT    1
-#define WPT_DOWN    2
-#define WPT_RIGHT   3
-const char waypoint_dir[NB_WAYPOINTS] = {WPT_RIGHT, WPT_RIGHT, WPT_UP, WPT_LEFT, WPT_DOWN, WPT_LEFT, WPT_UP, WPT_LEFT, WPT_DOWN};
-*/
 #define tmp psteering
-    // Compute the advance on the track
+    // Compute progress on the track
     tmp = waypoint_dir[Y = race_laps[X] & 0x0f];
     if (tmp == WPT_RIGHT) {
         race_step[X] = (xpos[X] >> 8) - waypoint_xy[Y];
@@ -262,7 +253,27 @@ const char waypoint_dir[NB_WAYPOINTS] = {WPT_RIGHT, WPT_RIGHT, WPT_UP, WPT_LEFT,
             race_step[X] = waypoint_xy[Y] - (ypos[X] >> 8);
         }
     }
-    // TODO: Compute rank
+    // Update race ranking
+    Y = pstate[X];
+    if (Y == STATE_READY_SET_GO) {
+        for (Y = 0; Y != 4; Y++) {
+            if (ranked[Y] == -1) {
+                ranked[Y] = X; 
+                pstate[X] = Y;
+                break;
+            }
+        }
+    } else if (Y >= STATE_SECOND) {
+        Y = ranked[--Y]; // Y is the car that is potentially overtaken by car X
+        if (race_laps[Y] < race_laps[X] || (race_laps[Y] == race_laps[X] && race_step[Y] < race_step[X])) {
+            tmp = Y;
+            Y = pstate[X]; // pstate[X] is the former position of X
+            ranked[Y] = tmp; // The overtaken car is ranked there
+            ranked[--Y] = X; // We put car X at the previous position        
+            pstate[X]--; // And we update the position of each X and Y cars
+            pstate[Y = tmp]++;
+        }
+    }
 }
 
 void main()
