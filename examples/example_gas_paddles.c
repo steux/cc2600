@@ -101,7 +101,7 @@ char min_timer_vblank, min_timer_overscan;
 
 void game_init() 
 {
-#define YSTART 180
+#define YSTART 32 //180
     const char xinit[4] = {80, 80, 68, 68};
     const char yinit[4] = {YSTART, YSTART + 12, YSTART, YSTART + 12};
     
