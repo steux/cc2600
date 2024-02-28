@@ -298,8 +298,8 @@ void main()
         // Blank
         *TIM64T = ((BLANK - 3) * 76) / 64 - 3;
         // Do some logic here
-        game_logic(0);
-        game_logic(1);
+        if (pstate[0] != STATE_OUT_OF_GAME) game_logic(0);
+        if (pstate[1] != STATE_OUT_OF_GAME) game_logic(1);
 #ifdef DEBUG
         if (*INTIM < min_timer_vblank) min_timer_vblank = *INTIM;
 #endif
@@ -405,8 +405,8 @@ void main()
 #ifdef DEBUG
         if (*INTIM < min_timer_overscan) min_timer_overscan = *INTIM;
 #endif
-        game_logic(2);
-        game_logic(3);
+        if (pstate[2] != STATE_OUT_OF_GAME) game_logic(2);
+        if (pstate[3] != STATE_OUT_OF_GAME) game_logic(3);
         counter++;
     
         while (*INTIM); // Wait for end of overscan
