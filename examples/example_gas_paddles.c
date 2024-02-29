@@ -76,8 +76,9 @@ char counter;
 #define STATE_LAST_LAP      7  
 char ranked[4];
 char game_state;
-#define GAME_STATE_STARTING 0
-#define GAME_STATE_RUNNING  1
+#define GAME_STATE_STARTING     0
+#define GAME_STATE_READY_SET_GO 1
+#define GAME_STATE_RUNNING      2
 
 const char car_model[24] = {6, 7, 8, 9, 10, 11, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5}; 
 const char car_offset[24] = {2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 1, 2}; 
@@ -99,12 +100,11 @@ const char waypoint_dir[NB_WAYPOINTS] = {WPT_RIGHT, WPT_RIGHT, WPT_UP, WPT_LEFT,
 char min_timer_vblank, min_timer_overscan;
 #endif
 
+const char xinit[4] = {80, 80, 68, 68};
+const char yinit[4] = {0, 12, 0, 12};
+
 void game_init() 
 {
-#define YSTART 32 //180
-    const char xinit[4] = {80, 80, 68, 68};
-    const char yinit[4] = {YSTART, YSTART + 12, YSTART, YSTART + 12};
-    
     // Initialize ball (start line)
     X = 90;
     strobe(WSYNC);                  
@@ -118,10 +118,11 @@ void game_init()
     strobe(WSYNC);                  // 3
     strobe(HMOVE);
 
-    char i;
+    char i, y;
     for (X = 0; X < 4; X++) {
         xpos[X] = xinit[X] << 8;
-        ypos[X] = yinit[X] << 8;
+        y = yinit[X] + 32;
+        ypos[X] = y << 8;
         direction[X] = 256 + 128;
         speed[X] = 0;
         steering[X] = 0;
@@ -132,13 +133,52 @@ void game_init()
         pstate_counter[X] = 0;
         paddle[X] = 100;
         i = X;
-        multisprite_new(6, xpos[X] >> 8, ypos[X] >> 8, 0, player_color[X]);
+        multisprite_new(6, xpos[X] >> 8, y, 0, player_color[X]);
         X = i;
     } 
     counter = 0;
     game_state = GAME_STATE_STARTING;
 
     strobe(HMCLR);
+}
+
+void game_prepare()
+{
+    char i, y;
+    for (i = 0; i != 4; i++) {
+        X = i;
+        if (!((*SWCHA) & paddle_trigger_flag[X])) {
+            // Car X is entering game ?
+            if (pstate[X] == STATE_OUT_OF_GAME) {
+                pstate[X] = STATE_OK;
+                y = yinit[X] + 180;
+                ypos[X] = y << 8;
+                multisprite_move(X, -1, y);
+            }
+        }
+    }
+    // Reset to start the game
+    if (!((*SWCHB) & 1)) {
+        i = 0;
+        for (X = 0; X != 4; X++) {
+           if (pstate[X] == STATE_OK) i++;
+        }
+        if (i >= 2) {
+            game_state = GAME_STATE_READY_SET_GO;
+        }
+    }
+}
+
+void game_ready()
+{
+    for (X = 0; X != 4; X++) {
+        if (pstate[X] == STATE_READY_SET_GO) {
+            if ((counter & 1) == 0) {
+                if (pstate_counter[X] < 126 - 9) pstate_counter[X]++;
+                else game_state = GAME_STATE_RUNNING;
+            }
+        }
+    }
 }
 
 inline void car_forward()
@@ -152,8 +192,6 @@ void game_logic(char player)
 {
     signed char psteering;
     X = player;
-    Y = direction[X] >> 8;
-    Y--;
     psteering = paddle[X] - 128;
     if (psteering >= 0) {
         if (psteering >= DEADZONE) psteering -= DEADZONE;
@@ -165,83 +203,66 @@ void game_logic(char player)
     psteering >>= 1;
     steering[X] = (psteering >> 2) + steering_offset[X] + 9;
 
-    if ((*SWCHA) & paddle_trigger_flag[X]) {
-        if (speed[X] >= 5) speed[X] -= 4;
-        else speed[X] = 0;
-    } else {
-        if (paddle[X] > 240) {
-            xpos[X] -= dx[Y];
-            ypos[X] -= dy[Y];
-            speed[X] = 0;
-        } else if (speed[X] != 255) speed[X]++;
-    }
-    if (ms_sprite_nusiz[X] & MS_COLLISION) {
-        speed[X] = 0; // Collision with playfield
-    }
-    if (speed[X] != 0) {
-        car_forward();
-        if (speed[X] >= 64) {
+    if (game_state == GAME_STATE_RUNNING && pstate[X] != STATE_OUT_OF_GAME) {
+        Y = direction[X] >> 8;
+        Y--;
+    
+        if ((*SWCHA) & paddle_trigger_flag[X]) {
+            if (speed[X] >= 5) speed[X] -= 4;
+            else speed[X] = 0;
+        } else {
+            if (paddle[X] > 240) {
+                xpos[X] -= dx[Y];
+                ypos[X] -= dy[Y];
+                speed[X] = 0;
+            } else if (speed[X] != 255) speed[X]++;
+        }
+        if (ms_sprite_nusiz[X] & MS_COLLISION) {
+            speed[X] = 0; // Collision with playfield
+        }
+        if (speed[X] != 0) {
             car_forward();
-            if (speed[X] >= 128) {
+            if (speed[X] >= 64) {
                 car_forward();
-                if (speed[X] >= 192) {
+                if (speed[X] >= 128) {
                     car_forward();
+                    if (speed[X] >= 192) {
+                        car_forward();
+                    } else {
+                        psteering -= (psteering >> 2);
+                    }
                 } else {
-                    psteering -= (psteering >> 2);
+                    psteering -= (psteering >> 1);
                 }
             } else {
-                psteering -= (psteering >> 1);
+                signed char s = psteering >> 1;
+                psteering -= s - (s >> 1);
             }
-        } else {
-            signed char s = psteering >> 1;
-            psteering -= s - (s >> 1);
+        } else psteering = 0; 
+        direction[X] += psteering;
+        Y = (direction[X] >> 8);
+        if (Y == 0) {
+            direction[X] += 24 * 256;
+            Y = 24;
+        } else if (Y == 25) {
+            direction[X] -= 24 * 256;
+            Y = 1;
         }
-    } else psteering = 0; 
-    direction[X] += psteering;
-    Y = (direction[X] >> 8);
-    if (Y == 0) {
-        direction[X] += 24 * 256;
-        Y = 24;
-    } else if (Y == 25) {
-        direction[X] -= 24 * 256;
-        Y = 1;
-    }
-    Y--;
-    if ((xpos[X] >> 8) < 2) { xpos[X] = 2 * 256; speed[X] = 0; }
-    else if ((xpos[X] >> 8) >= 152) { xpos[X] = 151 * 256; speed[X] = 0; }
-    if ((ypos[X] >> 8) < 22) { ypos[X] = 22 * 256; speed[X] = 0; }
-    else if ((ypos[X] >> 8) >= 200) { ypos[X] = 199 * 256; speed[X] = 0; }
+        Y--;
+        if ((xpos[X] >> 8) < 2) { xpos[X] = 2 * 256; speed[X] = 0; }
+        else if ((xpos[X] >> 8) >= 152) { xpos[X] = 151 * 256; speed[X] = 0; }
+        if ((ypos[X] >> 8) < 22) { ypos[X] = 22 * 256; speed[X] = 0; }
+        else if ((ypos[X] >> 8) >= 200) { ypos[X] = 199 * 256; speed[X] = 0; }
 
-    ms_sprite_model[X] = car_model[Y];
-    if (ms_sprite_nusiz[X] & MS_PF_COLLISION) {
-        speed[X] = 0; // Collision with playfield
-    }
-    ms_sprite_nusiz[X] = car_reflect[Y];
-    multisprite_move(X, xpos[X] >> 8, (ypos[X] >> 8) + car_offset[Y]);
-
-    if (pstate[X] == STATE_READY_SET_GO) {
-        if ((counter & 1) == 0 && pstate_counter[X] < 126 - 9) pstate_counter[X]++;
-    }
+        ms_sprite_model[X] = car_model[Y];
+        if (ms_sprite_nusiz[X] & MS_PF_COLLISION) {
+            speed[X] = 0; // Collision with playfield
+        }
+        ms_sprite_nusiz[X] = car_reflect[Y];
+        multisprite_move(X, xpos[X] >> 8, (ypos[X] >> 8) + car_offset[Y]);
 
 #define tmp psteering
-    // Compute progress on the track
-    tmp = waypoint_dir[Y = race_laps[X] & 0x0f];
-    if (tmp == WPT_RIGHT) {
-        race_step[X] = (xpos[X] >> 8) - waypoint_xy[Y];
-    } else if (tmp == WPT_UP) {
-        race_step[X] = (ypos[X] >> 8) - waypoint_xy[Y];
-    } else if (tmp == WPT_DOWN) {
-        race_step[X] = waypoint_xy[Y] - (ypos[X] >> 8);
-    } else {
-        race_step[X] = waypoint_xy[Y] - (ypos[X] >> 8);
-    }
-    if (race_step[X] < 0) {
-        race_laps[X]++;
-        if ((race_laps[X] & 0x0f) == NB_WAYPOINTS) {
-            race_laps[X] = race_laps[X] & 0x0f;
-        } else if ((race_laps[X] & 0x0f) == 1) {
-            race_laps[X] = (race_laps[X] & 0xf0) + 0x11;
-        }
+        // Compute progress on the track
         tmp = waypoint_dir[Y = race_laps[X] & 0x0f];
         if (tmp == WPT_RIGHT) {
             race_step[X] = (xpos[X] >> 8) - waypoint_xy[Y];
@@ -252,26 +273,44 @@ void game_logic(char player)
         } else {
             race_step[X] = waypoint_xy[Y] - (ypos[X] >> 8);
         }
-    }
-    // Update race ranking
-    Y = pstate[X];
-    if (Y == STATE_READY_SET_GO) {
-        for (Y = 0; Y != 4; Y++) {
-            if (ranked[Y] == -1) {
-                ranked[Y] = X; 
-                pstate[X] = Y;
-                break;
+        if (race_step[X] < 0) {
+            race_laps[X]++;
+            if ((race_laps[X] & 0x0f) == NB_WAYPOINTS) {
+                race_laps[X] = race_laps[X] & 0x0f;
+            } else if ((race_laps[X] & 0x0f) == 1) {
+                race_laps[X] = (race_laps[X] & 0xf0) + 0x11;
+            }
+            tmp = waypoint_dir[Y = race_laps[X] & 0x0f];
+            if (tmp == WPT_RIGHT) {
+                race_step[X] = (xpos[X] >> 8) - waypoint_xy[Y];
+            } else if (tmp == WPT_UP) {
+                race_step[X] = (ypos[X] >> 8) - waypoint_xy[Y];
+            } else if (tmp == WPT_DOWN) {
+                race_step[X] = waypoint_xy[Y] - (ypos[X] >> 8);
+            } else {
+                race_step[X] = waypoint_xy[Y] - (ypos[X] >> 8);
             }
         }
-    } else if (Y >= STATE_SECOND) {
-        Y = ranked[--Y]; // Y is the car that is potentially overtaken by car X
-        if (race_laps[Y] < race_laps[X] || (race_laps[Y] == race_laps[X] && race_step[Y] < race_step[X])) {
-            tmp = Y;
-            Y = pstate[X]; // pstate[X] is the former position of X
-            ranked[Y] = tmp; // The overtaken car is ranked there
-            ranked[--Y] = X; // We put car X at the previous position        
-            pstate[X]--; // And we update the position of each X and Y cars
-            pstate[Y = tmp]++;
+        // Update race ranking
+        Y = pstate[X];
+        if (Y == STATE_READY_SET_GO) {
+            for (Y = 0; Y != 4; Y++) {
+                if (ranked[Y] == -1) {
+                    ranked[Y] = X; 
+                    pstate[X] = Y;
+                    break;
+                }
+            }
+        } else if (Y >= STATE_SECOND) {
+            Y = ranked[--Y]; // Y is the car that is potentially overtaken by car X
+            if (race_laps[Y] < race_laps[X] || (race_laps[Y] == race_laps[X] && race_step[Y] < race_step[X])) {
+                tmp = Y;
+                Y = pstate[X]; // pstate[X] is the former position of X
+                ranked[Y] = tmp; // The overtaken car is ranked there
+                ranked[--Y] = X; // We put car X at the previous position        
+                pstate[X]--; // And we update the position of each X and Y cars
+                pstate[Y = tmp]++;
+            }
         }
     }
 }
@@ -285,6 +324,7 @@ void main()
     min_timer_overscan = 255;
 #endif
     multisprite_init(playfield);
+start:
     game_init();
 
     do {
@@ -298,8 +338,15 @@ void main()
         // Blank
         *TIM64T = ((BLANK - 3) * 76) / 64 - 3;
         // Do some logic here
-        if (pstate[0] != STATE_OUT_OF_GAME) game_logic(0);
-        if (pstate[1] != STATE_OUT_OF_GAME) game_logic(1);
+        game_logic(0);
+        game_logic(1);
+        if (game_state == GAME_STATE_RUNNING) {
+            if (!((*SWCHB) & 1)) goto start;
+        } else if (game_state == GAME_STATE_STARTING) {
+            game_prepare();
+        } else {
+            game_ready();
+        }
 #ifdef DEBUG
         if (*INTIM < min_timer_vblank) min_timer_vblank = *INTIM;
 #endif
@@ -405,8 +452,8 @@ void main()
 #ifdef DEBUG
         if (*INTIM < min_timer_overscan) min_timer_overscan = *INTIM;
 #endif
-        if (pstate[2] != STATE_OUT_OF_GAME) game_logic(2);
-        if (pstate[3] != STATE_OUT_OF_GAME) game_logic(3);
+        game_logic(2);
+        game_logic(3);
         counter++;
     
         while (*INTIM); // Wait for end of overscan
