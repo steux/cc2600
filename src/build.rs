@@ -292,14 +292,14 @@ pub fn build_cartridge(
         }
     }
 
-    for (level, l) in function_levels.iter().enumerate() {
+    for (level, l) in function_levels.into_iter().enumerate() {
         let mut maxbsize = 0;
         let mut bsize = 0;
         let mut ft = true;
         for fx in l {
             if let Some(f) = compiler_state.functions.get(&fx) {
                 if gstate.functions_actually_in_use.get(&fx).is_some()
-                    && f.local_variables.len() != 0
+                    && !f.local_variables.is_empty()
                 {
                     if ft {
                         gstate.write(&format!("\nLOCAL_VARIABLES_{}\n\n", level))?;
@@ -648,8 +648,8 @@ Powerup
         }
 
         // Generate included assembler
-        for (i, asm) in (&compiler_state.included_assembler).iter().enumerate() {
-            let basm = if let Some(b) = asm.3 { b as u32 } else { 0 };
+        for (i, asm) in compiler_state.included_assembler.iter().enumerate() {
+            let basm = if let Some(b) = asm.3 { b } else { 0 };
             debug!("assembler: {} {} {}", i, bank, basm);
             if bank == basm {
                 gstate.write(&asm.0)?;
@@ -860,7 +860,7 @@ Powerup
                 ))?;
             }
         } else {
-            let end_of_memory = if banked_functions.len() != 0 {
+            let end_of_memory = if !banked_functions.is_empty() {
                 0x1fef - banked_functions.len() * 10
             } else if compiler_state.variables.get("PLUSROM_API").is_some() {
                 0x1fef
@@ -875,7 +875,7 @@ Powerup
             ))?;
 
             if bank == 0 {
-                if banked_functions.len() > 0 {
+                if !banked_functions.is_empty() {
                     // Generate bankswitching functions code
                     banked_function_address = 0x0FEF - banked_functions.len() * 10;
                     debug!("Banked function address={:04x}", banked_function_address);

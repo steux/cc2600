@@ -1,3 +1,6 @@
+v0.4.5 (03/01/2024) :
+    - Applied Clippy on the code 
+
 v0.4.4 (02/11/2024) :
     - Corrected a bug with constant addresses in array of pointers
 
