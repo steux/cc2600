@@ -1,6 +1,6 @@
 /*
     cc2600 - a subset of C compiler for the Atari 2600
-    Copyright (C) 2023 Bruno STEUX 
+    Copyright (C) 2023-2024 Bruno STEUX
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,13 +18,13 @@
     Contact info: bruno.steux@gmail.com
 */
 
-use cc6502::Args;
 use cc6502::compile::compile;
+use cc6502::Args;
 
-use std::path::Path;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
+use std::path::Path;
 
 use clap::Parser;
 
@@ -37,10 +37,13 @@ fn main() -> Result<(), std::io::Error> {
     let args = Args::parse();
     if args.version {
         const VERSION: &str = env!("CARGO_PKG_VERSION");
-        println!("cc2600 v{} - a subset of C compiler targetting the Atari 2600", VERSION);
-        std::process::exit(0); 
+        println!(
+            "cc2600 v{} - a subset of C compiler targetting the Atari 2600",
+            VERSION
+        );
+        std::process::exit(0);
     }
-  
+
     let prefix = Path::new(&args.output).file_stem().unwrap();
     let mut assembler_filename = String::from(prefix.to_str().unwrap());
     assembler_filename.push_str(".a");
@@ -51,20 +54,20 @@ fn main() -> Result<(), std::io::Error> {
         assembler_filename.clone()
     };
 
-    let mut writer = File::create(&filename)?;
+    let mut writer = File::create(filename)?;
 
     if args.input == "stdin" {
         let reader = io::stdin().lock();
         if let Err(e) = compile(reader, &mut writer, &args, build_cartridge) {
             eprintln!("{}", e);
-            std::process::exit(1) 
+            std::process::exit(1)
         }
     } else {
         let f = File::open(&args.input)?;
         let reader = BufReader::new(f);
-        if let Err(e)  = compile(reader, &mut writer, &args, build_cartridge) {
+        if let Err(e) = compile(reader, &mut writer, &args, build_cartridge) {
             eprintln!("{}", e);
-            std::process::exit(1) 
+            std::process::exit(1)
         }
     }
 
@@ -92,17 +95,14 @@ fn main() -> Result<(), std::io::Error> {
                     .arg(&format!("-o{}", &args.output))
                     .output()
             };
-            match command {
-                Ok(x) => {
-                    output = Some(x);
-                    break;
-                },
-                Err(_) => ()
+            if let Ok(x) = command {
+                output = Some(x);
+                break;
             }
         }
         if output.is_none() {
             eprintln!("Can't find DASM. Exiting.");
-            std::process::exit(1) 
+            std::process::exit(1)
         }
 
         let output = output.unwrap();
@@ -123,8 +123,8 @@ fn main() -> Result<(), std::io::Error> {
                 eprintln!("Out of memory: {}", &caps[0]);
             } else {
                 eprintln!("{}", err);
-            } 
-            std::process::exit(1) 
+            }
+            std::process::exit(1)
         }
     } else {
         Ok(())
