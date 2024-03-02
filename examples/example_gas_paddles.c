@@ -105,6 +105,8 @@ const char yinit[4] = {0, 12, 0, 12};
 
 void game_init() 
 {
+    multisprite_clear();
+
     // Initialize ball (start line)
     X = 90;
     strobe(WSYNC);                  
@@ -153,7 +155,7 @@ void game_prepare()
                 pstate[X] = STATE_OK;
                 y = yinit[X] + 180;
                 ypos[X] = y << 8;
-                multisprite_move(X, -1, y);
+                multisprite_move(X, -1, y + 2);
             }
         }
     }
@@ -262,9 +264,11 @@ void game_logic(char player)
             speed[X] = 0; // Collision with playfield
         }
         ms_sprite_nusiz[X] = car_reflect[Y];
-        multisprite_move(X, xpos[X] >> 8, (ypos[X] >> 8) + car_offset[Y]);
-
 #define tmp psteering
+        tmp = X;
+        multisprite_move(X, xpos[X] >> 8, (ypos[X] >> 8) + car_offset[Y]);
+        X = tmp;
+
         // Compute progress on the track
         tmp = waypoint_dir[Y = race_laps[X] & 0x0f];
         if (tmp == WPT_RIGHT) {
@@ -276,7 +280,7 @@ void game_logic(char player)
         } else {
             race_step[X] = waypoint_xy[Y] - (ypos[X] >> 8);
         }
-        if (race_step[X] < 0) {
+        if (race_step[X] >= 0) {
             race_laps[X]++;
             if ((race_laps[X] & 0x0f) == NB_WAYPOINTS) {
                 race_laps[X] = race_laps[X] & 0x0f;
@@ -295,24 +299,30 @@ void game_logic(char player)
             }
         }
         // Update race ranking
-        Y = pstate[X];
-        if (Y == STATE_READY_SET_GO) {
-            for (Y = 0; Y != 4; Y++) {
-                if (ranked[Y] == -1) {
-                    ranked[Y] = X; 
-                    pstate[X] = Y;
-                    break;
+        if ((race_laps[X] & 0xf0) != 0xf0) {
+            Y = pstate[X];
+            if (Y == STATE_READY_SET_GO) {
+                for (Y = 0; Y != 4; Y++) {
+                    if (ranked[Y] == -1) {
+                        ranked[Y] = X; 
+                        pstate[X] = ++Y;
+                        pstate_counter[X] = 0;
+                        break;
+                    }
                 }
-            }
-        } else if (Y >= STATE_SECOND) {
-            Y = ranked[--Y]; // Y is the car that is potentially overtaken by car X
-            if (race_laps[Y] < race_laps[X] || (race_laps[Y] == race_laps[X] && race_step[Y] < race_step[X])) {
-                tmp = Y;
-                Y = pstate[X]; // pstate[X] is the former position of X
-                ranked[Y] = tmp; // The overtaken car is ranked there
-                ranked[--Y] = X; // We put car X at the previous position        
-                pstate[X]--; // And we update the position of each X and Y cars
-                pstate[Y = tmp]++;
+            } else {
+                if (Y >= STATE_SECOND) {
+                    --Y;
+                    Y = ranked[--Y]; // Y is the car that is potentially overtaken by car X
+                    if (race_laps[Y] < race_laps[X] || (race_laps[Y] == race_laps[X] && race_step[Y] < race_step[X])) {
+                        tmp = Y;
+                        Y = pstate[X]; // pstate[X] is the former position of X
+                        ranked[--Y] = tmp; // The overtaken car is ranked there
+                        ranked[--Y] = X; // We put car X at the previous position        
+                        pstate[X]--; // And we update the position of each X and Y cars
+                        pstate[Y = tmp]++;
+                    }
+                } 
             }
         }
     }
