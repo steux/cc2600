@@ -165,6 +165,9 @@ void game_prepare()
         }
         if (i >= 2) {
             game_state = GAME_STATE_READY_SET_GO;
+            for (X = 0; X != 4; X++) {
+                if (pstate[X] == STATE_OK) pstate[X] = STATE_READY_SET_GO;
+            }
         }
     }
 }
